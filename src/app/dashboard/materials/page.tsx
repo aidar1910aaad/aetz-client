@@ -1,74 +1,59 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
-import Link from "next/link";
-
-
-type Material = {
-  id: number;
-  name: string;
-  category: string;
-  unit: string;
-  date: string;
-  price: number;
-};
-
-const mockMaterials: Material[] = [
-  {
-    id: 1,
-    name: "Кабель ВВГ 3x2.5",
-    category: "Кабель",
-    unit: "м",
-    date: "2024-04-15",
-    price: 350,
-  },
-  {
-    id: 2,
-    name: "Трансформатор 100кВА",
-    category: "Трансформатор",
-    unit: "шт",
-    date: "2024-04-10",
-    price: 240000,
-  },
-  {
-    id: 3,
-    name: "Шкаф автоматики",
-    category: "Автоматика",
-    unit: "шт",
-    date: "2024-04-12",
-    price: 150000,
-  },
-];
+import { useState } from 'react';
+import Link from 'next/link';
+import { Pencil, Trash2 } from 'lucide-react';
+import { useMaterials } from '@/hooks/useMaterials';
+import { Material } from '@/api/material';
+import PageLoader from '@/shared/loader/PageLoader';
+import CreateMaterialModal from '@/shared/modals/materials/CreateMaterialModal';
+import EditMaterialModal from '@/shared/modals/materials/EditMaterialModal';
 
 export default function AllMaterialsPage() {
-  const [materials, setMaterials] = useState<Material[]>(mockMaterials);
-  const [selectedCategory, setSelectedCategory] = useState("Все");
+  const {
+    filtered,
+    categories,
+    selectedCategory,
+    handleCreate,
+    setSelectedCategory,
+    loading,
+    handleDelete,
+    allCategories,
+    handleUpdate,
+  } = useMaterials();
 
-  const categories = ["Все", ...new Set(materials.map((m) => m.category))];
-  const filtered = selectedCategory === "Все"
-    ? materials
-    : materials.filter((m) => m.category === selectedCategory);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
+
+  if (loading) return <PageLoader />;
 
   return (
-    <div className="p-6 h-[calc(100vh-124x)] flex flex-col">
+    <div className="p-6 h-[calc(100vh-124px)] flex flex-col">
       <div className="flex justify-between items-center mb-6">
-  <h1 className="text-2xl font-semibold">Материалы</h1>
+        <h1 className="text-2xl font-semibold">Материалы</h1>
 
-  <div className="flex items-center gap-3 ml-auto">
-    <Link
-      href="/dashboard/materials/categories"
-      className="bg-[#3A55DF] text-white px-4 py-2 rounded hover:bg-blue-700 transition text-sm"
-    >
-      Перейти к категориям
-    </Link>
-    <button className="bg-[#3A55DF] text-white px-4 py-2 rounded hover:bg-blue-700 transition">
-      Создать материал
-    </button>
-  </div>
-</div>
+        <div className="flex items-center gap-3 ml-auto">
+          <Link
+            href="/dashboard/materials/categories"
+            className="bg-[#3A55DF] text-white px-4 py-2 rounded hover:bg-blue-700 transition text-sm"
+          >
+            Перейти к категориям
+          </Link>
+          <button
+            onClick={() => setModalOpen(true)}
+            className="bg-[#3A55DF] text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+          >
+            Создать материал
+          </button>
 
-
+          {modalOpen && (
+            <CreateMaterialModal
+              onClose={() => setModalOpen(false)}
+              onCreate={handleCreate} // 👈 передаём handleCreate напрямую
+            />
+          )}
+        </div>
+      </div>
 
       {/* Фильтр по категории */}
       <div className="mb-4">
@@ -79,7 +64,7 @@ export default function AllMaterialsPage() {
         >
           {categories.map((cat) => (
             <option key={cat} value={cat}>
-              {cat}
+              {cat === 'Все' ? 'Все категории' : `Категория ${cat}`}
             </option>
           ))}
         </select>
@@ -93,35 +78,59 @@ export default function AllMaterialsPage() {
               <th className="text-left px-6 py-3">Название</th>
               <th className="text-left px-6 py-3">Категория</th>
               <th className="text-left px-6 py-3">Ед. изм.</th>
-              <th className="text-left px-6 py-3">Дата</th>
               <th className="text-left px-6 py-3">Цена</th>
               <th className="text-left px-6 py-3">Изменить / Удалить</th>
-
             </tr>
           </thead>
           <tbody>
             {filtered.map((m) => (
-              <tr key={m.id} className="border-gray-200 border-[1px]">
-                <td className="px-6 py-3">{m.name}</td>
-                <td className="px-6 py-3">{m.category}</td>
-                <td className="px-6 py-3">{m.unit}</td>
-                <td className="px-6 py-3">{m.date}</td>
-                <td className="px-6 py-3">{m.price.toLocaleString()} ₸</td>
+              <tr key={m.id} className="border-b border-gray-200">
                 <td className="px-6 py-3">
-  <div className="flex gap-4 ml-[50px]">
-    <button className="text-blue-600 hover:text-blue-800 transition">
-      <Pencil size={18} />
-    </button>
-    <button className="text-red-600 hover:text-red-800 transition">
-      <Trash2 size={18} />
-    </button>
-  </div>
-</td>
+                  <Link
+                    href={`/dashboard/materials/${m.id}/history`}
+                    className="inline-block text-[#3A55DF] font-medium px-2 py-1 rounded-md transition-all duration-300 ease-in-out hover:bg-[#3A55DF]/10 hover:text-[#2e45bb]"
+                  >
+                    {m.name}
+                  </Link>
+                </td>
 
+                <td className="px-6 py-3">{m.category?.name || '—'}</td>
+                <td className="px-6 py-3">{m.unit}</td>
+                <td className="px-6 py-3">
+                  {typeof m.price === 'string'
+                    ? parseFloat(m.price).toLocaleString()
+                    : m.price.toLocaleString()}{' '}
+                  ₸
+                </td>
+                <td className="px-6 py-3">
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setEditingMaterial(m)}
+                      className="text-blue-600 hover:text-blue-800 transition"
+                    >
+                      <Pencil size={18} />
+                    </button>
+
+                    <button
+                      className="text-red-600 hover:text-red-800 transition"
+                      onClick={() => handleDelete(m.id)}
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+        {editingMaterial && (
+          <EditMaterialModal
+            material={editingMaterial}
+            categories={allCategories}
+            onClose={() => setEditingMaterial(null)}
+            onUpdate={handleUpdate}
+          />
+        )}
       </div>
     </div>
   );

@@ -1,24 +1,47 @@
-"use client";
+'use client';
 
-import Image from "next/image";
-import { Pencil } from "lucide-react";
+import Image from 'next/image';
+import { Pencil } from 'lucide-react';
+import { useUserStore } from '@/store/useUserStore'; // 👈 zustand store
 
 export default function ProfilePage() {
+  const { user } = useUserStore(); // 👈 получаем пользователя
+
   return (
     <div className="flex h-full">
       {/* Sidebar */}
-      <aside className="w-64 bg-[#f8f9fb] border-r p-6 space-y-6">
+      <aside className="w-64 bg-[#f8f9fb]  p-6 space-y-6">
         <div className="space-y-4">
           <button className="flex items-center gap-2 font-medium text-[#3A55DF]">
-            <Image src="/icons/profile-icon.png" width={20} height={20} alt="Профиль" />
+            <Image
+              src="/icons/profile-icon.png"
+              alt="Профиль"
+              width={20}
+              height={20}
+              className="w-5 h-5"
+            />
             Мой профиль
           </button>
+
           <button className="flex items-center gap-2 text-black">
-            <Image src="/icons/bell-icon.png" width={20} height={20} alt="Уведомления" />
+            <Image
+              src="/icons/bell-icon.png"
+              alt="Уведомления"
+              width={20}
+              height={20}
+              className="w-5 h-5"
+            />
             Уведомления
           </button>
+
           <button className="flex items-center gap-2 text-black">
-            <Image src="/icons/history-icon.png" width={20} height={20} alt="История" />
+            <Image
+              src="/icons/history-icon.png"
+              alt="История"
+              width={20}
+              height={20}
+              className="w-5 h-5"
+            />
             История действий
           </button>
         </div>
@@ -43,9 +66,13 @@ export default function ProfilePage() {
               className="rounded-full"
             />
             <div>
-              <h2 className="text-xl font-semibold">Дусембай Альтаир</h2>
-              <p className="text-sm text-gray-600">Инженер ПТО</p>
-              <p className="text-sm text-gray-600">Астана, Казахстан</p>
+              <h2 className="text-xl font-semibold">
+                {user?.lastName} {user?.firstName}
+              </h2>
+              <p className="text-sm text-gray-600">{user?.position}</p>
+              <p className="text-sm text-gray-600">
+                {user?.city}, {user?.country}
+              </p>
             </div>
           </div>
           <button className="flex items-center gap-1 text-sm text-gray-600 hover:text-black">
@@ -64,23 +91,23 @@ export default function ProfilePage() {
           <div className="grid grid-cols-2 gap-4 text-sm text-gray-800">
             <div>
               <p className="font-semibold">Имя</p>
-              <p>Альтаир</p>
+              <p>{user?.firstName}</p>
             </div>
             <div>
               <p className="font-semibold">Фамилия</p>
-              <p>Дусембай</p>
+              <p>{user?.lastName}</p>
             </div>
             <div>
               <p className="font-semibold">Email адрес</p>
-              <p>altairdusembay@gmail.com</p>
+              <p>{user?.email}</p>
             </div>
             <div>
               <p className="font-semibold">Телефон</p>
-              <p>+7 707 160 2888</p>
+              <p>{user?.phone}</p>
             </div>
             <div>
               <p className="font-semibold">Должность</p>
-              <p>ПТО инженер</p>
+              <p>{user?.position}</p>
             </div>
           </div>
         </div>
@@ -96,19 +123,19 @@ export default function ProfilePage() {
           <div className="grid grid-cols-2 gap-4 text-sm text-gray-800">
             <div>
               <p className="font-semibold">Страна</p>
-              <p>Казахстан</p>
+              <p>{user?.country}</p>
             </div>
             <div>
               <p className="font-semibold">Город</p>
-              <p>Астана</p>
+              <p>{user?.city}</p>
             </div>
             <div>
               <p className="font-semibold">Почтовый индекс</p>
-              <p>010000</p>
+              <p>{user?.postalCode}</p>
             </div>
             <div>
               <p className="font-semibold">ID</p>
-              <p>25252525</p>
+              <p>{user?.id}</p>
             </div>
           </div>
         </div>

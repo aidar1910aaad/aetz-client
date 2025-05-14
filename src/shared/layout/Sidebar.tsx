@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import clsx from "clsx";
-import { ChevronLeft } from "lucide-react";
-import { sidebarLinks } from "./Sidebar/sidebarLinks";
-import SidebarLink from "./Sidebar/SidebarLink";
-import SidebarGroup from "./Sidebar/SidebarGroup";
+import { useState } from 'react';
+import clsx from 'clsx';
+import { ChevronLeft } from 'lucide-react';
+import { sidebarLinks } from './Sidebar/sidebarLinks';
+import SidebarLink from './Sidebar/SidebarLink';
+import SidebarGroup from './Sidebar/SidebarGroup';
 
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
@@ -17,15 +17,15 @@ export default function Sidebar() {
 
   return (
     <aside
-  className={clsx(
-    "bg-white shadow transition-all duration-300 flex flex-col justify-between h-[calc(100vh-64px)]",
-    collapsed ? "w-20" : "w-64"
-  )}
->
+      className={clsx(
+        'bg-white shadow transition-all duration-300 flex flex-col justify-between h-[calc(100vh-64px)]',
+        collapsed ? 'w-20' : 'w-64'
+      )}
+    >
       {/* Навигация (прокручиваемая) */}
       <div className="p-4 space-y-4 overflow-y-auto flex-1">
         {sidebarLinks.map((item, index) => {
-          if (item.type === "group") {
+          if (item.type === 'group') {
             return (
               <SidebarGroup
                 key={index}
@@ -57,7 +57,7 @@ export default function Sidebar() {
         >
           <ChevronLeft
             size={16}
-            className={clsx("transition-transform", collapsed && "rotate-180")}
+            className={clsx('transition-transform', collapsed && 'rotate-180')}
           />
         </button>
       </div>

@@ -1,30 +1,32 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import type { Metadata } from 'next';
+import './globals.css';
+import { Montserrat, Climate_Crisis } from 'next/font/google';
+import ToastProvider from '@/shared/modals/ToastProvider';
+import ConfirmModalContainer from '@/shared/modals/ConfirmModal';
+import EditModalContainer from '@/shared/modals/EditModalContainer';
+import LoaderOverlay from '@/shared/loader/PageLoader';
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+const montserrat = Montserrat({
+  variable: '--font-montserrat',
+  subsets: ['latin', 'cyrillic'], // обязательно для русского
+  weight: ['400', '600', '700', '800'],
+  display: 'swap',
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+const climate = Climate_Crisis({
+  variable: '--font-climate',
+  subsets: ['latin'], // кириллицы нет
+  weight: ['400'], // у Climate Crisis только 1 вес
 });
 
-export const metadata: Metadata = {
-  title: "ТОО АЭТЗ",
-  description: "Корпоративное приложения ТОО АЭТЗ",
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ru">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <html lang="ru" className={`${montserrat.variable} ${climate.variable}`}>
+      <body className="antialiased">
+        <ConfirmModalContainer />
+        <EditModalContainer />
+        <ToastProvider />
+
         {children}
       </body>
     </html>
