@@ -1,6 +1,4 @@
-'use client';
-
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   getAllMaterials,
   createMaterial,
@@ -11,72 +9,77 @@ import {
   CreateMaterialRequest,
   UpdateMaterialRequest,
   MaterialHistoryItem,
+  GetMaterialsParams,
 } from '@/api/material';
 import { getAllCategories, Category } from '@/api/categories';
 import { showToast } from '@/shared/modals/ToastProvider';
 import { showConfirm } from '@/shared/modals/ConfirmModal';
+import { useDebounce } from '@/hooks/useDebounce';
 
 export function useMaterials() {
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [total, setTotal] = useState(0);
+
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<'name' | 'price' | 'code'>('name');
+  const [order, setOrder] = useState<'ASC' | 'DESC'>('ASC');
   const [selectedCategory, setSelectedCategory] = useState('Все');
   const [loading, setLoading] = useState(true);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
 
-  useEffect(() => {
-    const fetchCategories = async () => {
-      const token = localStorage.getItem('token') || '';
-      const cats = await getAllCategories(token);
-      setAllCategories(cats);
-    };
-
-    fetchCategories();
-  }, []);
+  const debouncedSearch = useDebounce(search, 500);
 
   // ✅ Загрузка материалов
   const fetchMaterials = useCallback(async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token') || '';
-      const data = await getAllMaterials(token);
-      console.log(data);
+      const params: GetMaterialsParams = {
+        page,
+        limit,
+        search: debouncedSearch?.trim() || undefined,
+        sort,
+        order,
+        categoryId:
+          selectedCategory !== 'Все'
+            ? allCategories.find((cat) => cat.name === selectedCategory)?.id
+            : undefined,
+      };
+      const { data, total } = await getAllMaterials(token, params);
       setMaterials(data);
+      setTotal(total);
     } catch (err: any) {
       showToast(err.message || 'Ошибка при загрузке материалов', 'error');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, limit, debouncedSearch, sort, order, selectedCategory, allCategories]);
 
   useEffect(() => {
     fetchMaterials();
   }, [fetchMaterials]);
 
-  // ✅ Категории
-  const categories = useMemo(
-    () => ['Все', ...new Set(materials.map((m) => m.category?.name || 'Без категории'))],
-    [materials]
-  );
+  // ✅ Загрузка категорий при первом рендере
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const token = localStorage.getItem('token') || '';
+      const cats = await getAllCategories(token);
+      setAllCategories(cats);
+    };
+    fetchCategories();
+  }, []);
 
-  const filtered = useMemo(
-    () =>
-      selectedCategory === 'Все'
-        ? materials
-        : materials.filter((m) => m.category?.name === selectedCategory),
-    [selectedCategory, materials]
-  );
+  const categories = ['Все', ...new Set(allCategories.map((c) => c.name))];
 
-  // ✅ Создание
+  // ✅ Создание материала
   const handleCreate = async (data: CreateMaterialRequest) => {
     try {
       const token = localStorage.getItem('token') || '';
       await createMaterial(data, token);
-
-      // ⏳ Подождем перед перезагрузкой — на случай async-commit БД
-      await new Promise((res) => setTimeout(res, 300));
-
       await fetchMaterials();
-
-      setSelectedCategory('Все'); // чтобы фильтр не скрывал его
+      setSelectedCategory('Все');
       showToast('Материал создан!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Ошибка при создании', 'error');
@@ -94,7 +97,7 @@ export function useMaterials() {
     try {
       const token = localStorage.getItem('token') || '';
       await deleteMaterial(id, token);
-      setMaterials((prev) => prev.filter((m) => m.id !== id));
+      await fetchMaterials();
       showToast('Материал удалён!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Ошибка при удалении материала', 'error');
@@ -106,14 +109,14 @@ export function useMaterials() {
     try {
       const token = localStorage.getItem('token') || '';
       await updateMaterial(id, data, token);
-      setMaterials((prev) => prev.map((m) => (m.id === id ? { ...m, ...data } : m)));
+      await fetchMaterials();
       showToast('Материал обновлён!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Ошибка при обновлении материала', 'error');
     }
   };
 
-  // ✅ История изменений
+  // ✅ История
   const fetchHistory = async (id: number): Promise<MaterialHistoryItem[]> => {
     try {
       const token = localStorage.getItem('token') || '';
@@ -126,17 +129,26 @@ export function useMaterials() {
 
   return {
     materials,
-    setMaterials,
+    total,
+    page,
+    setPage,
+    limit,
+    setLimit,
+    search,
+    setSearch,
+    sort,
+    setSort,
+    order,
+    setOrder,
     selectedCategory,
     setSelectedCategory,
-    filtered,
     categories,
     loading,
-    fetchMaterials,
     handleCreate,
     handleDelete,
     handleUpdate,
     fetchHistory,
     allCategories,
+    fetchMaterials,
   };
 }

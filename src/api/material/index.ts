@@ -1,6 +1,7 @@
 import { api } from '../baseUrl';
 
 export interface Material {
+  code: string;
   id: number;
   name: string;
   unit: string;
@@ -11,6 +12,15 @@ export interface Material {
   };
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface GetMaterialsParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  sort?: 'name' | 'price' | 'code';
+  order?: 'ASC' | 'DESC';
+  categoryId?: number;
 }
 
 export interface CreateMaterialRequest {
@@ -57,9 +67,20 @@ export async function createMaterial(
 }
 
 // ✅ Получить все материалы
-export async function getAllMaterials(token: string): Promise<Material[]> {
-  const response = await fetch(`${api}/materials`, {
-    method: 'GET',
+export async function getAllMaterials(
+  token: string,
+  params: GetMaterialsParams = {}
+): Promise<{ data: Material[]; total: number }> {
+  const query = new URLSearchParams();
+
+  if (params.page) query.append('page', String(params.page));
+  if (params.limit) query.append('limit', String(params.limit));
+  if (params.search) query.append('search', params.search);
+  if (params.sort) query.append('sort', params.sort);
+  if (params.order) query.append('order', params.order);
+  if (params.categoryId) query.append('categoryId', String(params.categoryId));
+
+  const response = await fetch(`${api}/materials?${query.toString()}`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -145,3 +166,49 @@ export async function getMaterialHistory(
 
   return response.json();
 }
+
+// ✅ Получить все материалы по категории
+export const getMaterialsByCategoryId = async (categoryId: number, token: string): Promise<Material[]> => {
+  try {
+    console.log('Fetching materials for category:', categoryId);
+    const url = `${api}/categories/${categoryId}/materials`;
+    console.log('API URL:', url);
+    console.log('Request headers:', {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    });
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log('Response status:', response.status);
+    console.log('Response headers:', response.headers);
+    console.log('Response ok:', response.ok);
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Error response:', errorData);
+      throw new Error(errorData.message || 'Failed to fetch materials');
+    }
+
+    const data = await response.json();
+    console.log('Materials data:', data);
+    console.log('Materials data type:', typeof data);
+    console.log('Is array:', Array.isArray(data));
+
+    if (!Array.isArray(data)) {
+      console.error('Invalid response format:', data);
+      throw new Error('Invalid response format');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in getMaterialsByCategoryId:', error);
+    throw error;
+  }
+};

@@ -2,11 +2,15 @@ import { api } from '../baseUrl/index';
 
 interface CreateCategoryRequest {
   name: string;
+  description: string;
+  code: string;
 }
 
 interface CreateCategoryResponse {
   id: number;
   name: string;
+  description: string;
+  code: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -45,6 +49,8 @@ export async function createCategory(
 export interface Category {
   id: number;
   name: string;
+  description: string;
+  code: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -68,6 +74,8 @@ export async function getAllCategories(token: string): Promise<Category[]> {
 
 interface UpdateCategoryRequest {
   name: string;
+  description: string;
+  code: string;
 }
 
 export async function updateCategory(

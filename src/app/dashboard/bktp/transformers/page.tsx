@@ -69,15 +69,15 @@ export default function TransformerConfigurator() {
           <button
             key={item}
             onClick={() => handleSelect(key, item)}
-            disabled={!isAvailable}
+            disabled={!isAvailable || skip}
             className={`px-4 py-2 rounded-full border font-medium text-sm transition-all duration-200
-            ${
-              selected[key] === item
-                ? 'bg-[#3A55DF] text-white border-[#3A55DF]'
-                : !isAvailable
-                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                : 'bg-white hover:bg-[#E8F0FF] text-gray-800 border-gray-300'
-            }`}
+              ${
+                selected[key] === item
+                  ? 'bg-[#3A55DF] text-white border-[#3A55DF]'
+                  : !isAvailable || skip
+                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                  : 'bg-white hover:bg-[#E8F0FF] text-gray-800 border-gray-300'
+              }`}
           >
             {item}
           </button>
@@ -87,84 +87,97 @@ export default function TransformerConfigurator() {
   );
 
   return (
-    <div className="h-[calc(100vh-110px)] overflow-y-auto px-6 py-6 bg-gray-50">
-      <div className="px-6 pt-6 pb-2 ">
+    <div className="h-[calc(100vh-110px)] overflow-y-auto px-6 py-2 bg-gray-50">
+      <div className="px-6 pt-6 pb-2">
         <Breadcrumbs />
-        <h2 className="text-2xl font-semibold mt-2">Выбор силового трансформатора</h2>
-        <button
-          onClick={() => setSkip((prev) => !prev)}
-          className={`mt-4 px-4 py-2 rounded border text-sm font-medium ${
-            skip
-              ? 'bg-red-100 text-red-700 border-red-300'
-              : 'bg-white border-gray-300 hover:bg-gray-50'
-          }`}
-        >
-          {skip ? 'Выбран: Без трансформатора' : 'Нет трансформатора'}
-        </button>
+        <h2 className="text-2xl font-semibold mt-2">Силовой трансформатор</h2>
+
+        <p className="mt-2 text-sm text-gray-600 mb-2">Будет ли трансформатор?</p>
+        <div className="flex gap-4 mb-4">
+          <button
+            onClick={() => setSkip(false)}
+            className={`px-4 py-2 rounded text-sm font-medium border ${
+              !skip
+                ? 'bg-[#3A55DF] text-white border-[#3A55DF]'
+                : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
+            }`}
+          >
+            Да
+          </button>
+          <button
+            onClick={() => {
+              setSkip(true);
+              skipTransformer(); // очищает стор
+            }}
+            className={`px-4 py-2 rounded text-sm font-medium border ${
+              skip
+                ? 'bg-red-100 text-red-700 border-red-300'
+                : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
+            }`}
+          >
+            Нет
+          </button>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
-        {!skip && (
-          <>
-            <div>
-              <h3 className="font-medium mb-1">Напряжение (кВ)</h3>
-              {renderButtons(voltages, 'voltage')}
-            </div>
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <div>
+          <h3 className="font-medium mb-1">Напряжение (кВ)</h3>
+          {renderButtons(voltages, 'voltage')}
+        </div>
 
-            <div>
-              <h3 className="font-medium mb-1">Тип</h3>
-              {renderButtons(types, 'type')}
-            </div>
+        <div>
+          <h3 className="font-medium mb-1">Тип</h3>
+          {renderButtons(types, 'type')}
+        </div>
 
-            <div>
-              <h3 className="font-medium mb-1">Мощность (кВА)</h3>
-              {renderButtons(powers, 'power')}
-            </div>
+        <div>
+          <h3 className="font-medium mb-1">Мощность (кВА)</h3>
+          {renderButtons(powers, 'power')}
+        </div>
 
-            <div>
-              <h3 className="font-medium mb-1">Производитель</h3>
-              {renderButtons(manufacturers, 'manufacturer')}
-            </div>
+        <div>
+          <h3 className="font-medium mb-1">Производитель</h3>
+          {renderButtons(manufacturers, 'manufacturer')}
+        </div>
 
-            <div className="flex items-center gap-4">
-              <label className="font-medium text-sm">Количество трансформаторов</label>
-              <input
-                type="number"
-                min={1}
-                value={quantity}
-                onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
-                className="w-24 border px-3 py-1 rounded"
-              />
-            </div>
+        <div className="flex items-center gap-4">
+          <label className="font-medium text-sm">Количество трансформаторов</label>
+          <input
+            type="number"
+            min={1}
+            disabled={skip}
+            value={quantity}
+            onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
+            className="w-24 border px-3 py-1 rounded"
+          />
+        </div>
 
-            {isComplete && matched && (
-              <div className="bg-gray-50 border rounded p-4 space-y-1 text-sm">
-                <p>
-                  <span className="font-medium">Спецификация:</span> {matched.spec}
-                </p>
-                <p>
-                  <span className="font-medium">Цена за 1 шт:</span>{' '}
-                  {matched.price.toLocaleString()} тг
-                </p>
-                <p>
-                  <span className="font-medium">Количество:</span> {quantity}
-                </p>
-                <p>
-                  <span className="font-medium">Сумма:</span>{' '}
-                  {(matched.price * quantity).toLocaleString()} тг
-                </p>
-              </div>
-            )}
-          </>
+        {!skip && isComplete && matched && (
+          <div className="bg-gray-50 border rounded p-4 space-y-1 text-sm">
+            <p>
+              <span className="font-medium">Спецификация:</span> {matched.spec}
+            </p>
+            <p>
+              <span className="font-medium">Цена за 1 шт:</span> {matched.price.toLocaleString()} тг
+            </p>
+            <p>
+              <span className="font-medium">Количество:</span> {quantity}
+            </p>
+            <p>
+              <span className="font-medium">Сумма:</span>{' '}
+              {(matched.price * quantity).toLocaleString()} тг
+            </p>
+          </div>
         )}
       </div>
 
-      <div className=" p-4 bg-white">
+      <div className="p-4 bg-white border-t">
         <button
           onClick={handleSubmit}
           className="w-full py-2 rounded text-white bg-[#3A55DF] hover:bg-[#2e46c5] transition"
         >
-          Далее
+          Добавить в спецификацию
         </button>
       </div>
     </div>

@@ -136,7 +136,7 @@ export default function BmzConfigPage() {
           onClick={handleNext}
           className="bg-[#3A55DF] text-white px-6 py-2 rounded hover:bg-[#2e46c5]"
         >
-          Далее
+          Добавить в спецификацию
         </button>
       </div>
     </div>

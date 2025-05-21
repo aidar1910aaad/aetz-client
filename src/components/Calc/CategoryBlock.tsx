@@ -1,8 +1,9 @@
 'use client';
 
-import { Material } from '@/api/material';
+import { useEffect, useState } from 'react';
+import { Material, getAllMaterials } from '@/api/material';
 import { Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useDebounce } from '@/hooks/useDebounce';
 
 type ManualItem = {
   name: string;
@@ -18,7 +19,6 @@ type Props = {
   name: string;
   open: boolean;
   items: CalcItem[];
-  materials: Material[];
   searchQuery: string;
   onToggle: () => void;
   onSearchChange: (value: string) => void;
@@ -34,7 +34,6 @@ export default function CategoryBlock({
   name,
   open,
   items,
-  materials,
   searchQuery,
   onToggle,
   onSearchChange,
@@ -43,10 +42,23 @@ export default function CategoryBlock({
   onRemoveItem,
 }: Props) {
   const [showDropdown, setShowDropdown] = useState(false);
+  const [results, setResults] = useState<Material[]>([]);
+  const debouncedSearch = useDebounce(searchQuery, 400);
 
-  const filtered = useMemo(() => {
-    return materials.filter((m) => m.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [materials, searchQuery]);
+  useEffect(() => {
+    console.log('Поиск по:', debouncedSearch);
+    const fetch = async () => {
+      if (!debouncedSearch.trim()) return setResults([]);
+      try {
+        const token = localStorage.getItem('token') || '';
+        const { data } = await getAllMaterials(token, { search: debouncedSearch, limit: 50 });
+        setResults(data);
+      } catch (err: any) {
+        console.error('Ошибка поиска материалов:', err.message);
+      }
+    };
+    fetch();
+  }, [debouncedSearch]);
 
   const handleQuantityChange = (index: number, value: number) => {
     onChangeQuantity(index, value);
@@ -81,9 +93,9 @@ export default function CategoryBlock({
               className="w-full border rounded px-3 py-2 text-sm"
             />
 
-            {showDropdown && filtered.length > 0 && (
+            {showDropdown && results.length > 0 && (
               <div className="absolute z-10 w-full bg-white border mt-1 rounded shadow max-h-72 overflow-y-auto">
-                {filtered.map((m) => (
+                {results.map((m) => (
                   <div
                     key={m.id}
                     onClick={() => {

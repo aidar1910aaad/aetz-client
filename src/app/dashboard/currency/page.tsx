@@ -8,6 +8,7 @@ const DEFAULT_RATES = {
   usd: 512.34,
   eur: 582.07,
   rub: 6.31,
+  hourlyWage: 2000, // Часовая заработная плата в тенге
 };
 
 export default function CurrencyPage() {
@@ -34,7 +35,7 @@ export default function CurrencyPage() {
 
   const handleSave = async () => {
     const confirmed = await showConfirm({
-      title: 'Сохранить курсы валют?',
+      title: 'Сохранить настройки?',
       message: 'Вы уверены, что хотите сохранить изменения?',
     });
 
@@ -42,14 +43,14 @@ export default function CurrencyPage() {
 
     localStorage.setItem('currencyRates', JSON.stringify(rates));
     setInitialRates(rates);
-    showToast('Курсы валют успешно сохранены', 'success');
+    showToast('Настройки успешно сохранены', 'success');
   };
 
   return (
     <div className="h-[calc(100vh-110px)] overflow-y-auto px-6 py-6 bg-gray-50">
-      <h2 className="text-2xl font-semibold mt-2">Курсы валют</h2>
+      <h2 className="text-2xl font-semibold mt-2">Курсы валют и настройки</h2>
       <p className="text-sm text-gray-600 mt-1">
-        Укажите актуальные курсы валют по отношению к тенге
+        Укажите актуальные курсы валют и настройки
       </p>
 
       <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -57,6 +58,7 @@ export default function CurrencyPage() {
           { label: 'Доллар США (USD)', key: 'usd' },
           { label: 'Евро (EUR)', key: 'eur' },
           { label: 'Российский рубль (RUB)', key: 'rub' },
+          { label: 'Часовая заработная плата (₸)', key: 'hourlyWage' },
         ].map(({ label, key }) => (
           <div key={key} className="bg-white p-5 border rounded-xl shadow-sm space-y-2">
             <label className="block text-sm font-medium text-gray-700">{label}</label>

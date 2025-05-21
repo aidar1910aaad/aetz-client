@@ -10,14 +10,14 @@ export function BmzBuildingType({
   onChange: (value: BuildingType) => void;
 }) {
   const options: { value: BuildingType; label: string }[] = [
-    { value: 'bmz', label: 'БМЗ (учитывается)' },
-    { value: 'tp', label: 'ТП (не учитывается)' },
+    { value: 'bmz', label: 'БМЗ' },
+    { value: 'tp', label: 'ТП' },
     { value: 'none', label: 'Нет' },
   ];
 
   return (
     <div className="bg-white border border-gray-200 rounded-md p-5 shadow-sm space-y-4">
-      <p className="text-sm font-semibold text-gray-700">Тип здания</p>
+      <p className="text-sm font-semibold text-gray-700">Здание</p>
       <div className="flex flex-col sm:flex-row gap-3">
         {options.map(({ value, label }) => {
           const isActive = buildingType === value;

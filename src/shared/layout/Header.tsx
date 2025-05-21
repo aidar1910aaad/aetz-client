@@ -16,7 +16,7 @@ export default function Header() {
   const hasStarted = taskNumber.trim() !== '' || client.trim() !== '';
   const router = useRouter();
   const { user } = useUserStore(); // ← получаем пользователя
-  console.log(user);
+
   // Закрытие меню при клике вне блока
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

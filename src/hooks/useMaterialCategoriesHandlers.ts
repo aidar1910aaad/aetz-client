@@ -11,12 +11,19 @@ import {
 } from '@/api/categories';
 import { showToast } from '@/shared/modals/ToastProvider';
 import { showConfirm } from '@/shared/modals/ConfirmModal';
-import { showEditModal } from '@/shared/modals/EditModalContainer'; // <-- новый импорт
+import { showEditModal } from '@/shared/modals/EditModalContainer';
+
+interface NewCategory {
+  name: string;
+  description: string;
+  code: string;
+  id: number;
+}
 
 export function useMaterialCategoriesHandlers(
   categories: Category[],
   setCategories: React.Dispatch<React.SetStateAction<Category[]>>,
-  setNewCategory: React.Dispatch<React.SetStateAction<string>>
+  setNewCategory: React.Dispatch<React.SetStateAction<NewCategory>>
 ) {
   const fetchCategories = useCallback(async () => {
     try {
@@ -29,18 +36,36 @@ export function useMaterialCategoriesHandlers(
   }, [setCategories]);
 
   const handleAddCategory = useCallback(
-    async (newCategory: string) => {
-      const trimmed = newCategory.trim();
-      if (!trimmed) return;
+    async (newCategory: NewCategory) => {
+      const trimmedName = newCategory.name.trim();
+      
+      if (!trimmedName || !newCategory.id) {
+        showToast('Название и ID категории обязательны', 'error');
+        return;
+      }
 
-      const exists = categories.some((cat) => cat.name.toLowerCase() === trimmed.toLowerCase());
-      if (exists) return showToast('Такая категория уже существует', 'error');
+      const existsByName = categories.some((cat) => cat.name.toLowerCase() === trimmedName.toLowerCase());
+      if (existsByName) {
+        showToast('Категория с таким названием уже существует', 'error');
+        return;
+      }
+
+      const existsById = categories.some((cat) => cat.id === newCategory.id);
+      if (existsById) {
+        showToast('Категория с таким ID уже существует', 'error');
+        return;
+      }
 
       try {
         const token = localStorage.getItem('token') || '';
-        const created = await createCategory({ name: trimmed }, token);
+        const created = await createCategory({
+          name: trimmedName,
+          id: newCategory.id,
+          description: newCategory.description.trim(),
+        }, token);
+        console.log('Created category:', created);
         setCategories((prev) => [...prev, created]);
-        setNewCategory('');
+        setNewCategory({ name: '', description: '', id: 0 });
         showToast('Категория создана!', 'success');
       } catch (error: any) {
         showToast(error.message || 'Ошибка при создании категории', 'error');
@@ -79,27 +104,84 @@ export function useMaterialCategoriesHandlers(
 
   const handleUpdate = useCallback(
     async (cat: Category) => {
-      const newName = await showEditModal({
+      const result = await showEditModal({
         title: 'Редактировать категорию',
-        initialValue: cat.name,
-        placeholder: 'Название категории',
+        initialValues: {
+          name: cat.name,
+          code: cat.code,
+          description: cat.description,
+        },
+        fields: [
+          {
+            name: 'name',
+            label: 'Название',
+            type: 'text',
+            required: true,
+          },
+          {
+            name: 'code',
+            label: 'Код',
+            type: 'text',
+            required: true,
+          },
+          {
+            name: 'description',
+            label: 'Описание',
+            type: 'textarea',
+            required: false,
+          },
+        ],
       });
 
-      if (!newName || newName.trim() === cat.name.trim()) return;
+      if (!result) return;
 
-      const exists = categories.some(
-        (c) => c.name.toLowerCase() === newName.trim().toLowerCase() && c.id !== cat.id
+      const { name, code, description } = result;
+      const trimmedName = name.trim();
+      const trimmedCode = code.trim();
+
+      if (!trimmedName || !trimmedCode) {
+        showToast('Название и код категории обязательны', 'error');
+        return;
+      }
+
+      const existsByName = categories.some(
+        (c) => c.name.toLowerCase() === trimmedName.toLowerCase() && c.id !== cat.id
       );
-      if (exists) {
+      if (existsByName) {
         showToast('Категория с таким названием уже существует', 'error');
+        return;
+      }
+
+      const existsByCode = categories.some(
+        (c) => c.code && c.code.toLowerCase() === trimmedCode.toLowerCase() && c.id !== cat.id
+      );
+      if (existsByCode) {
+        showToast('Категория с таким кодом уже существует', 'error');
         return;
       }
 
       try {
         const token = localStorage.getItem('token') || '';
-        await updateCategory(cat.id, { name: newName.trim() }, token);
+        await updateCategory(
+          cat.id,
+          {
+            name: trimmedName,
+            code: trimmedCode,
+            description: description.trim(),
+          },
+          token
+        );
         setCategories((prev) =>
-          prev.map((item) => (item.id === cat.id ? { ...item, name: newName.trim() } : item))
+          prev.map((item) =>
+            item.id === cat.id
+              ? {
+                  ...item,
+                  name: trimmedName,
+                  code: trimmedCode,
+                  description: description.trim(),
+                }
+              : item
+          )
         );
         showToast('Категория обновлена!', 'success');
       } catch (err: any) {

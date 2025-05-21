@@ -1,1 +1,1 @@
-export const api = 'https://aetz-server-production.up.railway.app';
+export const api = 'http://localhost:3001';

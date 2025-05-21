@@ -1,5 +1,5 @@
 import { Trash2 } from 'lucide-react';
-import { CalcItem } from '@/app/dashboard/calc/new/page';
+import { CalcItem } from '@/app/dashboard/calc/[groupSlug]/new/page';
 
 type Props = {
   items: CalcItem[];

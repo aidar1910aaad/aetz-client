@@ -9,9 +9,12 @@ interface RusnGlobalOptions {
   tsnCount: number;
   tsnPower: string;
   busBridgeLength: number;
+  breaker: string;
+  rza: string;
+  meterType: string;
 }
 
-interface RusnCell {
+export interface RusnCell {
   id: string;
   purpose: string; // Ввод, СВ, СР и т.д.
   breaker: string;
@@ -19,14 +22,15 @@ interface RusnCell {
   meterType?: string;
   ctRatio?: string;
   avr?: boolean;
-  count?: number;
+  count: number;
+  calculationId?: number;
 }
 
 interface RusnState {
   global: RusnGlobalOptions;
   cellConfigs: RusnCell[];
   setGlobal: <K extends keyof RusnGlobalOptions>(key: K, value: RusnGlobalOptions[K]) => void;
-  addCell: (cell: Omit<RusnCell, 'id'> & { id?: string }) => void;
+  addCell: (cell: Omit<RusnCell, 'id'>) => void;
   updateCell: (id: string, key: keyof RusnCell, value: any) => void;
   removeCell: (id: string) => void;
   reset: () => void;
@@ -43,6 +47,9 @@ export const useRusnStore = create<RusnState>()(
         tsnCount: 2,
         tsnPower: '2 кВА',
         busBridgeLength: 2,
+        breaker: '',
+        rza: '',
+        meterType: ''
       },
       cellConfigs: [],
 
@@ -51,25 +58,21 @@ export const useRusnStore = create<RusnState>()(
           global: { ...state.global, [key]: value },
         })),
 
-      addCell: (cell) =>
+      addCell: (cell: Omit<RusnCell, 'id'>) =>
         set((state) => ({
-          cellConfigs: [
-            ...state.cellConfigs,
-            {
-              ...cell,
-              id: cell.id ?? crypto.randomUUID(),
-            },
-          ],
+          cellConfigs: [...state.cellConfigs, { ...cell, id: crypto.randomUUID() }],
         })),
 
-      updateCell: (id, key, value) =>
+      updateCell: (id: string, key: keyof RusnCell, value: any) =>
         set((state) => ({
-          cellConfigs: state.cellConfigs.map((c) => (c.id === id ? { ...c, [key]: value } : c)),
+          cellConfigs: state.cellConfigs.map((cell) =>
+            cell.id === id ? { ...cell, [key]: value } : cell
+          ),
         })),
 
-      removeCell: (id) =>
+      removeCell: (id: string) =>
         set((state) => ({
-          cellConfigs: state.cellConfigs.filter((c) => c.id !== id),
+          cellConfigs: state.cellConfigs.filter((cell) => cell.id !== id),
         })),
 
       reset: () =>
@@ -82,6 +85,9 @@ export const useRusnStore = create<RusnState>()(
             tsnCount: 2,
             tsnPower: '2 кВА',
             busBridgeLength: 2,
+            breaker: '',
+            rza: '',
+            meterType: ''
           },
           cellConfigs: [],
         }),

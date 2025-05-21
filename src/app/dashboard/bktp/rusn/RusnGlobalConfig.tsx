@@ -1,46 +1,90 @@
-// RusnGlobalConfig.tsx
 'use client';
 
 import { useRusnStore } from '@/store/useRusnStore';
 import TogglerWithInput from './TogglerWithInput';
 import RusnCellTable from './RusnCellTable';
+import { useEffect, useState } from 'react';
+import { getSettings } from '@/api/settings';
+import { getAllCategories } from '@/api/categories';
 
 export default function RusnGlobalConfig({ availableCells }: { availableCells: string[] }) {
   const { global, setGlobal } = useRusnStore();
+  const [rusnSettings, setRusnSettings] = useState<{
+    switch: { id: number; name: string }[];
+    rza: { id: number; name: string }[];
+    counter: { id: number; name: string }[];
+  }>({
+    switch: [],
+    rza: [],
+    counter: [],
+  });
+  const [allCategories, setAllCategories] = useState<{ id: number; name: string }[]>([]);
+
+  // Загружаем категории
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const token = localStorage.getItem('token') || '';
+        const categories = await getAllCategories(token);
+        setAllCategories(categories);
+      } catch (error) {
+        console.error('Ошибка при загрузке категорий:', error);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  // Загружаем настройки РУСН
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const token = localStorage.getItem('token') || '';
+        const settings = await getSettings(token);
+
+        if (settings) {
+          console.log('Settings loaded:', settings);
+          
+          // Получаем все видимые категории для каждого типа
+          const visibleRusn = settings.settings.rusn?.filter(item => item.isVisible) || [];
+          const visibleRunn = settings.settings.runn?.filter(item => item.isVisible) || [];
+          const visibleBmz = settings.settings.bmz?.filter(item => item.isVisible) || [];
+
+          console.log('Visible categories:', {
+            rusn: visibleRusn,
+            runn: visibleRunn,
+            bmz: visibleBmz
+          });
+
+          // Обновляем состояние с ID категорий
+          setRusnSettings({
+            switch: visibleRusn.map(item => ({
+              id: item.categoryId,
+              name: allCategories.find(cat => cat.id === item.categoryId)?.name || `Категория ${item.categoryId}`
+            })),
+            rza: visibleRunn.map(item => ({
+              id: item.categoryId,
+              name: allCategories.find(cat => cat.id === item.categoryId)?.name || `Категория ${item.categoryId}`
+            })),
+            counter: visibleBmz.map(item => ({
+              id: item.categoryId,
+              name: allCategories.find(cat => cat.id === item.categoryId)?.name || `Категория ${item.categoryId}`
+            })),
+          });
+        }
+      } catch (error) {
+        console.error('Ошибка при загрузке настроек:', error);
+      }
+    };
+
+    if (allCategories.length > 0) {
+      fetchSettings();
+    }
+  }, [allCategories, setGlobal]);
 
   return (
     <section className="flex flex-col gap-6">
-      <div>
-        <label className="block mb-1 font-medium">Тип корпуса</label>
-        <select
-          value={global.bodyType}
-          onChange={(e) => setGlobal('bodyType', e.target.value)}
-          className="w-full border px-3 py-2 rounded"
-        >
-          <option value="">Выберите</option>
-          {availableCells.map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label className="block mb-1 font-medium">Напряжение</label>
-        <select
-          value={global.voltage}
-          onChange={(e) => setGlobal('voltage', Number(e.target.value))}
-          className="w-full border px-3 py-2 rounded"
-        >
-          {[6, 10, 20].map((v) => (
-            <option key={v} value={v}>
-              {v} кВ
-            </option>
-          ))}
-        </select>
-      </div>
-
+      {/* Выключатель */}
       <div>
         <label className="block mb-1 font-medium">Выключатель (по умолчанию)</label>
         <select
@@ -49,14 +93,15 @@ export default function RusnGlobalConfig({ availableCells }: { availableCells: s
           className="w-full border px-3 py-2 rounded"
         >
           <option value="">Выберите</option>
-          {['AV-12', 'Siemens', 'Astels', 'ВНА-10/630', 'AETZ', 'Metasol', 'Sosul'].map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
+          {rusnSettings.switch.map((opt) => (
+            <option key={opt.id} value={opt.id}>
+              {opt.name}
             </option>
           ))}
         </select>
       </div>
 
+      {/* РЗА */}
       <div>
         <label className="block mb-1 font-medium">РЗА (по умолчанию)</label>
         <select
@@ -65,14 +110,15 @@ export default function RusnGlobalConfig({ availableCells }: { availableCells: s
           className="w-full border px-3 py-2 rounded"
         >
           <option value="">Выберите</option>
-          {['РС83-А2.0', 'Миком Р112', 'Алтей', 'Сименс', 'РЗА системз', 'Шнайдер'].map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
+          {rusnSettings.rza.map((opt) => (
+            <option key={opt.id} value={opt.id}>
+              {opt.name}
             </option>
           ))}
         </select>
       </div>
 
+      {/* Счетчик */}
       <div>
         <label className="block mb-1 font-medium">Счётчик (по умолчанию)</label>
         <select
@@ -81,9 +127,9 @@ export default function RusnGlobalConfig({ availableCells }: { availableCells: s
           className="w-full border px-3 py-2 rounded"
         >
           <option value="">Выберите</option>
-          {['Сайман', 'Mercury', 'Меркурий', 'Нет прибора'].map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
+          {rusnSettings.counter.map((opt) => (
+            <option key={opt.id} value={opt.id}>
+              {opt.name}
             </option>
           ))}
         </select>

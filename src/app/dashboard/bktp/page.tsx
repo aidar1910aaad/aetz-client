@@ -5,6 +5,7 @@ import { useUserStore } from '@/store/useUserStore';
 import { useBktpStore } from '@/store/useBktpStore';
 import { useRouter } from 'next/navigation';
 import Breadcrumbs from '@/components/Breadcrumbs/Breadcrumbs'; // ✅ добавь путь, где у тебя лежит компонент
+import { showToast } from '@/shared/modals/ToastProvider';
 
 export default function BktpRequestPage() {
   const router = useRouter();
@@ -17,6 +18,11 @@ export default function BktpRequestPage() {
   const fullName = user ? `${user.lastName || ''} ${user.firstName || ''}`.trim() : '';
 
   const handleNext = () => {
+    if (!taskNumber.trim() || !client.trim() || !date || !time) {
+      showToast('Пожалуйста, заполните все поля', 'error');
+      return;
+    }
+
     setField('executor', fullName);
     router.push('/dashboard/bktp/bmz');
   };

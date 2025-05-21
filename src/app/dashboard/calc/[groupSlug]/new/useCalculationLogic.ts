@@ -1,45 +1,29 @@
-// 💡 Полноценная страница создания калькуляции с категориями, базой материалов и ручными позициями
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import { getAllMaterials, Material } from '@/api/material';
+import { createCalculation, getAllCalculationGroups } from '@/api/calculations';
 import { showToast } from '@/shared/modals/ToastProvider';
 import { showConfirm } from '@/shared/modals/ConfirmModal';
-import CategoryBlock from '@/components/Calc/CategoryBlock';
-import ManualItemModal from '@/components/Calc/ManualItemModal';
-import CategoryNameModal from '@/components/Calc/CategoryNameModal';
+import { CategoryBlockType, ManualItem } from './page';
 
-export type ManualItem = {
-  name: string;
-  unit: string;
-  price: number;
-  quantity: number;
-};
-
-export type CalcItem = ManualItem & { id?: number };
-
-export type CategoryBlockType = {
-  id: string;
-  name: string;
-  items: CalcItem[];
-  open: boolean;
-  searchQuery?: string;
-};
-
-export default function CreateCalculationPage() {
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
+export function useCalculationLogic() {
   const [title, setTitle] = useState('');
   const [materials, setMaterials] = useState<Material[]>([]);
   const [categories, setCategories] = useState<CategoryBlockType[]>([]);
-  const [saved, setSaved] = useState(false);
   const [manualModalOpen, setManualModalOpen] = useState(false);
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+
+  const { groupSlug } = useParams() as { groupSlug: string };
 
   useEffect(() => {
     const fetch = async () => {
       const token = localStorage.getItem('token') || '';
       const data = await getAllMaterials(token);
+      console.log('Загруженные материалы:', data); // ← вот это добавь
       setMaterials(data);
     };
     fetch();
@@ -70,6 +54,7 @@ export default function CreateCalculationPage() {
       )
     );
   };
+
   const handleChangeQuantity = (catId: string, index: number, value: number) => {
     setCategories((prev) =>
       prev.map((cat) =>
@@ -138,71 +123,64 @@ export default function CreateCalculationPage() {
     });
     if (!confirmed) return;
 
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
-    showToast('Калькуляция сохранена', 'success');
+    try {
+      const token = localStorage.getItem('token') || '';
+
+      const groups = await getAllCalculationGroups(token);
+      const group = groups.find((g) => g.slug === groupSlug);
+      if (!group) {
+        showToast('Группа не найдена', 'error');
+        return;
+      }
+
+      const payload = {
+        name: title,
+        slug: title.toLowerCase().replace(/\s+/g, '-'),
+        groupId: group.id,
+        data: {
+          categories: categories.map((cat) => ({
+            name: cat.name,
+            items: cat.items.map((item) => ({
+              id: item.id ?? null,
+              name: item.name,
+              unit: item.unit,
+              price: item.price,
+              quantity: item.quantity,
+            })),
+          })),
+        },
+      };
+
+      await createCalculation(payload, token);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+      showToast('Калькуляция сохранена', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Ошибка при сохранении калькуляции', 'error');
+    }
   };
 
-  return (
-    <div className="px-8 py-8 bg-gray-50 min-h-screen">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold">Создание калькуляции</h2>
-        <button
-          onClick={handleSave}
-          className="bg-[#3A55DF] text-white px-5 py-2.5 rounded-lg hover:bg-[#2e46c5] transition"
-        >
-          {saved ? 'Сохранено' : 'Сохранить'}
-        </button>
-      </div>
-
-      <input
-        type="text"
-        placeholder="Название калькуляции"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        className="w-full max-w-xl mb-6 px-4 py-2 border rounded"
-      />
-
-      <button
-        onClick={() => setShowCategoryModal(true)}
-        className="mb-6 bg-white border border-gray-300 px-4 py-2 rounded hover:bg-gray-100"
-      >
-        + Добавить категорию
-      </button>
-
-      <CategoryNameModal
-        isOpen={showCategoryModal}
-        onClose={() => setShowCategoryModal(false)}
-        onSubmit={handleCategorySubmit}
-      />
-
-      {categories.map((cat) => (
-        <CategoryBlock
-          key={cat.id}
-          categoryId={cat.id}
-          name={cat.name}
-          open={cat.open}
-          items={cat.items}
-          materials={materials}
-          searchQuery={cat.searchQuery || ''}
-          onToggle={() => toggleCategory(cat.id)}
-          onSearchChange={(value) => updateSearchQuery(cat.id, value)}
-          onAddManual={() => openManualModal(cat.id)}
-          onAddMaterial={(m) => addMaterialToCategory(cat.id, m)}
-          onRemoveItem={(index) => removeItem(cat.id, index)}
-          onChangeQuantity={(index, value) => handleChangeQuantity(cat.id, index, value)} // ✅ добавлено
-        />
-      ))}
-
-      <ManualItemModal
-        isOpen={manualModalOpen}
-        onClose={() => setManualModalOpen(false)}
-        onSubmit={handleManualSubmit}
-      />
-
-      <div className="text-right text-lg font-semibold mt-10">
-        Общая сумма: {total.toLocaleString()} тг
-      </div>
-    </div>
-  );
+  return {
+    title,
+    setTitle,
+    materials,
+    categories,
+    setCategories,
+    saved,
+    showCategoryModal,
+    setShowCategoryModal,
+    handleCategorySubmit,
+    toggleCategory,
+    openManualModal,
+    manualModalOpen,
+    setManualModalOpen,
+    activeCategoryId,
+    handleManualSubmit,
+    handleChangeQuantity,
+    addMaterialToCategory,
+    removeItem,
+    updateSearchQuery,
+    total,
+    handleSave,
+  };
 }
