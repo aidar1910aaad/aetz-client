@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useCalculations } from '@/hooks/useCalculations';
-import { FileText } from 'lucide-react';
+import { FileText, Plus } from 'lucide-react';
 
 export default function GroupCalculationsPage() {
   const router = useRouter();
@@ -11,22 +11,46 @@ export default function GroupCalculationsPage() {
   const { selectedGroup, setSelectedGroup, groups, calculations, loading } = useCalculations();
 
   useEffect(() => {
-    const group = groups.find((g) => g.slug === groupSlug);
-    if (group) setSelectedGroup(group);
+    const decodedSlug = decodeURIComponent(groupSlug);
+    console.log('Group page - Current groups:', groups);
+    console.log('Group page - Looking for group with slug:', decodedSlug);
+    const group = groups.find((g) => g.slug === decodedSlug);
+    console.log('Group page - Found group:', group);
+    if (group) {
+      console.log('Group page - Setting selected group:', group);
+      setSelectedGroup(group);
+    }
   }, [groupSlug, groups, setSelectedGroup]);
 
   const handleOpenCalc = (calcSlug: string) => {
     router.push(`/dashboard/calc/${groupSlug}/${calcSlug}`);
   };
 
+  const handleCreateNew = () => {
+    router.push(`/dashboard/calc/${groupSlug}/new`);
+  };
+
+  const decodedGroupName = selectedGroup?.name || decodeURIComponent(groupSlug);
+
   return (
     <div className="px-8 py-6">
-      <h2 className="text-2xl font-bold mb-6 text-gray-800">
-        Калькуляции в группе: {selectedGroup?.name || groupSlug}
-      </h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-800">
+          Калькуляции в группе: {decodedGroupName}
+        </h2>
+        <button
+          onClick={handleCreateNew}
+          className="inline-flex items-center px-4 py-2 bg-[#3A55DF] text-white rounded-lg hover:bg-[#2A45CF] transition-colors"
+        >
+          <Plus className="w-5 h-5 mr-2" />
+          Создать калькуляцию
+        </button>
+      </div>
 
       {loading ? (
         <p className="text-gray-500">Загрузка...</p>
+      ) : calculations.length === 0 ? (
+        <p className="text-gray-500">В этой группе пока нет калькуляций</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {calculations.map((calc) => (

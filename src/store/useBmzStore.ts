@@ -1,65 +1,69 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { BmzSettings } from '@/api/bmz';
 
 interface BmzState {
-  width: number;
-  length: number;
-  height: number;
-  thickness: 50 | 100 | null;
-  lighting: boolean;
-  heatedFloor: boolean;
-  heating: boolean;
-  fireAlarm: boolean;
-  cableTrays: boolean;
-  conditioning: boolean;
-  ventilationShaft: boolean;
-
+  settings: BmzSettings | null;
   buildingType: 'bmz' | 'tp' | 'none';
-  isBuildingCounted: boolean;
-
-  setField: <K extends keyof BmzState>(key: K, value: BmzState[K]) => void;
+  length: number;
+  width: number;
+  height: number;
+  thickness: number;
+  blockCount: number;
+  equipmentState: Record<string, boolean>;
+  setSettings: (settings: BmzSettings) => void;
+  setBuildingType: (type: 'bmz' | 'tp' | 'none') => void;
+  setLength: (length: number) => void;
+  setWidth: (width: number) => void;
+  setHeight: (height: number) => void;
+  setThickness: (thickness: number) => void;
+  setBlockCount: (count: number) => void;
+  setEquipmentState: (equipmentName: string, value: boolean) => void;
   reset: () => void;
 }
+
+const initialState = {
+  settings: null,
+  buildingType: 'none' as const,
+  length: 0,
+  width: 0,
+  height: 0,
+  thickness: 50,
+  blockCount: 4,
+  equipmentState: {},
+};
 
 export const useBmzStore = create<BmzState>()(
   persist(
     (set) => ({
-      width: 0,
-      length: 0,
-      height: 0,
-      thickness: null,
-      lighting: false,
-      heatedFloor: false,
-      heating: false,
-      fireAlarm: false,
-      cableTrays: false,
-      conditioning: false,
-      ventilationShaft: false,
+      ...initialState,
 
-      buildingType: 'none',
-      isBuildingCounted: false,
+      setSettings: (settings) => set({ settings }),
 
-      setField: (key, value) => set({ [key]: value }),
+      setBuildingType: (type) => set({ buildingType: type }),
 
-      reset: () =>
-        set({
-          width: 0,
-          length: 0,
-          height: 0,
-          thickness: null,
-          lighting: false,
-          heatedFloor: false,
-          heating: false,
-          fireAlarm: false,
-          cableTrays: false,
-          conditioning: false,
-          ventilationShaft: false,
-          buildingType: 'none',
-          isBuildingCounted: false,
-        }),
+      setLength: (length) => set({ length }),
+
+      setWidth: (width) => set({ width }),
+
+      setHeight: (height) => set({ height }),
+
+      setThickness: (thickness) => set({ thickness }),
+
+      setBlockCount: (count) => set({ blockCount: count }),
+
+      setEquipmentState: (equipmentName, value) =>
+        set((state) => ({
+          equipmentState: {
+            ...state.equipmentState,
+            [equipmentName.toLowerCase().replace(/\s+/g, '')]: value,
+          },
+        })),
+
+      reset: () => set(initialState),
     }),
     {
-      name: 'bmz-storage', // имя ключа в localStorage
+      name: 'bmz-storage',
     }
   )
 );

@@ -5,6 +5,8 @@ import ToastProvider from '@/shared/modals/ToastProvider';
 import ConfirmModalContainer from '@/shared/modals/ConfirmModal';
 import EditModalContainer from '@/shared/modals/EditModalContainer';
 import LoaderOverlay from '@/shared/loader/PageLoader';
+import { ConfirmDialog } from '@/components/ui/confirm';
+import { ToastContainer } from '@/components/ui/toast';
 
 const montserrat = Montserrat({
   variable: '--font-montserrat',
@@ -26,6 +28,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ConfirmModalContainer />
         <EditModalContainer />
         <ToastProvider />
+        <ConfirmDialog />
+        <ToastContainer />
 
         {children}
       </body>

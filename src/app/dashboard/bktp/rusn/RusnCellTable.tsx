@@ -8,18 +8,77 @@ import RusnCell from './components/RusnCell';
 import { useCalculationGroups } from '@/hooks/useCalculationGroups';
 import { useRusnCalculation } from '@/hooks/useRusnCalculation';
 import RusnSummaryTable from './components/RusnSummaryTable';
+import { switchgearApi } from '@/api/switchgear';
 
 const cellTypes = ['Ввод', 'СВ', 'СР', 'ТР', 'Отходящая', 'ТН', 'ТСН'];
 
 export default function RusnCellTable() {
-  const { cellConfigs, addCell, updateCell, removeCell } = useRusnStore();
+  const { cellConfigs, addCell, updateCell, removeCell, global } = useRusnStore();
   const [openCellMap, setOpenCellMap] = useState<Record<string, string>>({});
   const { materials, loading, error: materialsError } = useRusnMaterials();
-  const { groups, loading: groupsLoading, error: groupsError } = useCalculationGroups();
-  const [selectedGroupSlug, setSelectedGroupSlug] = useState<string>('');
-  const [selectedGroupName, setSelectedGroupName] = useState<string>('');
-  const [selectedCalculationName, setSelectedCalculationName] = useState<string>('');
-  const { calculations, loading: calculationsLoading, error: calculationsError, calculateCellTotal } = useRusnCalculation(selectedGroupSlug);
+  const { loading: groupsLoading, error: groupsError } = useCalculationGroups();
+  const [selectedGroupSlug] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('selectedGroupSlug') || '';
+    }
+    return '';
+  });
+  const [selectedGroupName] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('selectedGroupName') || '';
+    }
+    return '';
+  });
+  const { calculations } = useRusnCalculation(selectedGroupSlug);
+
+  // Фильтруем материалы по выбранным категориям
+  const filteredMaterials = {
+    breaker: materials.breaker,
+    rza: materials.rza,
+    meter: materials.meter,
+    transformer: materials.transformer,
+  };
+
+  // Сохраняем выбранные значения в localStorage
+  useEffect(() => {
+    if (selectedGroupSlug) {
+      localStorage.setItem('selectedGroupSlug', selectedGroupSlug);
+    }
+    if (selectedGroupName) {
+      localStorage.setItem('selectedGroupName', selectedGroupName);
+    }
+  }, [selectedGroupSlug, selectedGroupName]);
+
+  // Выводим калькуляции и настройки свитчгеар в консоль при изменении типа ячейки
+  useEffect(() => {
+    const fetchSwitchgearConfig = async () => {
+      try {
+        const configs = await switchgearApi.getAll();
+        const filteredConfigs = configs.filter((config) => config.type === selectedGroupName);
+        console.log('Настройки свитчгеар для типа', selectedGroupName, ':', filteredConfigs);
+      } catch (error) {
+        console.error('Ошибка при получении настроек:', error);
+      }
+    };
+
+    if (selectedGroupName) {
+      console.log('Калькуляции для типа ячейки:', selectedGroupName);
+      console.log(calculations.cell);
+      fetchSwitchgearConfig();
+    }
+  }, [selectedGroupName, calculations.cell]);
+
+  useEffect(() => {
+    const handleAddCell = (event: CustomEvent) => {
+      const newCell = event.detail;
+      addCell(newCell);
+    };
+
+    window.addEventListener('addCell', handleAddCell as EventListener);
+    return () => {
+      window.removeEventListener('addCell', handleAddCell as EventListener);
+    };
+  }, [addCell]);
 
   const handleToggle = (type: string) => {
     const isOpen = !!openCellMap[type];
@@ -27,18 +86,23 @@ export default function RusnCellTable() {
     if (isOpen) {
       const id = openCellMap[type];
       removeCell(id);
-      setOpenCellMap(prev => {
+      setOpenCellMap((prev) => {
         const newMap = { ...prev };
         delete newMap[type];
         return newMap;
       });
     } else {
-      addCell({ purpose: type, breaker: '', count: 1 });
-      const newCell = cellConfigs.find(cell => cell.purpose === type);
+      addCell({
+        purpose: type,
+        cellType: global.bodyType || '',
+        count: 1,
+        totalPrice: 0,
+      });
+      const newCell = cellConfigs.find((cell) => cell.purpose === type);
       if (newCell) {
-        setOpenCellMap(prev => ({
+        setOpenCellMap((prev) => ({
           ...prev,
-          [type]: newCell.id
+          [type]: newCell.id,
         }));
       }
     }
@@ -47,7 +111,7 @@ export default function RusnCellTable() {
   // Синхронизируем openCellMap с cellConfigs
   useEffect(() => {
     const newOpenCellMap: Record<string, string> = {};
-    cellConfigs.forEach(cell => {
+    cellConfigs.forEach((cell) => {
       if (cell.purpose !== 'Отходящая') {
         newOpenCellMap[cell.purpose] = cell.id;
       }
@@ -55,71 +119,61 @@ export default function RusnCellTable() {
     setOpenCellMap(newOpenCellMap);
   }, [cellConfigs]);
 
-  if (loading || groupsLoading || calculationsLoading) {
+  if (loading || groupsLoading) {
     return <div>Загрузка...</div>;
   }
 
-  if (materialsError || groupsError || calculationsError) {
+  if (materialsError || groupsError) {
     return (
       <div className="text-red-600 p-4 rounded bg-red-50">
         <h3 className="font-medium mb-2">Произошла ошибка:</h3>
         {materialsError && <p>{materialsError}</p>}
         {groupsError && <p>{groupsError}</p>}
-        {calculationsError && <p>{calculationsError}</p>}
+      </div>
+    );
+  }
+
+  // Проверяем, выбран ли тип ячеек в общих настройках
+  if (!global.bodyType) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div className="flex items-center gap-3">
+          <svg className="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+              clipRule="evenodd"
+            />
+          </svg>
+          <div>
+            <h3 className="text-sm font-medium text-yellow-900">Сначала выберите тип ячеек</h3>
+            <p className="text-sm text-yellow-700 mt-1">
+              Перейдите в раздел &quot;Общие настройки&quot; и выберите тип ячеек для продолжения
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Тип ячейки
-        </label>
-        <select
-          value={selectedGroupSlug}
-          onChange={(e) => {
-            setSelectedGroupSlug(e.target.value);
-            const group = groups.find(g => g.slug === e.target.value);
-            setSelectedGroupName(group?.name || '');
-          }}
-          className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
-        >
-          <option value="">Выберите тип ячейки</option>
-          {groups.map((group) => (
-            <option key={group.id} value={group.slug}>
-              {group.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {selectedGroupSlug && calculations.cell.length > 0 && (
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Калькуляция ячейки
-          </label>
-          <select
-            value={cellConfigs[0]?.calculationId || ''}
-            onChange={(e) => {
-              const calculationId = Number(e.target.value);
-              const calculation = calculations.cell.find(c => c.id === calculationId);
-              setSelectedCalculationName(calculation?.name || '');
-              cellConfigs.forEach(cell => {
-                updateCell(cell.id, 'calculationId', calculationId);
-              });
-            }}
-            className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
-          >
-            <option value="">Выберите калькуляцию</option>
-            {calculations.cell.map((calc) => (
-              <option key={calc.id} value={calc.id}>
-                {calc.name}
-              </option>
-            ))}
-          </select>
+      {/* Информация о выбранном типе ячеек */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-center gap-3">
+          <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+              clipRule="evenodd"
+            />
+          </svg>
+          <div>
+            <h3 className="text-sm font-medium text-blue-900">Тип ячеек: {global.bodyType}</h3>
+            <p className="text-sm text-blue-700 mt-1">Все ячейки будут созданы с выбранным типом</p>
+          </div>
         </div>
-      )}
+      </div>
 
       {cellTypes.map((type) => {
         if (type === 'Отходящая') {
@@ -132,19 +186,24 @@ export default function RusnCellTable() {
               toggled={outgoingCells.length > 0}
               onToggle={() => {
                 if (outgoingCells.length === 0) {
-                  addCell({ purpose: 'Отходящая', breaker: '', count: 1 });
-                  const newCell = cellConfigs.find(cell => cell.purpose === 'Отходящая');
+                  addCell({
+                    purpose: 'Отходящая',
+                    cellType: global.bodyType || '',
+                    count: 1,
+                    totalPrice: 0,
+                  });
+                  const newCell = cellConfigs.find((cell) => cell.purpose === 'Отходящая');
                   if (newCell) {
-                    setOpenCellMap(prev => ({
+                    setOpenCellMap((prev) => ({
                       ...prev,
-                      ['Отходящая']: newCell.id
+                      ['Отходящая']: newCell.id,
                     }));
                   }
                 } else {
-                  outgoingCells.forEach(cell => {
+                  outgoingCells.forEach((cell) => {
                     removeCell(cell.id);
                   });
-                  setOpenCellMap(prev => {
+                  setOpenCellMap((prev) => {
                     const newMap = { ...prev };
                     delete newMap['Отходящая'];
                     return newMap;
@@ -159,143 +218,90 @@ export default function RusnCellTable() {
                   </span>
                   <RusnCell
                     cell={cell}
-                    materials={materials}
-                    onUpdate={updateCell}
+                    materials={filteredMaterials}
+                    onUpdate={(id, field, value) => {
+                      if (
+                        field === 'breaker' ||
+                        field === 'rza' ||
+                        field === 'meterType' ||
+                        field === 'transformer'
+                      ) {
+                        const materialField = field === 'meterType' ? 'meter' : field;
+                        const material = filteredMaterials[materialField].find(
+                          (m) => m.id.toString() === (value as { id: string }).id
+                        );
+                        if (material) {
+                          updateCell(id, field, {
+                            id: material.id.toString(),
+                            name: material.name,
+                            price: Number(material.price),
+                          });
+                        }
+                      } else {
+                        updateCell(id, field, value);
+                      }
+                    }}
                     onRemove={removeCell}
                     groupSlug={selectedGroupSlug}
                     selectedGroupName={selectedGroupName}
-                    selectedCalculationName={selectedCalculationName}
+                    selectedCalculationName={calculations.cell[0]?.name || ''}
                   />
                 </div>
               ))}
-
-              <button
-                onClick={() => addCell({ purpose: 'Отходящая', breaker: '', count: 1 })}
-                className="mt-2 px-3 py-1 bg-[#3A55DF] hover:bg-[#2d48be] text-white rounded text-sm"
-              >
-                + Добавить ещё
-              </button>
             </TogglerWithInput>
           );
         }
-
-        const id = openCellMap[type];
-        const cell = cellConfigs.find((c) => c.id === id);
 
         return (
           <TogglerWithInput
             key={type}
             label={`Ячейка: ${type}`}
-            toggled={!!id}
+            toggled={!!openCellMap[type]}
             onToggle={() => handleToggle(type)}
           >
-            {cell && (
+            {openCellMap[type] && (
               <RusnCell
-                cell={cell}
-                materials={materials}
-                onUpdate={updateCell}
+                cell={cellConfigs.find((c) => c.id === openCellMap[type])!}
+                materials={filteredMaterials}
+                onUpdate={(id, field, value) => {
+                  if (
+                    field === 'breaker' ||
+                    field === 'rza' ||
+                    field === 'meterType' ||
+                    field === 'transformer'
+                  ) {
+                    const materialField = field === 'meterType' ? 'meter' : field;
+                    const material = filteredMaterials[materialField].find(
+                      (m) => m.id.toString() === (value as { id: string }).id
+                    );
+                    if (material) {
+                      updateCell(id, field, {
+                        id: material.id.toString(),
+                        name: material.name,
+                        price: Number(material.price),
+                      });
+                    }
+                  } else {
+                    updateCell(id, field, value);
+                  }
+                }}
                 onRemove={removeCell}
                 groupSlug={selectedGroupSlug}
                 selectedGroupName={selectedGroupName}
-                selectedCalculationName={selectedCalculationName}
+                selectedCalculationName={calculations.cell[0]?.name || ''}
               />
             )}
           </TogglerWithInput>
         );
       })}
 
-      {cellConfigs.length > 0 && (
-        <div className="mt-8">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Общая сумма</h3>
-          <div className="space-y-2">
-            {cellConfigs.map((cell, index) => {
-              const cellCalculation = calculations.cell.find(c => c.name === selectedCalculationName);
-              if (!cellCalculation) return null;
-              
-              const rows = [];
-              
-              if (cell.breaker) {
-                const breaker = materials.breaker.find(m => m.id.toString() === cell.breaker);
-                if (breaker) {
-                  const price = Number(breaker.price) * (cell.count || 1);
-                  rows.push({
-                    name: `${cell.purpose} ${cellCalculation.name} Выключатель: ${breaker.name}`,
-                    price: price
-                  });
-                }
-              }
-              
-              if (cell.rza) {
-                const rza = materials.rza.find(m => m.id.toString() === cell.rza);
-                if (rza) {
-                  const price = Number(rza.price) * (cell.count || 1);
-                  rows.push({
-                    name: `${cell.purpose} ${cellCalculation.name} РЗА: ${rza.name}`,
-                    price: price
-                  });
-                }
-              }
-              
-              if (cell.meterType) {
-                const meter = materials.meter.find(m => m.id.toString() === cell.meterType);
-                if (meter) {
-                  const price = Number(meter.price) * (cell.count || 1);
-                  rows.push({
-                    name: `${cell.purpose} ${cellCalculation.name} Счетчик: ${meter.name}`,
-                    price: price
-                  });
-                }
-              }
-
-              return rows.map((row, rowIndex) => (
-                <div key={`${cell.id}-${rowIndex}`} className="flex justify-between items-center">
-                  <div className="text-gray-600">
-                    {row.name}
-                  </div>
-                  <div className="text-lg font-semibold text-[#3A55DF]">
-                    {row.price.toLocaleString('ru-RU')} ₸
-                  </div>
-                </div>
-              ));
-            })}
-            
-            <div className="pt-4 border-t border-gray-200 flex justify-between items-center">
-              <div className="text-lg font-medium text-gray-900">Итого:</div>
-              <div className="text-2xl font-bold text-[#3A55DF]">
-                {cellConfigs.reduce((total, cell) => {
-                  const cellCalculation = calculations.cell.find(c => c.name === selectedCalculationName);
-                  if (!cellCalculation) return total;
-                  
-                  let cellTotal = 0;
-                  
-                  if (cell.breaker) {
-                    const breaker = materials.breaker.find(m => m.id.toString() === cell.breaker);
-                    if (breaker) {
-                      cellTotal += Number(breaker.price) * (cell.count || 1);
-                    }
-                  }
-                  
-                  if (cell.rza) {
-                    const rza = materials.rza.find(m => m.id.toString() === cell.rza);
-                    if (rza) {
-                      cellTotal += Number(rza.price) * (cell.count || 1);
-                    }
-                  }
-                  
-                  if (cell.meterType) {
-                    const meter = materials.meter.find(m => m.id.toString() === cell.meterType);
-                    if (meter) {
-                      cellTotal += Number(meter.price) * (cell.count || 1);
-                    }
-                  }
-                  
-                  return total + cellTotal;
-                }, 0).toLocaleString('ru-RU')} ₸
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <RusnSummaryTable
+        cells={cellConfigs}
+        materials={materials}
+        groupSlug={selectedGroupSlug}
+        selectedGroupName={selectedGroupName}
+        selectedCalculationName={calculations.cell[0]?.name || ''}
+      />
     </div>
   );
 }

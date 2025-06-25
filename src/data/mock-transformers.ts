@@ -4,7 +4,7 @@ export interface Transformer {
   power: number;
   manufacturer: string;
   price: number;
-  spec: string;
+  model: string;
 }
 
 export const transformerData: Transformer[] = [
@@ -14,7 +14,7 @@ export const transformerData: Transformer[] = [
     power: 63,
     manufacturer: 'Alageum',
     price: 2703750,
-    spec: 'Силовой трансформатор ТСЛ-63кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-63кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -22,7 +22,7 @@ export const transformerData: Transformer[] = [
     power: 100,
     manufacturer: 'Alageum',
     price: 3145800,
-    spec: 'Силовой трансформатор ТСЛ-100кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-100кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -30,7 +30,7 @@ export const transformerData: Transformer[] = [
     power: 160,
     manufacturer: 'Alageum',
     price: 3810450,
-    spec: 'Силовой трансформатор ТСЛ-160кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-160кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -38,7 +38,7 @@ export const transformerData: Transformer[] = [
     power: 250,
     manufacturer: 'Alageum',
     price: 3526950,
-    spec: 'Силовой трансформатор ТСЛ-250кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-250кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -46,7 +46,7 @@ export const transformerData: Transformer[] = [
     power: 400,
     manufacturer: 'Alageum',
     price: 4182150,
-    spec: 'Силовой трансформатор ТСЛ-400кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-400кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -54,7 +54,7 @@ export const transformerData: Transformer[] = [
     power: 630,
     manufacturer: 'Alageum',
     price: 4894050,
-    spec: 'Силовой трансформатор ТСЛ-630кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-630кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -62,7 +62,7 @@ export const transformerData: Transformer[] = [
     power: 1000,
     manufacturer: 'Alageum',
     price: 7014000,
-    spec: 'Силовой трансформатор ТСЛ-1000кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-1000кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -70,7 +70,7 @@ export const transformerData: Transformer[] = [
     power: 1250,
     manufacturer: 'Alageum',
     price: 7919100,
-    spec: 'Силовой трансформатор ТСЛ-1250кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-1250кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -78,7 +78,7 @@ export const transformerData: Transformer[] = [
     power: 1600,
     manufacturer: 'Alageum',
     price: 9513000,
-    spec: 'Силовой трансформатор ТСЛ-1600кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-1600кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -86,7 +86,7 @@ export const transformerData: Transformer[] = [
     power: 2000,
     manufacturer: 'Alageum',
     price: 11254950,
-    spec: 'Силовой трансформатор ТСЛ-2000кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-2000кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -94,7 +94,7 @@ export const transformerData: Transformer[] = [
     power: 2500,
     manufacturer: 'Alageum',
     price: 12765900,
-    spec: 'Силовой трансформатор ТСЛ-2500кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-2500кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -102,7 +102,7 @@ export const transformerData: Transformer[] = [
     power: 3150,
     manufacturer: 'Alageum',
     price: 14689500,
-    spec: 'Силовой трансформатор ТСЛ-3150кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-3150кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -110,7 +110,7 @@ export const transformerData: Transformer[] = [
     power: 4000,
     manufacturer: 'Alageum',
     price: 16326450,
-    spec: 'Силовой трансформатор ТСЛ-4000кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-4000кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -118,7 +118,7 @@ export const transformerData: Transformer[] = [
     power: 25,
     manufacturer: 'Alageum',
     price: 549150,
-    spec: 'Силовой трансформатор ТМГ-25кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-25кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -126,7 +126,7 @@ export const transformerData: Transformer[] = [
     power: 40,
     manufacturer: 'Alageum',
     price: 595350,
-    spec: 'Силовой трансформатор ТМГ-40кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-40кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -134,7 +134,7 @@ export const transformerData: Transformer[] = [
     power: 63,
     manufacturer: 'Alageum',
     price: 721350,
-    spec: 'Силовой трансформатор ТМГ-63кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-63кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -142,7 +142,7 @@ export const transformerData: Transformer[] = [
     power: 100,
     manufacturer: 'Alageum',
     price: 854700,
-    spec: 'Силовой трансформатор ТМГ-100кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-100кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -150,7 +150,7 @@ export const transformerData: Transformer[] = [
     power: 160,
     manufacturer: 'Alageum',
     price: 1102500,
-    spec: 'Силовой трансформатор ТМГ-160кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-160кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -158,7 +158,7 @@ export const transformerData: Transformer[] = [
     power: 250,
     manufacturer: 'Alageum',
     price: 1407000,
-    spec: 'Силовой трансформатор ТМГ-250кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-250кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -166,7 +166,7 @@ export const transformerData: Transformer[] = [
     power: 400,
     manufacturer: 'Alageum',
     price: 1811250,
-    spec: 'Силовой трансформатор ТМГ-400кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-400кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -174,7 +174,7 @@ export const transformerData: Transformer[] = [
     power: 630,
     manufacturer: 'Alageum',
     price: 2642850,
-    spec: 'Силовой трансформатор ТМГ-630кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-630кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -182,7 +182,7 @@ export const transformerData: Transformer[] = [
     power: 1000,
     manufacturer: 'Alageum',
     price: 4295550,
-    spec: 'Силовой трансформатор ТМГ-1000кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-1000кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -190,7 +190,7 @@ export const transformerData: Transformer[] = [
     power: 1250,
     manufacturer: 'Alageum',
     price: 5006400,
-    spec: 'Силовой трансформатор ТМГ-1250кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-1250кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -198,7 +198,7 @@ export const transformerData: Transformer[] = [
     power: 1600,
     manufacturer: 'Alageum',
     price: 6200250,
-    spec: 'Силовой трансформатор ТМГ-1600кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-1600кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -206,7 +206,7 @@ export const transformerData: Transformer[] = [
     power: 2000,
     manufacturer: 'Alageum',
     price: 7596750,
-    spec: 'Силовой трансформатор ТМГ-2000кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-2000кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -214,7 +214,7 @@ export const transformerData: Transformer[] = [
     power: 2500,
     manufacturer: 'Alageum',
     price: 8751750,
-    spec: 'Силовой трансформатор ТМГ-2500кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-2500кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -222,7 +222,7 @@ export const transformerData: Transformer[] = [
     power: 630,
     manufacturer: 'ZBB',
     price: 3755895,
-    spec: 'Силовой трансформатор ТСЛ-630кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-630кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -230,7 +230,7 @@ export const transformerData: Transformer[] = [
     power: 1000,
     manufacturer: 'ZBB',
     price: 5228795,
-    spec: 'Силовой трансформатор ТСЛ-1000кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-1000кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -238,7 +238,7 @@ export const transformerData: Transformer[] = [
     power: 1250,
     manufacturer: 'ZBB',
     price: 6038890,
-    spec: 'Силовой трансформатор ТСЛ-1250кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-1250кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -246,7 +246,7 @@ export const transformerData: Transformer[] = [
     power: 1600,
     manufacturer: 'ZBB',
     price: 7364500,
-    spec: 'Силовой трансформатор ТСЛ-1600кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-1600кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -254,7 +254,7 @@ export const transformerData: Transformer[] = [
     power: 2000,
     manufacturer: 'ZBB',
     price: 8690110,
-    spec: 'Силовой трансформатор ТСЛ-2000кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-2000кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -262,7 +262,7 @@ export const transformerData: Transformer[] = [
     power: 2500,
     manufacturer: 'ZBB',
     price: 10383945,
-    spec: 'Силовой трансформатор ТСЛ-2500кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-2500кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -270,7 +270,7 @@ export const transformerData: Transformer[] = [
     power: 3150,
     manufacturer: 'ZBB',
     price: 12887875,
-    spec: 'Силовой трансформатор ТСЛ-3150кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-3150кВА 10/0,4кВ',
   },
   {
     voltage: 10,
@@ -278,7 +278,7 @@ export const transformerData: Transformer[] = [
     power: 4000,
     manufacturer: 'ZBB',
     price: 14581710,
-    spec: 'Силовой трансформатор ТСЛ-4000кВА 10/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-4000кВА 10/0,4кВ',
   },
   {
     voltage: 20,
@@ -286,7 +286,7 @@ export const transformerData: Transformer[] = [
     power: 100,
     manufacturer: 'Alageum',
     price: 3510150,
-    spec: 'Силовой трансформатор ТСЛ-100кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-100кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -294,7 +294,7 @@ export const transformerData: Transformer[] = [
     power: 160,
     manufacturer: 'Alageum',
     price: 3943800,
-    spec: 'Силовой трансформатор ТСЛ-160кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-160кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -302,7 +302,7 @@ export const transformerData: Transformer[] = [
     power: 250,
     manufacturer: 'Alageum',
     price: 4583250,
-    spec: 'Силовой трансформатор ТСЛ-250кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-250кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -310,7 +310,7 @@ export const transformerData: Transformer[] = [
     power: 400,
     manufacturer: 'Alageum',
     price: 5105100,
-    spec: 'Силовой трансформатор ТСЛ-400кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-400кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -318,7 +318,7 @@ export const transformerData: Transformer[] = [
     power: 630,
     manufacturer: 'Alageum',
     price: 6533100,
-    spec: 'Силовой трансформатор ТСЛ-630кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-630кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -326,7 +326,7 @@ export const transformerData: Transformer[] = [
     power: 1000,
     manufacturer: 'Alageum',
     price: 8559600,
-    spec: 'Силовой трансформатор ТСЛ-1000кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-1000кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -334,7 +334,7 @@ export const transformerData: Transformer[] = [
     power: 1250,
     manufacturer: 'Alageum',
     price: 9652650,
-    spec: 'Силовой трансформатор ТСЛ-1250кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-1250кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -342,7 +342,7 @@ export const transformerData: Transformer[] = [
     power: 1600,
     manufacturer: 'Alageum',
     price: 11416650,
-    spec: 'Силовой трансформатор ТСЛ-1600кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-1600кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -350,7 +350,7 @@ export const transformerData: Transformer[] = [
     power: 2000,
     manufacturer: 'Alageum',
     price: 13433700,
-    spec: 'Силовой трансформатор ТСЛ-2000кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-2000кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -358,7 +358,7 @@ export const transformerData: Transformer[] = [
     power: 2500,
     manufacturer: 'Alageum',
     price: 14758800,
-    spec: 'Силовой трансформатор ТСЛ-2500кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-2500кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -366,7 +366,7 @@ export const transformerData: Transformer[] = [
     power: 3150,
     manufacturer: 'Alageum',
     price: 17616900,
-    spec: 'Силовой трансформатор ТСЛ-3150кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-3150кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -374,7 +374,7 @@ export const transformerData: Transformer[] = [
     power: 4000,
     manufacturer: 'Alageum',
     price: 19884900,
-    spec: 'Силовой трансформатор ТСЛ-4000кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-4000кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -382,7 +382,7 @@ export const transformerData: Transformer[] = [
     power: 100,
     manufacturer: 'Alageum',
     price: 1516200,
-    spec: 'Силовой трансформатор ТМГ-100кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-100кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -390,7 +390,7 @@ export const transformerData: Transformer[] = [
     power: 160,
     manufacturer: 'Alageum',
     price: 1736700,
-    spec: 'Силовой трансформатор ТМГ-160кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-160кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -398,7 +398,7 @@ export const transformerData: Transformer[] = [
     power: 250,
     manufacturer: 'Alageum',
     price: 2173500,
-    spec: 'Силовой трансформатор ТМГ-250кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-250кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -406,7 +406,7 @@ export const transformerData: Transformer[] = [
     power: 400,
     manufacturer: 'Alageum',
     price: 2796150,
-    spec: 'Силовой трансформатор ТМГ-400кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-400кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -414,7 +414,7 @@ export const transformerData: Transformer[] = [
     power: 630,
     manufacturer: 'Alageum',
     price: 3774750,
-    spec: 'Силовой трансформатор ТМГ-630кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-630кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -422,7 +422,7 @@ export const transformerData: Transformer[] = [
     power: 1000,
     manufacturer: 'Alageum',
     price: 5688900,
-    spec: 'Силовой трансформатор ТМГ-1000кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-1000кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -430,7 +430,7 @@ export const transformerData: Transformer[] = [
     power: 1250,
     manufacturer: 'Alageum',
     price: 6453300,
-    spec: 'Силовой трансформатор ТМГ-1250кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-1250кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -438,7 +438,7 @@ export const transformerData: Transformer[] = [
     power: 1600,
     manufacturer: 'Alageum',
     price: 7518000,
-    spec: 'Силовой трансформатор ТМГ-1600кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-1600кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -446,7 +446,7 @@ export const transformerData: Transformer[] = [
     power: 2000,
     manufacturer: 'Alageum',
     price: 8411550,
-    spec: 'Силовой трансформатор ТМГ-2000кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-2000кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -454,7 +454,7 @@ export const transformerData: Transformer[] = [
     power: 2500,
     manufacturer: 'Alageum',
     price: 10090500,
-    spec: 'Силовой трансформатор ТМГ-2500кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТМГ-2500кВА 20/0,4кВ',
   },
 
   {
@@ -463,7 +463,7 @@ export const transformerData: Transformer[] = [
     power: 630,
     manufacturer: 'ZBB',
     price: 4418700,
-    spec: 'Силовой трансформатор ТСЛ-630кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-630кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -471,7 +471,7 @@ export const transformerData: Transformer[] = [
     power: 1000,
     manufacturer: 'ZBB',
     price: 6112535,
-    spec: 'Силовой трансформатор ТСЛ-1000кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-1000кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -479,7 +479,7 @@ export const transformerData: Transformer[] = [
     power: 1250,
     manufacturer: 'ZBB',
     price: 6996275,
-    spec: 'Силовой трансформатор ТСЛ-1250кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-1250кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -487,7 +487,7 @@ export const transformerData: Transformer[] = [
     power: 1600,
     manufacturer: 'ZBB',
     price: 8542820,
-    spec: 'Силовой трансформатор ТСЛ-1600кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-1600кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -495,7 +495,7 @@ export const transformerData: Transformer[] = [
     power: 2000,
     manufacturer: 'ZBB',
     price: 9942075,
-    spec: 'Силовой трансформатор ТСЛ-2000кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-2000кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -503,7 +503,7 @@ export const transformerData: Transformer[] = [
     power: 2500,
     manufacturer: 'ZBB',
     price: 11783200,
-    spec: 'Силовой трансформатор ТСЛ-2500кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-2500кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -511,7 +511,7 @@ export const transformerData: Transformer[] = [
     power: 3150,
     manufacturer: 'ZBB',
     price: 15318160,
-    spec: 'Силовой трансформатор ТСЛ-3150кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-3150кВА 20/0,4кВ',
   },
   {
     voltage: 20,
@@ -519,6 +519,6 @@ export const transformerData: Transformer[] = [
     power: 4000,
     manufacturer: 'ZBB',
     price: 16938350,
-    spec: 'Силовой трансформатор ТСЛ-4000кВА 20/0,4кВ',
+    model: 'Силовой трансформатор ТСЛ-4000кВА 20/0,4кВ',
   },
 ];

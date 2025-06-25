@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Save, Power, Settings2, Gauge } from 'lucide-react';
+import { ChevronLeft, Save, Power, Settings2, Gauge, Zap, Battery, Cable } from 'lucide-react';
 import { useRusnSettings } from '@/hooks/useRusnSettings';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 
@@ -52,7 +52,7 @@ export default function RusnSettingsPage() {
         </div>
 
         {/* Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="space-y-6">
           <SettingsSection
             title="Выключатель"
             type="switch"
@@ -81,6 +81,39 @@ export default function RusnSettingsPage() {
             icon={<div className="p-2 bg-green-50 rounded-lg"><Gauge className="w-6 h-6 text-green-600" /></div>}
             allCategories={allCategories}
             selectedCategories={selectedCategories.counter}
+            onAddCategory={handleAddCategory}
+            onRemoveCategory={handleRemoveCategory}
+            onToggleVisibility={handleToggleVisibility}
+          />
+
+          <SettingsSection
+            title="СР"
+            type="sr"
+            icon={<div className="p-2 bg-purple-50 rounded-lg"><Cable className="w-6 h-6 text-purple-600" /></div>}
+            allCategories={allCategories}
+            selectedCategories={selectedCategories.sr}
+            onAddCategory={handleAddCategory}
+            onRemoveCategory={handleRemoveCategory}
+            onToggleVisibility={handleToggleVisibility}
+          />
+
+          <SettingsSection
+            title="ТСН"
+            type="tsn"
+            icon={<div className="p-2 bg-yellow-50 rounded-lg"><Zap className="w-6 h-6 text-yellow-600" /></div>}
+            allCategories={allCategories}
+            selectedCategories={selectedCategories.tsn}
+            onAddCategory={handleAddCategory}
+            onRemoveCategory={handleRemoveCategory}
+            onToggleVisibility={handleToggleVisibility}
+          />
+
+          <SettingsSection
+            title="ТН"
+            type="tn"
+            icon={<div className="p-2 bg-orange-50 rounded-lg"><Battery className="w-6 h-6 text-orange-600" /></div>}
+            allCategories={allCategories}
+            selectedCategories={selectedCategories.tn}
             onAddCategory={handleAddCategory}
             onRemoveCategory={handleRemoveCategory}
             onToggleVisibility={handleToggleVisibility}

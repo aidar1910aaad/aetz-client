@@ -8,6 +8,7 @@ interface Props {
     breaker: Material[];
     rza: Material[];
     meter: Material[];
+    transformer: Material[];
   };
   groupSlug: string;
   selectedGroupName: string;
@@ -26,7 +27,7 @@ export default function RusnSummaryTable({
   materials,
   groupSlug,
   selectedGroupName,
-  selectedCalculationName
+  selectedCalculationName,
 }: Props) {
   const { calculations, calculateCellTotal } = useRusnCalculation(groupSlug);
 
@@ -35,54 +36,69 @@ export default function RusnSummaryTable({
 
     // Добавляем стоимость ячейки
     if (selectedGroupName && selectedCalculationName) {
-      const cellCalculation = calculations.cell.find(c => c.name === selectedCalculationName);
+      const cellCalculation = calculations.cell.find((c) => c.name === selectedCalculationName);
       if (cellCalculation) {
         items.push({
           name: `${selectedGroupName} ${selectedCalculationName}`,
           price: calculateCellTotal(cellCalculation.id),
           count: cells.length,
-          total: calculateCellTotal(cellCalculation.id) * cells.length
+          total: calculateCellTotal(cellCalculation.id) * cells.length,
         });
       }
     }
 
     // Собираем все материалы
-    cells.forEach(cell => {
+    cells.forEach((cell) => {
       // Выключатель
       if (cell.breaker) {
-        const breaker = materials.breaker.find(m => m.id.toString() === cell.breaker);
+        const breaker = materials.breaker.find((m) => m.id.toString() === cell.breaker.id);
         if (breaker) {
           items.push({
             name: `Выключатель: ${breaker.name}`,
             price: Number(breaker.price),
             count: cell.count || 1,
-            total: Number(breaker.price) * (cell.count || 1)
+            total: Number(breaker.price) * (cell.count || 1),
           });
         }
       }
 
       // РЗА
       if (cell.rza) {
-        const rza = materials.rza.find(m => m.id.toString() === cell.rza);
+        const rza = materials.rza.find((m) => m.id.toString() === cell.rza.id);
         if (rza) {
           items.push({
             name: `РЗА: ${rza.name}`,
             price: Number(rza.price),
             count: cell.count || 1,
-            total: Number(rza.price) * (cell.count || 1)
+            total: Number(rza.price) * (cell.count || 1),
           });
         }
       }
 
       // Счетчик
       if (cell.meterType) {
-        const meter = materials.meter.find(m => m.id.toString() === cell.meterType);
+        const meter = materials.meter.find((m) => m.id.toString() === cell.meterType.id);
         if (meter) {
           items.push({
             name: `Счетчик: ${meter.name}`,
             price: Number(meter.price),
             count: cell.count || 1,
-            total: Number(meter.price) * (cell.count || 1)
+            total: Number(meter.price) * (cell.count || 1),
+          });
+        }
+      }
+
+      // Трансформатор
+      if (cell.transformer) {
+        const transformer = materials.transformer.find(
+          (m) => m.id.toString() === cell.transformer.id
+        );
+        if (transformer) {
+          items.push({
+            name: `Трансформатор: ${transformer.name}`,
+            price: Number(transformer.price),
+            count: cell.count || 1,
+            total: Number(transformer.price) * (cell.count || 1),
           });
         }
       }
@@ -118,9 +134,7 @@ export default function RusnSummaryTable({
           <tbody className="bg-white divide-y divide-gray-200">
             {summaryItems.map((item, index) => (
               <tr key={index}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {item.name}
-                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.name}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
                   {item.price.toLocaleString('ru-RU')} ₸
                 </td>
@@ -133,7 +147,10 @@ export default function RusnSummaryTable({
               </tr>
             ))}
             <tr className="bg-gray-50">
-              <td colSpan={3} className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
+              <td
+                colSpan={3}
+                className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right"
+              >
                 Итого:
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
@@ -145,4 +162,4 @@ export default function RusnSummaryTable({
       </div>
     </div>
   );
-} 
+}

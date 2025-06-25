@@ -16,7 +16,6 @@ import { showEditModal } from '@/shared/modals/EditModalContainer';
 interface NewCategory {
   name: string;
   description: string;
-  code: string;
   id: number;
 }
 
@@ -38,13 +37,15 @@ export function useMaterialCategoriesHandlers(
   const handleAddCategory = useCallback(
     async (newCategory: NewCategory) => {
       const trimmedName = newCategory.name.trim();
-      
+
       if (!trimmedName || !newCategory.id) {
         showToast('Название и ID категории обязательны', 'error');
         return;
       }
 
-      const existsByName = categories.some((cat) => cat.name.toLowerCase() === trimmedName.toLowerCase());
+      const existsByName = categories.some(
+        (cat) => cat.name.toLowerCase() === trimmedName.toLowerCase()
+      );
       if (existsByName) {
         showToast('Категория с таким названием уже существует', 'error');
         return;
@@ -58,11 +59,14 @@ export function useMaterialCategoriesHandlers(
 
       try {
         const token = localStorage.getItem('token') || '';
-        const created = await createCategory({
-          name: trimmedName,
-          id: newCategory.id,
-          description: newCategory.description.trim(),
-        }, token);
+        const created = await createCategory(
+          {
+            name: trimmedName,
+            id: newCategory.id,
+            description: newCategory.description.trim(),
+          },
+          token
+        );
         console.log('Created category:', created);
         setCategories((prev) => [...prev, created]);
         setNewCategory({ name: '', description: '', id: 0 });
@@ -104,23 +108,18 @@ export function useMaterialCategoriesHandlers(
 
   const handleUpdate = useCallback(
     async (cat: Category) => {
+      console.log('Starting category update for:', cat);
+
       const result = await showEditModal({
         title: 'Редактировать категорию',
         initialValues: {
           name: cat.name,
-          code: cat.code,
           description: cat.description,
         },
         fields: [
           {
             name: 'name',
             label: 'Название',
-            type: 'text',
-            required: true,
-          },
-          {
-            name: 'code',
-            label: 'Код',
             type: 'text',
             required: true,
           },
@@ -133,14 +132,18 @@ export function useMaterialCategoriesHandlers(
         ],
       });
 
-      if (!result) return;
+      if (!result) {
+        console.log('Edit modal cancelled');
+        return;
+      }
 
-      const { name, code, description } = result;
+      console.log('Edit modal result:', result);
+
+      const { name, description } = result;
       const trimmedName = name.trim();
-      const trimmedCode = code.trim();
 
-      if (!trimmedName || !trimmedCode) {
-        showToast('Название и код категории обязательны', 'error');
+      if (!trimmedName) {
+        showToast('Название категории обязательно', 'error');
         return;
       }
 
@@ -152,40 +155,33 @@ export function useMaterialCategoriesHandlers(
         return;
       }
 
-      const existsByCode = categories.some(
-        (c) => c.code && c.code.toLowerCase() === trimmedCode.toLowerCase() && c.id !== cat.id
-      );
-      if (existsByCode) {
-        showToast('Категория с таким кодом уже существует', 'error');
-        return;
-      }
-
       try {
         const token = localStorage.getItem('token') || '';
-        await updateCategory(
-          cat.id,
-          {
-            name: trimmedName,
-            code: trimmedCode,
-            description: description.trim(),
-          },
-          token
-        );
+        const updateData = {
+          name: trimmedName,
+        };
+
+        console.log('Sending update request with data:', updateData);
+
+        await updateCategory(cat.id, updateData, token);
+
+        console.log('Update successful, updating local state');
+
         setCategories((prev) =>
           prev.map((item) =>
             item.id === cat.id
               ? {
                   ...item,
                   name: trimmedName,
-                  code: trimmedCode,
-                  description: description.trim(),
+                  description: description?.trim() || '',
                 }
               : item
           )
         );
         showToast('Категория обновлена!', 'success');
       } catch (err: any) {
-        showToast('Ошибка при обновлении категории', 'error');
+        console.error('Error updating category:', err);
+        showToast(err.message || 'Ошибка при обновлении категории', 'error');
       }
     },
     [categories, setCategories]

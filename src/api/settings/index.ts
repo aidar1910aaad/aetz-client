@@ -3,19 +3,25 @@ import { api } from '../baseUrl/index';
 // Интерфейсы
 export interface CategorySetting {
   categoryId: number;
-  type: 'switch' | 'rza' | 'counter';
+  type: 'switch' | 'rza' | 'counter' | 'sr' | 'tsn' | 'tn';
   isVisible: boolean;
 }
 
-export interface SettingsData {
-  id: number;
+export interface Settings {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
   settings: {
     rusn: CategorySetting[];
     bmz: CategorySetting[];
-    runn?: CategorySetting[]; // опционально, так как в примере его нет
+    runn: CategorySetting[];
+    work: CategorySetting[];
+    transformer: CategorySetting[];
+    additionalEquipment: CategorySetting[];
+    sr: CategorySetting[];
+    tsn: CategorySetting[];
+    tn: CategorySetting[];
   };
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface SettingsPayload {
@@ -26,15 +32,6 @@ export interface SettingsPayload {
   };
 }
 
-export interface Settings {
-  rusn: CategorySetting[];
-  bmz: CategorySetting[];
-  transformer?: CategorySetting[];
-  runn?: CategorySetting[];
-  additional?: CategorySetting[];
-  works?: CategorySetting[];
-}
-
 export interface SettingsResponse {
   settings: Settings;
 }
@@ -42,7 +39,7 @@ export interface SettingsResponse {
 // Функции для работы с API
 export const createSettings = async (settings: SettingsPayload, token: string): Promise<void> => {
   try {
-    const response = await fetch('/api/settings', {
+    const response = await fetch(`${api}/settings`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -63,7 +60,7 @@ export const createSettings = async (settings: SettingsPayload, token: string): 
 
 export const updateSettings = async (id: number, settings: SettingsPayload, token: string): Promise<void> => {
   try {
-    const response = await fetch(`/api/settings/${id}`, {
+    const response = await fetch(`${api}/settings/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -82,17 +79,13 @@ export const updateSettings = async (id: number, settings: SettingsPayload, toke
   }
 };
 
-export const getSettings = async (token: string): Promise<SettingsData> => {
+export const getSettings = async (token: string): Promise<Settings> => {
   try {
-    const response = await fetch('http://localhost:3001/settings', {
-      method: 'GET',
+    const response = await fetch(`${api}/settings`, {
       headers: {
-        'accept': 'application/json',
         'Authorization': `Bearer ${token}`
       }
     });
-
-    console.log('Get settings response status:', response.status);
     
     if (!response.ok) {
       throw new Error(`Ошибка при получении настроек: ${response.status}`);
@@ -100,56 +93,70 @@ export const getSettings = async (token: string): Promise<SettingsData> => {
 
     const data = await response.json();
     console.log('Get settings response:', data);
-
-    // Проверяем, что data это массив и берем только первую настройку
-    if (!Array.isArray(data) || data.length === 0) {
-      console.error('No settings found');
-      return {
-        id: 1,
-        settings: {
-          rusn: [],
-          bmz: [],
-          runn: []
-        },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-    }
-
-    // Возвращаем только первую настройку
-    return data[0];
+    return data;
   } catch (error) {
     console.error('Error in getSettings:', error);
     throw error;
   }
 };
 
-export const saveSettings = async (id: number, settings: {
+export const saveSettings = async (settings: {
   settings: {
-    rusn: CategorySetting[];
-    bmz: CategorySetting[];
+    rusn?: CategorySetting[];
+    bmz?: CategorySetting[];
     runn?: CategorySetting[];
+    work?: CategorySetting[];
+    transformer?: CategorySetting[];
+    additionalEquipment?: CategorySetting[];
+    sr?: CategorySetting[];
+    tsn?: CategorySetting[];
+    tn?: CategorySetting[];
   }
-}, token: string): Promise<void> => {
+}, token: string): Promise<Settings> => {
   try {
-    const response = await fetch(`http://localhost:3001/settings/${id}`, {
-      method: 'PATCH',
-      headers: {
+    const url = `${api}/settings`;
+    
+    const headers = {
+      'accept': 'application/json',
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify(settings)
+    };
+
+    console.log('Saving settings with:', {
+      url,
+      method: 'PUT',
+      headers,
+      body: settings
     });
+
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(settings),
+      mode: 'cors',
+      credentials: 'include'
+    });
+
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
+      console.error('Error response:', errorData);
       throw new Error(errorData?.message || `Ошибка при сохранении настроек: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('Save settings response:', data);
+    console.log('Save settings success response:', data);
+    return data;
   } catch (error) {
     console.error('Error in saveSettings:', error);
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack
+      });
+    }
     throw error;
   }
 };

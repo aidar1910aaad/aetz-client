@@ -73,9 +73,9 @@ export async function getAllCategories(token: string): Promise<Category[]> {
 }
 
 interface UpdateCategoryRequest {
-  name: string;
-  description: string;
-  code: string;
+  name?: string;
+  description?: string;
+  code?: string;
 }
 
 export async function updateCategory(
@@ -83,6 +83,8 @@ export async function updateCategory(
   data: UpdateCategoryRequest,
   token: string
 ): Promise<void> {
+  console.log('Updating category:', { id, data });
+
   const response = await fetch(`${api}/categories/${id}`, {
     method: 'PATCH',
     headers: {
@@ -92,10 +94,15 @@ export async function updateCategory(
     body: JSON.stringify(data),
   });
 
+  console.log('Update response status:', response.status);
+
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
+    console.error('Update error:', error);
     throw new Error(error.message || 'Ошибка при обновлении категории');
   }
+
+  console.log('Category updated successfully');
 }
 
 export async function deleteCategory(id: number, token: string): Promise<void> {

@@ -1,130 +1,62 @@
 'use client';
 
-import HeaderInfo from '@/components/FinalReview/HeaderInfo';
-import BmzSection from '@/components/FinalReview/BmzSection';
-import TransformerSection from '@/components/FinalReview/TransformerSection';
-import RusnSection from '@/components/FinalReview/RusnSection';
-import FooterTotal from '@/components/FinalReview/FooterTotal';
-import { exportFinalReviewToExcel } from '@/utils/exportFinalReviewToExcel';
-import { useBktpStore } from '@/store/useBktpStore';
-import { useBmzStore } from '@/store/useBmzStore';
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTransformerStore } from '@/store/useTransformerStore';
 import { useRusnStore } from '@/store/useRusnStore';
-import { exportFinalReviewToPdf } from '@/utils/exportFinalReviewToPdf';
-import Breadcrumbs from '@/components/Breadcrumbs/Breadcrumbs'; // ✅ добавь путь, где у тебя лежит компонент
+import { useBmzStore } from '@/store/useBmzStore';
+import Breadcrumbs from '@/components/Breadcrumbs/Breadcrumbs';
+import TransformerSection from '@/components/FinalReview/TransformerSection';
+import RusnSection from '@/components/FinalReview/RusnSection';
+import BmzSection from '@/components/FinalReview/BmzSection';
 
-export default function FinalReviewForm() {
-  const bktp = useBktpStore();
-  const bmz = useBmzStore();
-  const { selectedTransformer, isSkipped } = useTransformerStore();
-  const rusn = useRusnStore();
-  const rusnMapped = {
-    selectedCellTypes: [rusn.global.bodyType],
-    breaker: '', // если хочешь — можешь получить из первой ячейки: rusn.cellConfigs[0]?.breaker
-    rza: '',
-    ctRatio: '',
-    meterType: '',
-    cells: {
-      input: rusn.cellConfigs.filter((c) => c.purpose === '1ВК').length,
-      sv: rusn.cellConfigs.filter((c) => c.purpose === '3СВ').length,
-      sr: rusn.cellConfigs.filter((c) => c.purpose === '4РСВ').length,
-      outgoing: rusn.cellConfigs.filter((c) => c.purpose === 'Отходящая линия').length,
-      transformerOutgoing: rusn.cellConfigs.filter((c) => c.purpose === '2ЛК1').length,
-      tn: rusn.global.tnCount,
-      tsn: rusn.global.tsnCount,
-    },
-  };
+export default function FinalReview() {
+  const { selectedTransformer } = useTransformerStore();
+  const { global: rusn } = useRusnStore();
+  const bmzStore = useBmzStore();
+  const [isLoading, setIsLoading] = useState(true);
 
-  const transformerStore = useTransformerStore();
+  useEffect(() => {
+    const loadData = () => {
+      try {
+        const data = localStorage.getItem('currentRequest');
+        if (data) {
+          JSON.parse(data);
+        }
+      } catch (error) {
+        console.error('Error parsing current request data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const bmzLength = Number(bmz.length);
-  const bmzWidth = Number(bmz.width);
-  const bmzArea = Math.round(((bmzLength * bmzWidth) / 1_000_000) * 100) / 100;
+    loadData();
+    window.addEventListener('storage', loadData);
 
-  const pricePerLighting = 5000;
-  const pricePerHeatedFloor = 7500;
+    return () => {
+      window.removeEventListener('storage', loadData);
+    };
+  }, []);
 
-  const bmzTotal =
-    (bmz.lighting ? bmzArea * pricePerLighting : 0) +
-    (bmz.heatedFloor ? bmzArea * pricePerHeatedFloor : 0);
-
-  const transformerTotal = selectedTransformer
-    ? selectedTransformer.price * selectedTransformer.quantity
-    : 0;
-
-  const rusnTotal = 8169028;
-  const miscTotal = 1622663;
-
-  const fullTotal =
-    (bmz.lighting ? 18044000 : 0) +
-    (bmz.fireAlarm ? 572000 : 0) +
-    transformerTotal +
-    rusnTotal +
-    miscTotal;
-
-  const handleSave = () => {
-    bktp.reset();
-    bmz.reset();
-    transformerStore.reset();
-    rusn.reset();
-    alert('Заявка успешно сохранена');
-    // можно сделать router.push('/dashboard/bktp') если хочешь редирект
-  };
+  if (isLoading) {
+    return (
+      <div className="h-[calc(100vh-110px)] overflow-y-auto px-6 py-6 bg-gray-50">
+        <div className="flex items-center justify-center h-full">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3A55DF]"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-10 bg-white rounded shadow-md">
+    <div className="h-[calc(100vh-110px)] overflow-y-auto px-6 py-6 bg-gray-50">
       <Breadcrumbs />
-      <HeaderInfo bktp={bktp} />
-      <BmzSection bmz={bmz} />
-      {!isSkipped && selectedTransformer && (
-        <TransformerSection transformer={selectedTransformer} />
-      )}
-      <RusnSection
-        rusn={{
-          selectedCellTypes: [rusn.global.bodyType],
-          breaker: '', // если нужен — можно передавать из cellConfigs[0]
-          rza: '',
-          ctRatio: '',
-          meterType: '',
-          cells: {
-            input: rusn.cellConfigs.filter((c) => c.purpose === '1ВК').length,
-            sv: rusn.cellConfigs.filter((c) => c.purpose === '3СВ').length,
-            sr: rusn.cellConfigs.filter((c) => c.purpose === '4РСВ').length,
-            outgoing: rusn.cellConfigs.filter((c) => c.purpose === 'Отходящая линия').length,
-            transformerOutgoing: rusn.cellConfigs.filter((c) => c.purpose === '2ЛК1').length,
-            tn: rusn.global.tnCount,
-            tsn: rusn.global.tsnCount,
-          },
-        }}
-      />
+      <h1 className="text-2xl font-bold mb-4">Итоговая спецификация</h1>
 
-      <FooterTotal total={fullTotal} />
-      <div className="text-right space-x-4">
-        <button
-          onClick={() => exportFinalReviewToExcel(bmz, selectedTransformer ?? null, rusnMapped)}
-          className="mt-4 px-4 py-2 bg-[#3A55DF] text-white rounded hover:bg-blue-700"
-        >
-          Скачать Excel
-        </button>
-        <button
-          onClick={() =>
-            exportFinalReviewToPdf(bmz, selectedTransformer ?? null, rusnMapped, {
-              client: bktp.client,
-              executor: bktp.executor,
-              date: bktp.date,
-              taskNumber: bktp.taskNumber,
-            })
-          }
-          className="mt-4 px-4 py-2 bg-[#10B981] text-white rounded hover:bg-green-700"
-        >
-          Скачать PDF
-        </button>
-        <button
-          onClick={handleSave}
-          className="mt-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
-        >
-          Сохранить
-        </button>
+      <div className="space-y-6">
+        <BmzSection bmz={bmzStore} />
+        <TransformerSection transformer={selectedTransformer} />
+        <RusnSection rusn={rusn} />
       </div>
     </div>
   );

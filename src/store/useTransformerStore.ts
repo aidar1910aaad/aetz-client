@@ -2,12 +2,13 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 interface Transformer {
-  voltage: number;
+  id: number;
+  model: string;
+  voltage: string;
   type: string;
   power: number;
   manufacturer: string;
   price: number;
-  spec: string;
   quantity: number; // количество трансформаторов
 }
 
@@ -27,12 +28,13 @@ export const useTransformerStore = create<TransformerStore>()(
       setTransformer: (t) => {
         set({
           selectedTransformer: {
-            voltage: t.voltage ?? 0,
+            id: t.id ?? 0,
+            model: t.model ?? '',
+            voltage: t.voltage ?? '',
             type: t.type ?? '',
             power: t.power ?? 0,
             manufacturer: t.manufacturer ?? '',
             price: t.price ?? 0,
-            spec: t.spec ?? '',
             quantity: t.quantity ?? 2, // <-- тут ставим по умолчанию quantity = 2
           },
           isSkipped: false,

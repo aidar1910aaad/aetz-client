@@ -30,37 +30,50 @@ export function useCalculations() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token') || '';
+      console.log('Fetching calculation groups...');
       const result = await getAllCalculationGroups(token);
+      console.log('Fetched groups:', result);
       setGroups(result);
-    } catch (err: any) {
-      showToast(err.message || 'Ошибка при загрузке групп', 'error');
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Error fetching groups:', error);
+      showToast(error.message || 'Ошибка при загрузке групп', 'error');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    console.log('Initial fetchGroups effect triggered');
     fetchGroups();
   }, [fetchGroups]);
 
   // ✅ Загрузка калькуляций по выбранной группе
   const fetchCalculations = useCallback(async () => {
-    if (!selectedGroup) return;
+    if (!selectedGroup) {
+      console.log('No selected group, skipping calculations fetch');
+      return;
+    }
     setLoading(true);
     try {
       const token = localStorage.getItem('token') || '';
+      console.log('Fetching calculations for group:', selectedGroup.slug);
       const result = await getCalculationsByGroup(selectedGroup.slug, token);
+      console.log('Fetched calculations:', result);
       setCalculations(result);
-    } catch (err: any) {
-      showToast(err.message || 'Ошибка при загрузке калькуляций', 'error');
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Error fetching calculations:', error);
+      showToast(error.message || 'Ошибка при загрузке калькуляций', 'error');
     } finally {
       setLoading(false);
     }
   }, [selectedGroup]);
 
   useEffect(() => {
+    console.log('Selected group changed:', selectedGroup);
     fetchCalculations();
-  }, [fetchCalculations]);
+  }, [fetchCalculations, selectedGroup]);
 
   // ✅ Создание группы
   const handleCreateGroup = async (data: CreateCalculationGroupRequest) => {
@@ -69,8 +82,9 @@ export function useCalculations() {
       await createCalculationGroup(data, token);
       await fetchGroups();
       showToast('Группа создана!', 'success');
-    } catch (err: any) {
-      showToast(err.message || 'Ошибка при создании группы', 'error');
+    } catch (err: unknown) {
+      const error = err as Error;
+      showToast(error.message || 'Ошибка при создании группы', 'error');
     }
   };
 
@@ -81,8 +95,9 @@ export function useCalculations() {
       await createCalculation(data, token);
       await fetchCalculations();
       showToast('Калькуляция создана!', 'success');
-    } catch (err: any) {
-      showToast(err.message || 'Ошибка при создании калькуляции', 'error');
+    } catch (err: unknown) {
+      const error = err as Error;
+      showToast(error.message || 'Ошибка при создании калькуляции', 'error');
     }
   };
 
@@ -93,8 +108,9 @@ export function useCalculations() {
       const calc = await getCalculationBySlugs(groupSlug, calcSlug, token);
       setSelectedCalculation(calc);
       return calc;
-    } catch (err: any) {
-      showToast(err.message || 'Ошибка при получении калькуляции', 'error');
+    } catch (err: unknown) {
+      const error = err as Error;
+      showToast(error.message || 'Ошибка при получении калькуляции', 'error');
       return null;
     }
   };

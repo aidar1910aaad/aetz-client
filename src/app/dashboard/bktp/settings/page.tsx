@@ -1,15 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { 
-  Building2, 
-  Zap, 
-  Power, 
-  Battery, 
-  Wrench, 
-  HardHat,
-  ChevronLeft
-} from 'lucide-react';
+import { Building2, Zap, Power, Battery, Wrench, HardHat, ChevronLeft, Cable } from 'lucide-react';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -20,43 +12,50 @@ export default function SettingsPage() {
       description: 'Настройки БМЗ',
       path: '/dashboard/settings/bmz',
       icon: Building2,
-      color: 'bg-blue-50 text-blue-600'
+      color: 'bg-blue-50 text-blue-600',
     },
     {
       title: 'Трансформатор',
       description: 'Настройки трансформатора',
       path: '/dashboard/settings/transformer',
       icon: Zap,
-      color: 'bg-yellow-50 text-yellow-600'
+      color: 'bg-yellow-50 text-yellow-600',
     },
     {
       title: 'РУСН',
       description: 'Настройки РУСН',
       path: '/dashboard/settings/rusn',
       icon: Power,
-      color: 'bg-red-50 text-red-600'
+      color: 'bg-red-50 text-red-600',
     },
     {
       title: 'РУНН',
       description: 'Настройки РУНН',
       path: '/dashboard/settings/runn',
       icon: Battery,
-      color: 'bg-green-50 text-green-600'
+      color: 'bg-green-50 text-green-600',
+    },
+    {
+      title: 'Сборные шины',
+      description: 'Настройка сборных шин',
+      path: '/dashboard/bktp/settings/busbar',
+      icon: Cable,
+      color: 'bg-indigo-50 text-indigo-600',
     },
     {
       title: 'Дополнительное оборудование',
       description: 'Настройки дополнительного оборудования',
       path: '/dashboard/settings/additional',
       icon: Wrench,
-      color: 'bg-purple-50 text-purple-600'
+      color: 'bg-purple-50 text-purple-600',
     },
     {
       title: 'Работы',
       description: 'Настройки работ',
       path: '/dashboard/settings/works',
       icon: HardHat,
-      color: 'bg-orange-50 text-orange-600'
-    }
+      color: 'bg-orange-50 text-orange-600',
+    },
   ];
 
   return (
@@ -93,9 +92,7 @@ export default function SettingsPage() {
                     <h2 className="text-lg font-semibold text-gray-900 group-hover:text-[#3A55DF] transition-colors duration-200">
                       {section.title}
                     </h2>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {section.description}
-                    </p>
+                    <p className="text-sm text-gray-500 mt-1">{section.description}</p>
                   </div>
                 </div>
               </div>

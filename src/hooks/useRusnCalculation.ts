@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { api } from '@/api/baseUrl';
 
 interface CalculationItem {
   id: number | null;
@@ -34,7 +35,7 @@ export function useRusnCalculation(groupSlug?: string) {
     breaker: [],
     rza: [],
     meter: [],
-    cell: []
+    cell: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,10 +49,10 @@ export function useRusnCalculation(groupSlug?: string) {
 
       try {
         const token = localStorage.getItem('token') || '';
-        const response = await fetch(`http://localhost:3001/calculations/groups/${groupSlug}/calculations`, {
+        const response = await fetch(`${api}/calculations/groups/${groupSlug}/calculations`, {
           headers: {
-            Authorization: `Bearer ${token}`
-          }
+            Authorization: `Bearer ${token}`,
+          },
         });
 
         if (!response.ok) {
@@ -59,13 +60,13 @@ export function useRusnCalculation(groupSlug?: string) {
         }
 
         const data: Calculation[] = await response.json();
-        
+
         // Группируем расчеты по типам
         const groupedCalculations: CalculationState = {
           breaker: [],
           rza: [],
           meter: [],
-          cell: data // Все калькуляции ячеек
+          cell: data, // Все калькуляции ячеек
         };
 
         setCalculations(groupedCalculations);
@@ -81,23 +82,35 @@ export function useRusnCalculation(groupSlug?: string) {
   }, [groupSlug]);
 
   const calculateCellTotal = (calculationId: number) => {
-    const calculation = calculations.cell.find(c => c.id === calculationId);
+    const calculation = calculations.cell.find((c) => c.id === calculationId);
     if (!calculation) return 0;
 
-    let total = 0;
-    calculation.data.categories.forEach(category => {
-      category.items.forEach(item => {
-        total += item.price * item.quantity;
-      });
-    });
+    // Получаем отпускную цену из данных калькуляции
+    const totalMaterialsCost = calculation.data.categories.reduce((total, category) => {
+      return total + category.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    }, 0);
 
-    return total;
+    const calculationData = calculation.data.calculation;
+    if (!calculationData) return totalMaterialsCost;
+
+    // Calculate the total cost including all materials
+    const totalSalary = calculationData.manufacturingHours * calculationData.hourlyRate;
+    const overheadCost = (totalMaterialsCost * calculationData.overheadPercentage) / 100;
+    const productionCost = totalMaterialsCost + totalSalary + overheadCost;
+    const adminCost = (totalMaterialsCost * calculationData.adminPercentage) / 100;
+    const fullCost = productionCost + adminCost;
+    const plannedProfit = (fullCost * calculationData.plannedProfitPercentage) / 100;
+    const wholesalePrice = fullCost + plannedProfit;
+    const ndsAmount = (wholesalePrice * calculationData.ndsPercentage) / 100;
+    const finalPrice = wholesalePrice + ndsAmount;
+
+    return finalPrice;
   };
 
   return {
     calculations,
     loading,
     error,
-    calculateCellTotal
+    calculateCellTotal,
   };
-} 
+}

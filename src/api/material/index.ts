@@ -1,5 +1,7 @@
 import { api } from '../baseUrl';
 
+console.log('LOADED MATERIAL API MODULE');
+
 export interface Material {
   code: string;
   id: number;
@@ -49,6 +51,7 @@ export async function createMaterial(
   data: CreateMaterialRequest,
   token: string
 ): Promise<Material> {
+  console.log('[createMaterial] data:', data, 'token:', !!token);
   const response = await fetch(`${api}/materials`, {
     method: 'POST',
     headers: {
@@ -60,42 +63,86 @@ export async function createMaterial(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
+    console.error('[createMaterial] error:', error);
     throw new Error(error.message || 'Ошибка при создании материала');
-  }
-
-  return response.json(); // ← должно вернуть материал с category
-}
-
-// ✅ Получить все материалы
-export async function getAllMaterials(
-  token: string,
-  params: GetMaterialsParams = {}
-): Promise<{ data: Material[]; total: number }> {
-  const query = new URLSearchParams();
-
-  if (params.page) query.append('page', String(params.page));
-  if (params.limit) query.append('limit', String(params.limit));
-  if (params.search) query.append('search', params.search);
-  if (params.sort) query.append('sort', params.sort);
-  if (params.order) query.append('order', params.order);
-  if (params.categoryId) query.append('categoryId', String(params.categoryId));
-
-  const response = await fetch(`${api}/materials?${query.toString()}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Ошибка при получении материалов');
   }
 
   return response.json();
 }
 
+// ✅ Получить все материалы
+export const getAllMaterials = async (
+  token: string,
+  params: GetMaterialsParams
+): Promise<{ data: Material[]; total: number }> => {
+  try {
+    console.log('[getAllMaterials] token:', !!token, 'params:', params);
+    const query = new URLSearchParams();
+
+    // Required parameters
+    query.append('page', (params.page || 1).toString());
+    query.append('limit', (params.limit || 10).toString());
+
+    // Optional parameters
+    if (params.search) {
+      query.append('search', params.search.trim());
+    }
+    if (params.sort) {
+      query.append('sort', params.sort);
+    }
+    if (params.order) {
+      query.append('order', params.order);
+    }
+    if (params.categoryId) {
+      query.append('categoryId', params.categoryId.toString());
+    }
+
+    const url = `${api}/materials?${query.toString()}`;
+    console.log('API Request URL:', url);
+    console.log('API Request Headers:', {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    });
+
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    console.log('API Response Status:', response.status);
+    console.log('API Response Headers:', Object.fromEntries(response.headers.entries()));
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      console.error('API Error Response:', errorData);
+      throw new Error(errorData?.message || 'Failed to fetch materials');
+    }
+
+    const data = await response.json();
+    console.log('API Response Data:', {
+      total: data.total,
+      count: data.data?.length,
+      page: params.page,
+      limit: params.limit,
+      firstItem: data.data?.[0],
+      lastItem: data.data?.[data.data.length - 1],
+    });
+
+    return {
+      data: data.data || [],
+      total: data.total || 0,
+    };
+  } catch (error) {
+    console.error('[getAllMaterials] API Error:', error);
+    throw error;
+  }
+};
+
 // ✅ Получить материал по ID
 export async function getMaterialById(id: number, token: string): Promise<Material> {
+  console.log('[getMaterialById] id:', id, 'token:', !!token);
   const response = await fetch(`${api}/materials/${id}`, {
     method: 'GET',
     headers: {
@@ -117,6 +164,7 @@ export async function updateMaterial(
   data: UpdateMaterialRequest,
   token: string
 ): Promise<void> {
+  console.log('[updateMaterial] id:', id, 'data:', data, 'token:', !!token);
   const response = await fetch(`${api}/materials/${id}`, {
     method: 'PATCH',
     headers: {
@@ -127,13 +175,30 @@ export async function updateMaterial(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
+    const text = await response.text();
+    let error;
+    try {
+      error = JSON.parse(text);
+    } catch {
+      error = { message: text || '[empty response]' };
+    }
+    console.error(
+      '[updateMaterial] error:',
+      error,
+      'status:',
+      response.status,
+      'statusText:',
+      response.statusText,
+      'rawText:',
+      text
+    );
     throw new Error(error.message || 'Ошибка при обновлении материала');
   }
 }
 
 // ✅ Удалить материал
 export async function deleteMaterial(id: number, token: string): Promise<void> {
+  console.log('[deleteMaterial] id:', id, 'token:', !!token);
   const response = await fetch(`${api}/materials/${id}`, {
     method: 'DELETE',
     headers: {
@@ -152,6 +217,7 @@ export async function getMaterialHistory(
   id: number,
   token: string
 ): Promise<MaterialHistoryItem[]> {
+  console.log('[getMaterialHistory] id:', id, 'token:', !!token);
   const response = await fetch(`${api}/materials/${id}/history`, {
     method: 'GET',
     headers: {
@@ -168,22 +234,25 @@ export async function getMaterialHistory(
 }
 
 // ✅ Получить все материалы по категории
-export const getMaterialsByCategoryId = async (categoryId: number, token: string): Promise<Material[]> => {
+export const getMaterialsByCategoryId = async (
+  categoryId: number,
+  token: string
+): Promise<Material[]> => {
   try {
     console.log('Fetching materials for category:', categoryId);
     const url = `${api}/categories/${categoryId}/materials`;
     console.log('API URL:', url);
     console.log('Request headers:', {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
     });
 
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
     });
 
     console.log('Response status:', response.status);

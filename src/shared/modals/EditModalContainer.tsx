@@ -6,23 +6,23 @@ import { createPortal } from 'react-dom';
 interface Field {
   name: string;
   label: string;
-  type: 'text' | 'textarea';
+  type: 'text' | 'textarea' | 'number';
   required?: boolean;
 }
 
 interface ModalData {
   title?: string;
-  initialValues: Record<string, string>;
+  initialValues: Record<string, string | number>;
   fields: Field[];
 }
 
-let resolveModal: (value: Record<string, string> | null) => void;
+let resolveModal: (value: Record<string, string | number> | null) => void;
 
 export const showEditModal = ({
   title,
   initialValues,
   fields,
-}: ModalData): Promise<Record<string, string> | null> => {
+}: ModalData): Promise<Record<string, string | number> | null> => {
   const event = new CustomEvent('open-edit-modal', {
     detail: { title, initialValues, fields },
   });
@@ -35,8 +35,8 @@ export const showEditModal = ({
 
 export default function EditModalContainer() {
   const [open, setOpen] = useState(false);
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [initialValues, setInitialValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<Record<string, string | number>>({});
+  const [initialValues, setInitialValues] = useState<Record<string, string | number>>({});
   const [title, setTitle] = useState('Редактировать');
   const [fields, setFields] = useState<Field[]>([]);
 
@@ -67,20 +67,31 @@ export default function EditModalContainer() {
   };
 
   const handleChange = (name: string, value: string) => {
-    setValues((prev) => ({ ...prev, [name]: value }));
+    const field = fields.find((f) => f.name === name);
+    const processedValue = field?.type === 'number' ? Number(value) : value;
+    setValues((prev) => ({ ...prev, [name]: processedValue }));
   };
 
   const isFormValid = () => {
     return fields.every((field) => {
       if (!field.required) return true;
-      return values[field.name]?.trim() !== '';
+      const value = values[field.name];
+      if (field.type === 'number') {
+        return value !== undefined && value !== null && value !== '';
+      }
+      return typeof value === 'string' && value.trim() !== '';
     });
   };
 
   const hasChanges = () => {
-    return Object.keys(values).some(
-      (key) => values[key]?.trim() !== initialValues[key]?.trim()
-    );
+    return Object.keys(values).some((key) => {
+      const currentValue = values[key];
+      const initialValue = initialValues[key];
+      if (typeof currentValue === 'number' && typeof initialValue === 'number') {
+        return currentValue !== initialValue;
+      }
+      return String(currentValue)?.trim() !== String(initialValue)?.trim();
+    });
   };
 
   if (!open) return null;
@@ -101,15 +112,15 @@ export default function EditModalContainer() {
               </label>
               {field.type === 'textarea' ? (
                 <textarea
-                  value={values[field.name] || ''}
+                  value={String(values[field.name] || '')}
                   onChange={(e) => handleChange(field.name, e.target.value)}
                   className="w-full border border-gray-300 px-4 py-2 rounded text-black focus:outline-[#3A55DF]"
                   rows={3}
                 />
               ) : (
                 <input
-                  type="text"
-                  value={values[field.name] || ''}
+                  type={field.type}
+                  value={String(values[field.name] || '')}
                   onChange={(e) => handleChange(field.name, e.target.value)}
                   className="w-full border border-gray-300 px-4 py-2 rounded text-black focus:outline-[#3A55DF]"
                 />

@@ -13,7 +13,7 @@ export default function CalculationsPage() {
   const [newGroupName, setNewGroupName] = useState('');
 
   const handleOpenGroup = (slug: string) => {
-    router.push(`/dashboard/calc/${slug}`);
+    router.push(`/dashboard/calc/${encodeURIComponent(slug)}`);
   };
 
   const handleCreate = async () => {
