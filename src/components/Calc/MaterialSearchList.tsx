@@ -22,7 +22,7 @@ export default function MaterialSearchList({ materials, searchQuery, onAdd, onSe
         className="w-full border rounded px-3 py-2 text-sm"
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[300px] overflow-y-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto">
         {filtered.map((m) => (
           <div
             key={m.id}

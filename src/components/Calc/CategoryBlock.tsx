@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { Material, getAllMaterials } from '@/api/material';
 import { Trash2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -15,7 +16,6 @@ type ManualItem = {
 type CalcItem = ManualItem & { id?: number };
 
 type Props = {
-  categoryId: string;
   name: string;
   open: boolean;
   items: CalcItem[];
@@ -30,7 +30,6 @@ type Props = {
 
 export default function CategoryBlock({
   onChangeQuantity,
-  categoryId,
   name,
   open,
   items,
@@ -44,6 +43,64 @@ export default function CategoryBlock({
   const [showDropdown, setShowDropdown] = useState(false);
   const [results, setResults] = useState<Material[]>([]);
   const debouncedSearch = useDebounce(searchQuery, 400);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dropdownPos, setDropdownPos] = useState({ left: 0, top: 0, width: 0 });
+  const [dropdownDirection, setDropdownDirection] = useState<'down' | 'up'>('down');
+
+  const handleShowDropdown = () => {
+    setShowDropdown(true);
+    if (inputRef.current) {
+      const rect = inputRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const dropdownHeight = 300; // px
+      if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+        setDropdownDirection('up');
+        setDropdownPos({ left: rect.left, top: rect.top, width: rect.width });
+      } else {
+        setDropdownDirection('down');
+        setDropdownPos({ left: rect.left, top: rect.bottom, width: rect.width });
+      }
+    }
+  };
+
+  // Обновлять позицию при scroll/resize
+  useEffect(() => {
+    if (!showDropdown) return;
+    const updateDropdownPos = () => {
+      if (inputRef.current) {
+        const rect = inputRef.current.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        const dropdownHeight = 300; // px
+        if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+          setDropdownDirection('up');
+          setDropdownPos({ left: rect.left, top: rect.top, width: rect.width });
+        } else {
+          setDropdownDirection('down');
+          setDropdownPos({ left: rect.left, top: rect.bottom, width: rect.width });
+        }
+      }
+    };
+    window.addEventListener('resize', updateDropdownPos);
+    window.addEventListener('scroll', updateDropdownPos, true);
+    return () => {
+      window.removeEventListener('resize', updateDropdownPos);
+      window.removeEventListener('scroll', updateDropdownPos, true);
+    };
+  }, [showDropdown]);
+
+  // Закрытие по клику вне
+  useEffect(() => {
+    if (!showDropdown) return;
+    const handleClick = (e: MouseEvent) => {
+      if (inputRef.current && !inputRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showDropdown]);
 
   useEffect(() => {
     console.log('Поиск по:', debouncedSearch);
@@ -51,10 +108,11 @@ export default function CategoryBlock({
       if (!debouncedSearch.trim()) return setResults([]);
       try {
         const token = localStorage.getItem('token') || '';
-        const { data } = await getAllMaterials(token, { search: debouncedSearch, limit: 50 });
+        const data = await getAllMaterials(token);
         setResults(data);
-      } catch (err: any) {
-        console.error('Ошибка поиска материалов:', err.message);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('Ошибка поиска материалов:', message);
       }
     };
     fetch();
@@ -85,36 +143,52 @@ export default function CategoryBlock({
 
           <div className="relative">
             <input
+              ref={inputRef}
               type="text"
               placeholder="Поиск материалов..."
               value={searchQuery}
-              onFocus={() => setShowDropdown(true)}
+              onFocus={handleShowDropdown}
               onChange={(e) => onSearchChange(e.target.value)}
               className="w-full border rounded px-3 py-2 text-sm"
             />
 
-            {showDropdown && results.length > 0 && (
-              <div className="absolute z-10 w-full bg-white border mt-1 rounded shadow max-h-72 overflow-y-auto">
-                {results.map((m) => (
-                  <div
-                    key={m.id}
-                    onClick={() => {
-                      onAddMaterial(m);
-                      setShowDropdown(false);
-                    }}
-                    className="px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm flex justify-between items-center"
-                  >
-                    <div>
-                      <div className="font-medium">{m.name}</div>
-                      <div className="text-gray-500 text-xs">
-                        {m.unit}, {m.price.toLocaleString()} тг
+            {showDropdown &&
+              results.length > 0 &&
+              typeof window !== 'undefined' &&
+              document.body &&
+              ReactDOM.createPortal(
+                <div
+                  className="z-[99999] bg-white border rounded shadow max-h-[300px] overflow-y-auto"
+                  style={{
+                    position: 'fixed',
+                    left: dropdownPos.left,
+                    top: dropdownDirection === 'down' ? dropdownPos.top : undefined,
+                    bottom:
+                      dropdownDirection === 'up' ? window.innerHeight - dropdownPos.top : undefined,
+                    width: dropdownPos.width,
+                  }}
+                >
+                  {results.map((m) => (
+                    <div
+                      key={m.id}
+                      onClick={() => {
+                        onAddMaterial(m);
+                        setShowDropdown(false);
+                      }}
+                      className="px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm flex justify-between items-center"
+                    >
+                      <div>
+                        <div className="font-medium">{m.name}</div>
+                        <div className="text-gray-500 text-xs">
+                          {m.unit}, {m.price.toLocaleString()} тг
+                        </div>
                       </div>
+                      <span className="text-[#3A55DF] text-sm">Добавить</span>
                     </div>
-                    <span className="text-[#3A55DF] text-sm">Добавить</span>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>,
+                document.body
+              )}
           </div>
 
           {items.length === 0 ? (

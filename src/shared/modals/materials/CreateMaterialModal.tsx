@@ -18,6 +18,7 @@ export default function CreateMaterialModal({ onClose, onCreate }: Props) {
     unit: '',
     price: 0,
     categoryId: 0,
+    code: '',
   });
 
   const [search, setSearch] = useState('');
@@ -36,7 +37,10 @@ export default function CreateMaterialModal({ onClose, onCreate }: Props) {
       return;
     }
 
-    await onCreate(form); // ✅ используем проп, а не локальную функцию
+    const { code, ...rest } = form;
+    const dataToSend = code?.trim() ? form : rest;
+
+    await onCreate(dataToSend as CreateMaterialRequest);
     onClose();
   };
 
@@ -84,6 +88,14 @@ export default function CreateMaterialModal({ onClose, onCreate }: Props) {
           className="border p-2 rounded w-full mb-3 text-sm placeholder:text-gray-400"
           value={form.price || ''}
           onChange={(e) => setForm({ ...form, price: +e.target.value })}
+        />
+
+        <input
+          type="text"
+          placeholder="Код (опционально)"
+          className="border p-2 rounded w-full mb-3 text-sm"
+          value={form.code || ''}
+          onChange={(e) => setForm({ ...form, code: e.target.value })}
         />
 
         {/* Поиск категории */}

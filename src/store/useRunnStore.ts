@@ -5,15 +5,22 @@ interface RunnGlobalOptions {
   voltage: 0.4 | 6 | 10;
   bodyType: string;
   busBridgeLength: number;
+  withdrawableBreaker: string;
+  moldedCaseBreaker: string;
+  meterType: string;
 }
 
-interface RunnCell {
+export interface RunnCell {
   id: string;
   purpose: string;
   breaker: string;
+  switchingDevice?: string; // Коммутационный аппарат для отходящих ячеек
   rza?: string;
   meterType?: string;
   ctRatio?: string;
+  nominalPower?: number; // Номинальная мощность в кВт
+  price?: number; // Цена в тенге
+  quantity?: number; // Количество
 }
 
 interface RunnState {
@@ -33,6 +40,9 @@ export const useRunnStore = create<RunnState>()(
         voltage: 0.4,
         bodyType: '',
         busBridgeLength: 0,
+        withdrawableBreaker: '',
+        moldedCaseBreaker: '',
+        meterType: '',
       },
       cellConfigs: [],
 
@@ -62,6 +72,9 @@ export const useRunnStore = create<RunnState>()(
             voltage: 0.4,
             bodyType: '',
             busBridgeLength: 0,
+            withdrawableBreaker: '',
+            moldedCaseBreaker: '',
+            meterType: '',
           },
           cellConfigs: [],
         }),

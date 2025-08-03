@@ -4,6 +4,7 @@ import { getAllCategories } from '@/api/categories';
 import { getSettings, saveSettings } from '@/api/settings/index';
 import { api } from '@/api/baseUrl';
 import { showToast } from '@/shared/modals/ToastProvider';
+import { RusnSettings, fetchCategories, fetchRusnSettings } from '@/utils/rusnSettings';
 
 interface CategorySettings {
   id: number;
@@ -11,7 +12,62 @@ interface CategorySettings {
   isVisible: boolean;
 }
 
-export function useRusnSettings() {
+export const useRusnSettings = () => {
+  const [rusnSettings, setRusnSettings] = useState<RusnSettings>({
+    switch: [],
+    rza: [],
+    counter: [],
+    sr: [],
+    tsn: [],
+    tn: [],
+    tt: [],
+  });
+  const [allCategories, setAllCategories] = useState<{ id: number; name: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const token = localStorage.getItem('token') || '';
+        if (!token) {
+          throw new Error('Токен не найден');
+        }
+
+        // Загружаем категории
+        const categories = await fetchCategories(token);
+        setAllCategories(categories);
+
+        // Загружаем настройки РУСН
+        if (categories.length > 0) {
+          const settings = await fetchRusnSettings(token, categories);
+          if (settings) {
+            setRusnSettings(settings);
+          }
+        }
+      } catch (err) {
+        console.error('Ошибка при загрузке настроек РУСН:', err);
+        setError(err instanceof Error ? err.message : 'Неизвестная ошибка');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  return {
+    rusnSettings,
+    allCategories,
+    loading,
+    error,
+  };
+};
+
+export function useRusnSettingsOld() {
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<{
     switch: CategorySettings[];
@@ -20,13 +76,15 @@ export function useRusnSettings() {
     sr: CategorySettings[];
     tsn: CategorySettings[];
     tn: CategorySettings[];
+    tt: CategorySettings[];
   }>({
     switch: [],
     rza: [],
     counter: [],
     sr: [],
     tsn: [],
-    tn: []
+    tn: [],
+    tt: [],
   });
   const [loading, setLoading] = useState(true);
   const [hasChanges, setHasChanges] = useState(false);
@@ -38,17 +96,33 @@ export function useRusnSettings() {
 
       const [categories, settings] = await Promise.all([
         getAllCategories(token),
-        getSettings(token)
+        getSettings(token),
       ]);
 
+      console.log('=== useRusnSettings: Получение данных ===');
       console.log('Fetched categories:', categories);
       console.log('Fetched settings:', settings);
+      console.log('Тип настроек:', typeof settings);
+      console.log('Структура настроек:', settings ? Object.keys(settings) : 'null');
 
       setAllCategories(categories);
 
       if (settings) {
         const rusnSettings = settings.settings.rusn || [];
         console.log('RUSN settings:', rusnSettings);
+        console.log('Количество настроек РУСН:', rusnSettings.length);
+        console.log('Тип настроек РУСН:', typeof rusnSettings);
+
+        // Показываем детальную информацию о каждой настройке
+        rusnSettings.forEach((setting, index) => {
+          console.log(`Настройка ${index + 1}:`, {
+            type: setting.type,
+            categoryId: setting.categoryId,
+            isVisible: setting.isVisible,
+            categoryName:
+              categories.find((cat) => cat.id === setting.categoryId)?.name || 'Не найдена',
+          });
+        });
 
         const categorizedSettings = {
           switch: [],
@@ -56,16 +130,17 @@ export function useRusnSettings() {
           counter: [],
           sr: [],
           tsn: [],
-          tn: []
+          tn: [],
+          tt: [],
         };
 
-        rusnSettings.forEach(setting => {
-          const category = categories.find(cat => cat.id === setting.categoryId);
+        rusnSettings.forEach((setting) => {
+          const category = categories.find((cat) => cat.id === setting.categoryId);
           if (category) {
             const categorySetting = {
               id: category.id,
               name: category.name,
-              isVisible: setting.isVisible
+              isVisible: setting.isVisible,
             };
 
             switch (setting.type) {
@@ -87,6 +162,9 @@ export function useRusnSettings() {
               case 'tn':
                 categorizedSettings.tn.push(categorySetting);
                 break;
+              case 'tt':
+                categorizedSettings.tt.push(categorySetting);
+                break;
             }
           }
         });
@@ -105,12 +183,25 @@ export function useRusnSettings() {
     fetchData();
   }, []);
 
-  const handleAddCategory = (type: string, categoryId: number) => {
-    const category = allCategories.find(cat => cat.id === categoryId);
-    if (!category) return;
+  const handleAddCategory = (type: string, categoryId: number | string) => {
+    let category;
 
-    const isAlreadyAdded = Object.values(selectedCategories).some(
-      categories => categories.some(cat => cat.id === categoryId)
+    // Проверяем, является ли categoryId числом или строкой
+    if (typeof categoryId === 'number' || !isNaN(Number(categoryId))) {
+      // Это ID из API
+      category = allCategories.find((cat) => cat.id === Number(categoryId));
+    } else {
+      // Это строка из моковых данных - ищем по названию
+      category = allCategories.find((cat) => cat.name === categoryId);
+    }
+
+    if (!category) {
+      console.error('Категория не найдена:', categoryId);
+      return;
+    }
+
+    const isAlreadyAdded = Object.values(selectedCategories).some((categories) =>
+      categories.some((cat) => cat.id === category.id)
     );
 
     if (isAlreadyAdded) {
@@ -118,27 +209,32 @@ export function useRusnSettings() {
       return;
     }
 
-    setSelectedCategories(prev => ({
+    setSelectedCategories((prev) => ({
       ...prev,
-      [type]: [...prev[type as keyof typeof prev], { id: category.id, name: category.name, isVisible: true }]
+      [type]: [
+        ...prev[type as keyof typeof prev],
+        { id: category.id, name: category.name, isVisible: true },
+      ],
     }));
     setHasChanges(true);
   };
 
-  const handleRemoveCategory = (type: string, categoryId: number) => {
-    setSelectedCategories(prev => ({
+  const handleRemoveCategory = (type: string, categoryId: number | string) => {
+    const idToRemove = typeof categoryId === 'string' ? Number(categoryId) : categoryId;
+    setSelectedCategories((prev) => ({
       ...prev,
-      [type]: prev[type as keyof typeof prev].filter(cat => cat.id !== categoryId)
+      [type]: prev[type as keyof typeof prev].filter((cat) => cat.id !== idToRemove),
     }));
     setHasChanges(true);
   };
 
-  const handleToggleVisibility = (type: string, categoryId: number) => {
-    setSelectedCategories(prev => ({
+  const handleToggleVisibility = (type: string, categoryId: number | string) => {
+    const idToToggle = typeof categoryId === 'string' ? Number(categoryId) : categoryId;
+    setSelectedCategories((prev) => ({
       ...prev,
-      [type]: prev[type as keyof typeof prev].map(cat =>
-        cat.id === categoryId ? { ...cat, isVisible: !cat.isVisible } : cat
-      )
+      [type]: prev[type as keyof typeof prev].map((cat) =>
+        cat.id === idToToggle ? { ...cat, isVisible: !cat.isVisible } : cat
+      ),
     }));
     setHasChanges(true);
   };
@@ -153,43 +249,48 @@ export function useRusnSettings() {
 
       // Формируем массив настроек для секции rusn
       const rusnSettings = [
-        ...selectedCategories.switch.map(cat => ({
+        ...selectedCategories.switch.map((cat) => ({
           categoryId: cat.id,
           type: 'switch' as const,
-          isVisible: cat.isVisible
+          isVisible: cat.isVisible,
         })),
-        ...selectedCategories.rza.map(cat => ({
+        ...selectedCategories.rza.map((cat) => ({
           categoryId: cat.id,
           type: 'rza' as const,
-          isVisible: cat.isVisible
+          isVisible: cat.isVisible,
         })),
-        ...selectedCategories.counter.map(cat => ({
+        ...selectedCategories.counter.map((cat) => ({
           categoryId: cat.id,
           type: 'counter' as const,
-          isVisible: cat.isVisible
+          isVisible: cat.isVisible,
         })),
-        ...selectedCategories.sr.map(cat => ({
+        ...selectedCategories.sr.map((cat) => ({
           categoryId: cat.id,
           type: 'sr' as const,
-          isVisible: cat.isVisible
+          isVisible: cat.isVisible,
         })),
-        ...selectedCategories.tsn.map(cat => ({
+        ...selectedCategories.tsn.map((cat) => ({
           categoryId: cat.id,
           type: 'tsn' as const,
-          isVisible: cat.isVisible
+          isVisible: cat.isVisible,
         })),
-        ...selectedCategories.tn.map(cat => ({
+        ...selectedCategories.tn.map((cat) => ({
           categoryId: cat.id,
           type: 'tn' as const,
-          isVisible: cat.isVisible
-        }))
+          isVisible: cat.isVisible,
+        })),
+        ...selectedCategories.tt.map((cat) => ({
+          categoryId: cat.id,
+          type: 'tt' as const,
+          isVisible: cat.isVisible,
+        })),
       ];
 
       // Отправляем только секцию rusn
       const settings = {
         settings: {
-          rusn: rusnSettings
-        }
+          rusn: rusnSettings,
+        },
       };
 
       console.log('Saving settings:', settings);
@@ -206,7 +307,7 @@ export function useRusnSettings() {
       if (error instanceof Error) {
         console.error('Error details:', {
           message: error.message,
-          stack: error.stack
+          stack: error.stack,
         });
       }
       showToast('Ошибка при сохранении настроек', 'error');
@@ -221,6 +322,6 @@ export function useRusnSettings() {
     handleAddCategory,
     handleRemoveCategory,
     handleToggleVisibility,
-    handleSave
+    handleSave,
   };
-} 
+}

@@ -20,6 +20,18 @@ interface Calculation {
   slug: string;
   data: {
     categories: CalculationCategory[];
+    calculation?: {
+      manufacturingHours?: number;
+      hourlyRate?: number;
+      overheadPercentage?: number;
+      adminPercentage?: number;
+      plannedProfitPercentage?: number;
+      ndsPercentage?: number;
+    };
+    cellConfig?: {
+      type?: string;
+      materials?: Record<string, unknown>;
+    };
   };
 }
 

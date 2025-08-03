@@ -64,7 +64,7 @@ export const BusbarTable: React.FC<BusbarTableProps> = ({
   console.log('BusbarTable received data:', data);
   console.log('BusbarTable received columnHeaders:', columnHeaders);
 
-  const cellTypes = ['Ввод', 'СВ', 'ОТХ', 'ТР', 'ТН', 'ТСН', 'ЗШН', 'СР'];
+  const cellTypes = ['Ввод', 'СВ', 'ОТХ', 'ТР', 'ТН', 'ТСН', 'ЗШН', 'СР', 'Шинный мост'];
 
   // Фильтрация данных таблицы по типу
   const dataFilteredByType = data.filter((row) => {

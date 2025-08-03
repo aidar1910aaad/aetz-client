@@ -1,12 +1,13 @@
-import { Material } from '@/api/material';
 import { RusnCell as RusnCellType } from '@/store/useRusnStore';
+import { RusnMaterials, getMaterialById } from '@/utils/rusnMaterials';
+import { calculateCost } from '@/utils/calculationUtils';
 import MaterialsTable from './MaterialsTable';
+import SelectedMaterialsTable from './SelectedMaterialsTable';
+import CalculationDisplay from './CalculationDisplay';
 
 interface BreakerCalculationProps {
   cell: RusnCellType;
-  materials: {
-    breaker: Material[];
-  };
+  materials: RusnMaterials;
   calculation: {
     data: {
       categories: Array<{
@@ -19,11 +20,15 @@ interface BreakerCalculationProps {
         }>;
       }>;
       calculation: {
+        manufacturingHours?: number;
         hourlyRate: number;
         overheadPercentage: number;
         adminPercentage: number;
         plannedProfitPercentage: number;
         ndsPercentage: number;
+      };
+      cellConfig?: {
+        type?: string;
       };
     };
   };
@@ -34,161 +39,130 @@ export default function BreakerCalculation({
   materials,
   calculation,
 }: BreakerCalculationProps) {
-  const materialsTotal =
-    calculation.data.categories.reduce(
-      (sum, category) =>
-        sum + category.items.reduce((itemSum, item) => itemSum + item.price * item.quantity, 0),
-      0
-    ) +
-    (cell.breaker
-      ? Number(materials.breaker.find((m) => m.id.toString() === cell.breaker?.id)?.price || 0)
-      : 0);
+  // Рассчитываем общую стоимость материалов (без добавления выбранных материалов)
+  const materialsTotal = calculation.data.categories.reduce(
+    (sum, category) =>
+      sum + category.items.reduce((itemSum, item) => itemSum + item.price * item.quantity, 0),
+    0
+  );
 
-  const calculationData = calculation.data.calculation;
-  const salary = calculationData.hourlyRate * 4;
-  const overheadCost = (materialsTotal * calculationData.overheadPercentage) / 100;
-  const productionCost = materialsTotal + salary + overheadCost;
-  const adminCost = (materialsTotal * calculationData.adminPercentage) / 100;
-  const fullCost = productionCost + adminCost;
-  const plannedProfit = (fullCost * calculationData.plannedProfitPercentage) / 100;
-  const wholesalePrice = fullCost + plannedProfit;
-  const ndsAmount = (wholesalePrice * calculationData.ndsPercentage) / 100;
-  const finalPrice = wholesalePrice + ndsAmount;
+  // Определяем тип ячейки на основе выбранных материалов
+  // Проверяем, какая калькуляция используется для определения типа
+  const isPuCell =
+    calculation.data.cellConfig?.type === 'pu' ||
+    (cell.meterType && !cell.breaker && !cell.transformerPower && !cell.transformerVoltage);
+  const isDisconnectorCell =
+    cell.purpose === 'Секционный разьединитель' ||
+    calculation.data.cellConfig?.type === 'disconnector';
+  const isTsnCell =
+    calculation.data.cellConfig?.type === 'tsn' ||
+    (cell.transformerPower && !cell.breaker && !cell.meterType);
+  const isTnCell =
+    calculation.data.cellConfig?.type === 'tn' ||
+    (cell.transformerVoltage && !cell.breaker && !cell.meterType);
+
+  // Логи для отладки
+  console.log('=== BREAKER CALCULATION DEBUG ===');
+  console.log('Cell purpose:', cell.purpose);
+  console.log('Cell materials:', {
+    breaker: !!cell.breaker,
+    meterType: !!cell.meterType,
+    transformerPower: !!cell.transformerPower,
+    transformerVoltage: !!cell.transformerVoltage,
+  });
+  console.log('Calculation cellConfig type:', calculation.data.cellConfig?.type);
+  console.log('Cell type determination:', {
+    isPuCell,
+    isDisconnectorCell,
+    isTsnCell,
+    isTnCell,
+  });
+  console.log('================================');
+
+  // Рассчитываем стоимость выбранных материалов в зависимости от типа ячейки
+  let selectedMaterialsTotal = 0;
+
+  if (isPuCell) {
+    // Для ПУ показываем только выбранный ПУ
+    const puMaterialTotal = cell.meterType
+      ? Number(materials.meter.find((m) => m.id.toString() === cell.meterType?.id)?.price || 0)
+      : 0;
+    selectedMaterialsTotal = puMaterialTotal;
+  } else if (isDisconnectorCell) {
+    // Для разъединителя показываем только разъединитель
+    const disconnectorMaterialTotal = cell.breaker
+      ? Number(materials.sr.find((m) => m.id.toString() === cell.breaker?.id)?.price || 0)
+      : 0;
+    selectedMaterialsTotal = disconnectorMaterialTotal;
+  } else if (isTsnCell) {
+    // Для ТСН показываем только ТСН
+    const tsnMaterialTotal = cell.transformerPower
+      ? Number(materials.tsn.find((m) => m.id.toString() === cell.transformerPower?.id)?.price || 0)
+      : 0;
+    selectedMaterialsTotal = tsnMaterialTotal;
+  } else if (isTnCell) {
+    // Для ТН показываем только ТН
+    const tnMaterialTotal = cell.transformerVoltage
+      ? Number(
+          materials.tn.find((m) => m.id.toString() === cell.transformerVoltage?.id)?.price || 0
+        )
+      : 0;
+    selectedMaterialsTotal = tnMaterialTotal;
+  } else {
+    // Для выключателя показываем выключатель и трансформатор тока
+    const breakerMaterialTotal = cell.breaker
+      ? Number(materials.breaker.find((m) => m.id.toString() === cell.breaker?.id)?.price || 0)
+      : 0;
+
+    const transformerCurrentTotal = cell.transformerCurrent
+      ? Number(getMaterialById(materials, 'tt', cell.transformerCurrent.id)?.price || 0) * 3
+      : 0;
+
+    selectedMaterialsTotal = breakerMaterialTotal + transformerCurrentTotal;
+  }
+
+  // Используем утилиту для расчета
+  const calculationResult = calculateCost(
+    materialsTotal,
+    calculation.data.calculation,
+    selectedMaterialsTotal
+  );
+
+  // Определяем заголовок в зависимости от типа ячейки
+  let title = 'Калькуляция выключателя';
+  if (isPuCell) title = 'Калькуляция ПУ';
+  else if (isDisconnectorCell) title = 'Калькуляция разъединителя';
+  else if (isTsnCell) title = 'Калькуляция ТСН';
+  else if (isTnCell) title = 'Калькуляция ТН';
+
+  // Создаем компонент таблицы материалов
+  const materialsTableComponent = (
+    <>
+      {calculation.data.categories.map((category, index) => (
+        <MaterialsTable key={index} category={category} />
+      ))}
+      <SelectedMaterialsTable
+        cell={cell}
+        materials={materials}
+        showBreaker={!isPuCell && !isDisconnectorCell && !isTsnCell && !isTnCell}
+        showRza={false}
+        showTransformerCurrent={!isPuCell && !isDisconnectorCell && !isTsnCell && !isTnCell}
+        showPu={isPuCell}
+        showDisconnector={isDisconnectorCell}
+        showTsn={isTsnCell}
+        showTn={isTnCell}
+      />
+    </>
+  );
 
   return (
-    <div className="px-6 py-4 border-b border-gray-200">
-      <h3 className="text-lg font-medium text-gray-900 mb-4">Калькуляция выключателя</h3>
-      <div className="space-y-4">
-        {/* Категории материалов */}
-        {calculation.data.categories.map((category, index) => (
-          <MaterialsTable
-            key={index}
-            category={category}
-            cell={cell}
-            materials={materials}
-            showBreaker={true}
-          />
-        ))}
-
-        {/* Расчет стоимости */}
-        <div className="mt-8 space-y-6">
-          <div className="flex justify-between items-center">
-            <span className="text-lg font-medium">Итого по материалам:</span>
-            <span className="text-lg font-medium">
-              {materialsTotal.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₸
-            </span>
-          </div>
-
-          {/* Изготовление */}
-          <div className="space-y-2">
-            <div className="text-lg font-medium">Изготовление</div>
-            <div className="flex justify-between items-center">
-              <span>Зарплата на изделие:</span>
-              <span>{salary.toLocaleString('ru-RU')} ₸</span>
-            </div>
-          </div>
-
-          {/* Общепроизводственные расходы */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span>Общепроизводственные расходы:</span>
-              <span>{calculationData.overheadPercentage}%</span>
-            </div>
-            <div className="flex justify-between items-center text-sm text-gray-600">
-              <span>Сумма: (Итого по материалам × {calculationData.overheadPercentage}%)</span>
-              <span>{overheadCost.toLocaleString('ru-RU', { maximumFractionDigits: 3 })} ₸</span>
-            </div>
-          </div>
-
-          {/* Производственная себестоимость */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-lg font-medium">Производственная себестоимость:</span>
-              <span className="text-lg font-medium">
-                {productionCost.toLocaleString('ru-RU', { maximumFractionDigits: 3 })} ₸
-              </span>
-            </div>
-            <div className="text-sm text-gray-600">
-              (Итого по материалам + Зарплата + Общепроизводственные расходы)
-            </div>
-          </div>
-
-          {/* Административные расходы */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span>Административные расходы:</span>
-              <span>{calculationData.adminPercentage}%</span>
-            </div>
-            <div className="flex justify-between items-center text-sm text-gray-600">
-              <span>Сумма: (Итого по материалам × {calculationData.adminPercentage}%)</span>
-              <span>{adminCost.toLocaleString('ru-RU', { maximumFractionDigits: 3 })} ₸</span>
-            </div>
-          </div>
-
-          {/* Полная себестоимость */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-lg font-medium">Полная себестоимость:</span>
-              <span className="text-lg font-medium">
-                {fullCost.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₸
-              </span>
-            </div>
-            <div className="text-sm text-gray-600">
-              (Производственная себестоимость + Административные расходы)
-            </div>
-          </div>
-
-          {/* Плановые накопления */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span>Плановые накопления:</span>
-              <span>{calculationData.plannedProfitPercentage}%</span>
-            </div>
-            <div className="flex justify-between items-center text-sm text-gray-600">
-              <span>
-                Сумма: (Полная себестоимость × {calculationData.plannedProfitPercentage}%)
-              </span>
-              <span>{plannedProfit.toLocaleString('ru-RU', { maximumFractionDigits: 3 })} ₸</span>
-            </div>
-          </div>
-
-          {/* Оптовая цена */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-lg font-medium">Оптовая цена:</span>
-              <span className="text-lg font-medium">
-                {wholesalePrice.toLocaleString('ru-RU', { maximumFractionDigits: 3 })} ₸
-              </span>
-            </div>
-            <div className="text-sm text-gray-600">
-              (Полная себестоимость + Плановые накопления)
-            </div>
-          </div>
-
-          {/* НДС */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span>НДС:</span>
-              <span>{calculationData.ndsPercentage}%</span>
-            </div>
-            <div className="flex justify-between items-center text-sm text-gray-600">
-              <span>Сумма: (Оптовая цена × {calculationData.ndsPercentage}%)</span>
-              <span>{ndsAmount.toLocaleString('ru-RU', { maximumFractionDigits: 3 })} ₸</span>
-            </div>
-          </div>
-
-          {/* Отпускная расчетная цена */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-lg font-medium">Отпускная расчетная цена:</span>
-              <span className="text-lg font-medium">
-                {finalPrice.toLocaleString('ru-RU', { maximumFractionDigits: 3 })} ₸
-              </span>
-            </div>
-            <div className="text-sm text-gray-600">(Оптовая цена + НДС)</div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <CalculationDisplay
+      title={title}
+      calculation={calculationResult}
+      calculationData={calculation.data.calculation}
+      showMaterialsTable={true}
+      materialsTableComponent={materialsTableComponent}
+      additionalMaterialsTotal={selectedMaterialsTotal}
+    />
   );
 }

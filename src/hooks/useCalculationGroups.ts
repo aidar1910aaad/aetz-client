@@ -1,11 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAllCalculationGroups } from '@/api/calculations';
-
-export interface CalculationGroup {
-  id: number;
-  name: string;
-  slug: string;
-}
+import { getAllCalculationGroups, CalculationGroup } from '@/api/calculations';
 
 export function useCalculationGroups() {
   const [groups, setGroups] = useState<CalculationGroup[]>([]);
@@ -17,7 +11,7 @@ export function useCalculationGroups() {
       try {
         setLoading(true);
         setError(null);
-        
+
         const token = localStorage.getItem('token') || '';
         console.log('Fetching calculation groups...');
         const response = await getAllCalculationGroups(token);
@@ -40,4 +34,4 @@ export function useCalculationGroups() {
   }, []);
 
   return { groups, loading, error };
-} 
+}

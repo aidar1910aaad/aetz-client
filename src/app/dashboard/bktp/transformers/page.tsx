@@ -26,7 +26,16 @@ export default function TransformerConfigurator() {
   });
 
   const [quantity, setQuantity] = useState(selectedTransformer?.quantity ?? 2);
-  const [skip, setSkip] = useState(selectedTransformer === null);
+  const [skip, setSkip] = useState(() => {
+    if (selectedTransformer !== null) return false;
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('transformer-skip');
+      return stored === 'true';
+    }
+    return false;
+  });
+
+  const wasTransformerChoiceMade = skip || selectedTransformer !== null;
 
   // Загрузка трансформаторов
   useEffect(() => {
@@ -151,34 +160,39 @@ export default function TransformerConfigurator() {
       <div className="px-6 pt-6 pb-2">
         <Breadcrumbs />
         <h2 className="text-2xl font-semibold mt-2">Силовой трансформатор</h2>
-        <p className="mt-2 text-sm text-gray-600 mb-2">Будет ли трансформатор?</p>
-        <div className="flex gap-4 mb-4">
-          <button
-            onClick={() => setSkip(false)}
-            className={`px-4 py-2 rounded text-sm font-medium border ${
-              !skip
-                ? 'bg-[#3A55DF] text-white border-[#3A55DF]'
-                : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
-            }`}
-          >
-            Да
-          </button>
-          <button
-            onClick={() => {
-              setSkip(true);
-              setSelected({ voltage: null, type: null, power: null, manufacturer: null });
-              setQuantity(2);
-              skipTransformer();
-            }}
-            className={`px-4 py-2 rounded text-sm font-medium border ${
-              skip
-                ? 'bg-red-100 text-red-700 border-red-300'
-                : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
-            }`}
-          >
-            Нет
-          </button>
-        </div>
+        {!wasTransformerChoiceMade && (
+          <>
+            <p className="mt-2 text-sm text-gray-600 mb-2">Будет ли трансформатор?</p>
+            <div className="flex gap-4 mb-4">
+              <button
+                onClick={() => setSkip(false)}
+                className={`px-4 py-2 rounded text-sm font-medium border ${
+                  !skip
+                    ? 'bg-[#3A55DF] text-white border-[#3A55DF]'
+                    : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
+                }`}
+              >
+                Да
+              </button>
+              <button
+                onClick={() => {
+                  setSkip(true);
+                  localStorage.setItem('transformer-skip', 'true');
+                  setSelected({ voltage: null, type: null, power: null, manufacturer: null });
+                  setQuantity(2);
+                  skipTransformer();
+                }}
+                className={`px-4 py-2 rounded text-sm font-medium border ${
+                  skip
+                    ? 'bg-red-100 text-red-700 border-red-300'
+                    : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
+                }`}
+              >
+                Нет
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">

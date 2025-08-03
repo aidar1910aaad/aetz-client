@@ -10,7 +10,7 @@ import {
   BUS_CONSUMPTION,
 } from '@/types/rusn';
 
-interface RusnGlobalOptions {
+export interface RusnGlobalOptions {
   voltage: 6 | 10 | 20;
   bodyType: string;
   tnCount: number;
@@ -18,9 +18,13 @@ interface RusnGlobalOptions {
   tsnCount: number;
   tsnPower: string;
   busBridgeLength: number;
-  breaker: string;
-  rza: string;
-  meterType: string;
+  breaker?: { id: number; name: string } | null;
+  rza?: { id: number; name: string } | null;
+  meterType?: { id: number; name: string } | null;
+  sr?: { id: number; name: string } | null;
+  tsn?: { id: number; name: string } | null;
+  tn?: { id: number; name: string } | null;
+  tt?: { id: number; name: string } | null;
   busBridge: BusBridgeConfig;
 }
 
@@ -49,9 +53,46 @@ export interface RusnCell {
     name: string;
     price: number;
   };
+  transformerCurrent?: {
+    id: string;
+    name: string;
+    price: number;
+  };
+  transformerVoltage?: {
+    id: string;
+    name: string;
+    price: number;
+  };
+  transformerPower?: {
+    id: string;
+    name: string;
+    price: number;
+  };
   count: number;
   calculationId?: number;
   totalPrice: number; // Итоговая цена ячейки (Отпускная расчетная цена)
+}
+
+export interface RusnBusbarSummary {
+  name: string;
+  quantity: number;
+  pricePerUnit: number;
+  totalPrice: number;
+}
+
+export interface RusnCellSummary {
+  cellId: string;
+  name: string;
+  quantity: number;
+  pricePerUnit: number;
+  totalPrice: number;
+}
+
+// Тип для шинного моста
+export interface BusbarBridge {
+  id: string;
+  length: number;
+  quantity: number;
 }
 
 interface RusnState {
@@ -64,13 +105,25 @@ interface RusnState {
   setBusMaterial: (material: BusMaterial) => void;
   updateBusBridge: () => void;
   reset: () => void;
+  busbarSummary: RusnBusbarSummary | null;
+  busBridgeSummary: RusnBusbarSummary | null;
+  busBridgeSummaries: RusnBusbarSummary[];
+  cellSummaries: RusnCellSummary[];
+  setBusbarSummary: (summary: RusnBusbarSummary) => void;
+  setBusBridgeSummary: (summary: RusnBusbarSummary) => void;
+  setBusBridgeSummaries: (summaries: RusnBusbarSummary[]) => void;
+  setCellSummary: (summary: RusnCellSummary) => void;
+  removeCellSummary: (cellId: string) => void;
+  clearCellSummaries: () => void;
+  busBridges: BusbarBridge[];
+  setBusBridges: (bridges: BusbarBridge[]) => void;
 }
 
 const initialBusBridge: BusBridgeConfig = {
-  material: 'copper',
+  material: 'АД',
   selectedBus: null,
   totalWeight: 0,
-  pricePerKg: BUS_MATERIAL_PRICES.copper,
+  pricePerKg: BUS_MATERIAL_PRICES['АД'],
   totalPrice: 0,
   consumption: [],
 };
@@ -83,9 +136,13 @@ const initialGlobalState: RusnGlobalOptions = {
   tsnCount: 2,
   tsnPower: '2 кВА',
   busBridgeLength: 2,
-  breaker: '',
-  rza: '',
-  meterType: '',
+  breaker: null,
+  rza: null,
+  meterType: null,
+  sr: null,
+  tsn: null,
+  tn: null,
+  tt: null,
   busBridge: initialBusBridge,
 };
 
@@ -97,12 +154,17 @@ const migrateState = (persistedState: Partial<RusnState> | null): Partial<RusnSt
   const global = {
     ...initialGlobalState,
     ...persistedState.global,
+    // Ensure new fields exist
+    sr: persistedState.global?.sr || null,
+    tsn: persistedState.global?.tsn || null,
+    tn: persistedState.global?.tn || null,
+    tt: persistedState.global?.tt || null,
     busBridge: {
       ...initialBusBridge,
       ...(persistedState.global?.busBridge || {}),
       pricePerKg: persistedState.global?.busBridge?.material
         ? BUS_MATERIAL_PRICES[persistedState.global.busBridge.material as BusMaterial]
-        : BUS_MATERIAL_PRICES.copper,
+        : BUS_MATERIAL_PRICES['АД'],
     },
   };
 
@@ -112,16 +174,25 @@ const migrateState = (persistedState: Partial<RusnState> | null): Partial<RusnSt
   };
 };
 
+export type { RusnState };
 export const useRusnStore = create<RusnState>()(
   persist(
     (set, get) => ({
       global: initialGlobalState,
       cellConfigs: [],
+      busbarSummary: null,
+      busBridgeSummary: null,
+      busBridgeSummaries: [],
+      cellSummaries: [],
+      busBridges: [],
 
       setGlobal: (key, value) =>
-        set((state) => ({
-          global: { ...state.global, [key]: value },
-        })),
+        set((state) => {
+          console.log('useRusnStore.setGlobal', key, value);
+          return {
+            global: { ...state.global, [key]: value },
+          };
+        }),
 
       addCell: (cell: Omit<RusnCell, 'id'>) =>
         set((state) => ({
@@ -211,7 +282,7 @@ export const useRusnStore = create<RusnState>()(
               selectedBus,
               totalWeight,
               totalPrice:
-                totalWeight * (state.global.busBridge?.pricePerKg || BUS_MATERIAL_PRICES.copper),
+                totalWeight * (state.global.busBridge?.pricePerKg || BUS_MATERIAL_PRICES['АД']),
               consumption,
             },
           },
@@ -222,7 +293,61 @@ export const useRusnStore = create<RusnState>()(
         set({
           global: initialGlobalState,
           cellConfigs: [],
+          busbarSummary: null,
+          busBridgeSummary: null,
+          busBridgeSummaries: [],
+          cellSummaries: [],
+          busBridges: [],
         }),
+
+      setBusbarSummary: (summary) =>
+        set((state) => {
+          // Проверяем, изменились ли данные
+          if (JSON.stringify(state.busbarSummary) === JSON.stringify(summary)) {
+            return state;
+          }
+          return { busbarSummary: summary };
+        }),
+      setBusBridgeSummary: (summary) =>
+        set((state) => {
+          console.log('useRusnStore - setBusBridgeSummary:', {
+            currentSummary: state.busBridgeSummary,
+            newSummary: summary,
+            isEqual: JSON.stringify(state.busBridgeSummary) === JSON.stringify(summary),
+          });
+
+          // Проверяем, изменились ли данные
+          if (JSON.stringify(state.busBridgeSummary) === JSON.stringify(summary)) {
+            return state;
+          }
+          return { busBridgeSummary: summary };
+        }),
+      setBusBridgeSummaries: (summaries) => set({ busBridgeSummaries: summaries }),
+      setCellSummary: (summary) =>
+        set((state) => {
+          // Проверяем, есть ли уже такая ячейка с теми же данными
+          const existingIndex = state.cellSummaries.findIndex((s) => s.cellId === summary.cellId);
+          if (existingIndex >= 0) {
+            const existing = state.cellSummaries[existingIndex];
+            if (JSON.stringify(existing) === JSON.stringify(summary)) {
+              return state;
+            }
+            // Обновляем существующую запись
+            const newSummaries = [...state.cellSummaries];
+            newSummaries[existingIndex] = summary;
+            return { cellSummaries: newSummaries };
+          }
+          // Добавляем новую запись
+          return {
+            cellSummaries: [...state.cellSummaries, summary],
+          };
+        }),
+      removeCellSummary: (cellId) =>
+        set((state) => ({
+          cellSummaries: state.cellSummaries.filter((s) => s.cellId !== cellId),
+        })),
+      clearCellSummaries: () => set({ cellSummaries: [] }),
+      setBusBridges: (bridges) => set({ busBridges: bridges }),
     }),
     {
       name: 'rusn-storage',

@@ -89,7 +89,7 @@ export default function BusbarSettingsPage() {
         return acc;
       }, {} as { [key: string]: Switchgear[] });
 
-      const cellTypes = ['Ввод', 'СВ', 'ОТХ', 'ТР', 'ТН', 'ТСН', 'ЗШН', 'СР'];
+      const cellTypes = ['Ввод', 'СВ', 'ОТХ', 'ТР', 'ТН', 'ТСН', 'ЗШН', 'СР', 'Шинный мост'];
 
       const transformedTableData: TableRow[] = [];
 
@@ -208,7 +208,7 @@ export default function BusbarSettingsPage() {
           },
         ]);
       }
-      const cellTypes = ['Ввод', 'СВ', 'ОТХ', 'ТР', 'ТН', 'ТСН', 'ЗШН', 'СР'];
+      const cellTypes = ['Ввод', 'СВ', 'ОТХ', 'ТР', 'ТН', 'ТСН', 'ЗШН', 'СР', 'Шинный мост'];
       const newRows: TableRow[] = cellTypes.map((cellName) => {
         const cell = response.cells.find((c) => c.name === cellName);
         return {

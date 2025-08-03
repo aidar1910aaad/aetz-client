@@ -31,7 +31,7 @@ export default function SettingsPage() {
     {
       title: 'РУНН',
       description: 'Настройки РУНН',
-      path: '/dashboard/settings/runn',
+      path: '/dashboard/bktp/settings/runn',
       icon: Battery,
       color: 'bg-green-50 text-green-600',
     },

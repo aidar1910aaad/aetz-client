@@ -4,6 +4,7 @@ import { useState } from 'react';
 import RusnGlobalConfig from './RusnGlobalConfig';
 import RusnCellTable from './RusnCellTable';
 import { RusnBusBridge } from '@/components/bktp/rusn/RusnBusBridge';
+import { RusnBusbarSystem } from '@/components/bktp/rusn/RusnBusbarSystem';
 import { RusnConfigTabs } from '@/components/bktp/rusn/RusnConfigTabs';
 import { useEffect } from 'react';
 import { useRusnStore } from '@/store/useRusnStore';
@@ -26,7 +27,12 @@ const RusnFormFields = () => {
       case 'cells':
         return <RusnCellTable />;
       case 'bus-bridge':
-        return <RusnBusBridge />;
+        return (
+          <div className="space-y-8">
+            <RusnBusbarSystem />
+            <RusnBusBridge />
+          </div>
+        );
       default:
         return <RusnGlobalConfig />;
     }

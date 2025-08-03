@@ -1,23 +1,6 @@
 import { api } from '@/api/baseUrl';
 import { NextResponse } from 'next/server';
 
-// Временные данные для тестирования
-const mockSettings = {
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-  settings: {
-    rusn: [],
-    bmz: [],
-    runn: [],
-    work: [],
-    transformer: [],
-    additionalEquipment: [],
-    sr: [],
-    tsn: [],
-    tn: [],
-  },
-};
-
 export async function GET(request: Request) {
   try {
     console.log('GET /api/settings request received');

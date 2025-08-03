@@ -44,7 +44,7 @@ const availableBreakers: string[] = [
   'AV-12 2500A',
   'AV-12 3150A',
 ];
-const cellTypes = ['Ввод', 'СВ', 'ОТХ', 'ТР', 'ТН', 'ТСН', 'ЗШН', 'СР'];
+const cellTypes = ['Ввод', 'СВ', 'ОТХ', 'ТР', 'ТН', 'ТСН', 'ЗШН', 'СР', 'Шинный мост'];
 
 export const AddSwitchgearModal: React.FC<AddSwitchgearModalProps> = ({
   open,

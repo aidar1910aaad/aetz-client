@@ -3,7 +3,7 @@ import { api } from '../baseUrl/index';
 // Интерфейсы
 export interface CategorySetting {
   categoryId: number;
-  type: 'switch' | 'rza' | 'counter' | 'sr' | 'tsn' | 'tn';
+  type: 'switch' | 'rza' | 'counter' | 'sr' | 'tsn' | 'tn' | 'tt';
   isVisible: boolean;
 }
 
@@ -21,14 +21,22 @@ export interface Settings {
     sr: CategorySetting[];
     tsn: CategorySetting[];
     tn: CategorySetting[];
+    tt: CategorySetting[];
   };
 }
 
 export interface SettingsPayload {
   settings: {
-    rusn: CategorySetting[];
-    bmz: CategorySetting[];
-    runn: CategorySetting[];
+    rusn?: CategorySetting[];
+    bmz?: CategorySetting[];
+    runn?: CategorySetting[];
+    work?: CategorySetting[];
+    transformer?: CategorySetting[];
+    additionalEquipment?: CategorySetting[];
+    sr?: CategorySetting[];
+    tsn?: CategorySetting[];
+    tn?: CategorySetting[];
+    tt?: CategorySetting[];
   };
 }
 
@@ -43,9 +51,9 @@ export const createSettings = async (settings: SettingsPayload, token: string): 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(settings)
+      body: JSON.stringify(settings),
     });
 
     if (!response.ok) {
@@ -58,15 +66,19 @@ export const createSettings = async (settings: SettingsPayload, token: string): 
   }
 };
 
-export const updateSettings = async (id: number, settings: SettingsPayload, token: string): Promise<void> => {
+export const updateSettings = async (
+  id: number,
+  settings: SettingsPayload,
+  token: string
+): Promise<void> => {
   try {
     const response = await fetch(`${api}/settings/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(settings)
+      body: JSON.stringify(settings),
     });
 
     if (!response.ok) {
@@ -81,18 +93,29 @@ export const updateSettings = async (id: number, settings: SettingsPayload, toke
 
 export const getSettings = async (token: string): Promise<Settings> => {
   try {
+    console.log('=== API getSettings: Отправка запроса ===');
+    console.log('Token:', token ? 'Present' : 'Missing');
+    console.log('URL:', `${api}/settings`);
+
     const response = await fetch(`${api}/settings`, {
       headers: {
-        'Authorization': `Bearer ${token}`
-      }
+        Authorization: `Bearer ${token}`,
+      },
     });
-    
+
+    console.log('Response status:', response.status);
+    console.log('Response ok:', response.ok);
+
     if (!response.ok) {
       throw new Error(`Ошибка при получении настроек: ${response.status}`);
     }
 
     const data = await response.json();
     console.log('Get settings response:', data);
+    console.log('Структура ответа:', Object.keys(data));
+    console.log('Настройки РУСН в ответе:', data.settings?.rusn);
+    console.log('Количество настроек РУСН:', data.settings?.rusn?.length || 0);
+
     return data;
   } catch (error) {
     console.error('Error in getSettings:', error);
@@ -100,33 +123,37 @@ export const getSettings = async (token: string): Promise<Settings> => {
   }
 };
 
-export const saveSettings = async (settings: {
+export const saveSettings = async (
   settings: {
-    rusn?: CategorySetting[];
-    bmz?: CategorySetting[];
-    runn?: CategorySetting[];
-    work?: CategorySetting[];
-    transformer?: CategorySetting[];
-    additionalEquipment?: CategorySetting[];
-    sr?: CategorySetting[];
-    tsn?: CategorySetting[];
-    tn?: CategorySetting[];
-  }
-}, token: string): Promise<Settings> => {
+    settings: {
+      rusn?: CategorySetting[];
+      bmz?: CategorySetting[];
+      runn?: CategorySetting[];
+      work?: CategorySetting[];
+      transformer?: CategorySetting[];
+      additionalEquipment?: CategorySetting[];
+      sr?: CategorySetting[];
+      tsn?: CategorySetting[];
+      tn?: CategorySetting[];
+      tt?: CategorySetting[];
+    };
+  },
+  token: string
+): Promise<Settings> => {
   try {
     const url = `${api}/settings`;
-    
+
     const headers = {
-      'accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+      accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
     };
 
     console.log('Saving settings with:', {
       url,
       method: 'PUT',
       headers,
-      body: settings
+      body: settings,
     });
 
     const response = await fetch(url, {
@@ -134,7 +161,7 @@ export const saveSettings = async (settings: {
       headers,
       body: JSON.stringify(settings),
       mode: 'cors',
-      credentials: 'include'
+      credentials: 'include',
     });
 
     console.log('Response status:', response.status);
@@ -154,7 +181,7 @@ export const saveSettings = async (settings: {
     if (error instanceof Error) {
       console.error('Error details:', {
         message: error.message,
-        stack: error.stack
+        stack: error.stack,
       });
     }
     throw error;

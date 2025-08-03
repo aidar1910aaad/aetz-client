@@ -1,21 +1,27 @@
 import { Plus, X, Eye, EyeOff } from 'lucide-react';
-import { Category } from '@/api/categories';
 
-interface CategorySettings {
+interface Category {
+  id: string;
+  name: string;
+  visible: boolean;
+}
+
+interface CategoryObject {
   id: number;
   name: string;
-  isVisible: boolean;
+  code: string;
+  description: string;
 }
 
 interface SettingsSectionProps {
   title: string;
-  type: 'switch' | 'rza' | 'counter' | 'sr' | 'tsn' | 'tn';
+  type: 'switch' | 'rza' | 'counter' | 'sr' | 'tsn' | 'tn' | 'tt';
   icon: React.ReactNode;
-  allCategories: Category[];
-  selectedCategories: CategorySettings[];
-  onAddCategory: (type: string, categoryId: number) => void;
-  onRemoveCategory: (type: string, categoryId: number) => void;
-  onToggleVisibility: (type: string, categoryId: number) => void;
+  allCategories: CategoryObject[] | string[];
+  selectedCategories: Category[];
+  onAddCategory: (type: string, categoryId: number | string) => void;
+  onRemoveCategory: (type: string, categoryId: string) => void;
+  onToggleVisibility: (type: string, categoryId: string) => void;
 }
 
 export function SettingsSection({
@@ -26,10 +32,20 @@ export function SettingsSection({
   selectedCategories,
   onAddCategory,
   onRemoveCategory,
-  onToggleVisibility
+  onToggleVisibility,
 }: SettingsSectionProps) {
-  const availableCategories = allCategories.filter(
-    category => !selectedCategories.some(selected => selected.id === category.id)
+  // Convert category objects to strings if needed and store original objects
+  const categoryData =
+    allCategories?.map((category) => {
+      if (typeof category === 'string') {
+        return { name: category, id: category, original: category };
+      } else {
+        return { name: category.name, id: category.id, original: category };
+      }
+    }) || [];
+
+  const availableCategories = categoryData.filter(
+    (category) => !selectedCategories.some((selected) => selected.name === category.name)
   );
 
   return (
@@ -41,7 +57,7 @@ export function SettingsSection({
 
       {/* Selected Categories */}
       <div className="space-y-3 mb-6">
-        {selectedCategories.map(category => (
+        {selectedCategories.map((category) => (
           <div
             key={category.id}
             className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
@@ -51,17 +67,13 @@ export function SettingsSection({
               <button
                 onClick={() => onToggleVisibility(type, category.id)}
                 className={`p-1.5 rounded-lg transition-colors duration-200 ${
-                  category.isVisible 
-                    ? 'hover:bg-gray-200 text-gray-600' 
+                  category.visible
+                    ? 'hover:bg-gray-200 text-gray-600'
                     : 'hover:bg-gray-200 text-gray-400'
                 }`}
-                title={category.isVisible ? 'Скрыть' : 'Показать'}
+                title={category.visible ? 'Скрыть' : 'Показать'}
               >
-                {category.isVisible ? (
-                  <Eye className="w-4 h-4" />
-                ) : (
-                  <EyeOff className="w-4 h-4" />
-                )}
+                {category.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
               </button>
               <button
                 onClick={() => onRemoveCategory(type, category.id)}
@@ -80,7 +92,7 @@ export function SettingsSection({
         <div className="relative">
           <select
             onChange={(e) => {
-              const categoryId = parseInt(e.target.value);
+              const categoryId = e.target.value;
               if (categoryId) {
                 onAddCategory(type, categoryId);
                 e.target.value = '';
@@ -89,9 +101,14 @@ export function SettingsSection({
             className="w-full p-2 border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#3A55DF] focus:border-transparent"
             defaultValue=""
           >
-            <option value="" disabled>Добавить категорию</option>
-            {availableCategories.map(category => (
-              <option key={category.id} value={category.id}>
+            <option value="" disabled>
+              Добавить категорию
+            </option>
+            {availableCategories.map((category) => (
+              <option
+                key={category.id}
+                value={typeof category.original === 'string' ? category.name : category.id}
+              >
                 {category.name}
               </option>
             ))}
@@ -103,4 +120,4 @@ export function SettingsSection({
       )}
     </div>
   );
-} 
+}

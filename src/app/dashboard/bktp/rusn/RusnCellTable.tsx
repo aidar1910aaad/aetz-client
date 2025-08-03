@@ -1,16 +1,24 @@
 'use client';
 
 import { useRusnStore } from '@/store/useRusnStore';
+import { useRusnMaterials } from '@/hooks/useRusnMaterials';
+import { useRusnCalculation } from '@/hooks/useRusnCalculation';
+import RusnCell from './components/RusnCell';
+import RusnSummaryTable from './components/RusnSummaryTable';
 import TogglerWithInput from './TogglerWithInput';
 import { useState, useEffect } from 'react';
-import { useRusnMaterials } from '@/hooks/useRusnMaterials';
-import RusnCell from './components/RusnCell';
 import { useCalculationGroups } from '@/hooks/useCalculationGroups';
-import { useRusnCalculation } from '@/hooks/useRusnCalculation';
-import RusnSummaryTable from './components/RusnSummaryTable';
 import { switchgearApi } from '@/api/switchgear';
 
-const cellTypes = ['Ввод', 'СВ', 'СР', 'ТР', 'Отходящая', 'ТН', 'ТСН'];
+const cellTypes = [
+  'Ввод',
+  'Секционный выключатель',
+  'Секционный разьединитель',
+  'Трансформаторная',
+  'Отходящая',
+  'Трансформатор напряжения',
+  'Трансформатор собственных нужд',
+];
 
 export default function RusnCellTable() {
   const { cellConfigs, addCell, updateCell, removeCell, global } = useRusnStore();
@@ -37,6 +45,10 @@ export default function RusnCellTable() {
     rza: materials.rza,
     meter: materials.meter,
     transformer: materials.transformer,
+    sr: materials.sr,
+    tsn: materials.tsn,
+    tn: materials.tn,
+    tt: materials.tt,
   };
 
   // Сохраняем выбранные значения в localStorage
@@ -220,26 +232,7 @@ export default function RusnCellTable() {
                     cell={cell}
                     materials={filteredMaterials}
                     onUpdate={(id, field, value) => {
-                      if (
-                        field === 'breaker' ||
-                        field === 'rza' ||
-                        field === 'meterType' ||
-                        field === 'transformer'
-                      ) {
-                        const materialField = field === 'meterType' ? 'meter' : field;
-                        const material = filteredMaterials[materialField].find(
-                          (m) => m.id.toString() === (value as { id: string }).id
-                        );
-                        if (material) {
-                          updateCell(id, field, {
-                            id: material.id.toString(),
-                            name: material.name,
-                            price: Number(material.price),
-                          });
-                        }
-                      } else {
-                        updateCell(id, field, value);
-                      }
+                      updateCell(id, field, value);
                     }}
                     onRemove={removeCell}
                     groupSlug={selectedGroupSlug}
@@ -264,26 +257,7 @@ export default function RusnCellTable() {
                 cell={cellConfigs.find((c) => c.id === openCellMap[type])!}
                 materials={filteredMaterials}
                 onUpdate={(id, field, value) => {
-                  if (
-                    field === 'breaker' ||
-                    field === 'rza' ||
-                    field === 'meterType' ||
-                    field === 'transformer'
-                  ) {
-                    const materialField = field === 'meterType' ? 'meter' : field;
-                    const material = filteredMaterials[materialField].find(
-                      (m) => m.id.toString() === (value as { id: string }).id
-                    );
-                    if (material) {
-                      updateCell(id, field, {
-                        id: material.id.toString(),
-                        name: material.name,
-                        price: Number(material.price),
-                      });
-                    }
-                  } else {
-                    updateCell(id, field, value);
-                  }
+                  updateCell(id, field, value);
                 }}
                 onRemove={removeCell}
                 groupSlug={selectedGroupSlug}

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import api from '@/api/baseUrl/index';
+import { api } from '@/api/baseUrl/index';
 
 export async function GET(request: Request) {
   try {

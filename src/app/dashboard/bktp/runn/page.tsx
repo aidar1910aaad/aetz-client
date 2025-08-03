@@ -5,6 +5,7 @@ import { useTransformerStore } from '@/store/useTransformerStore';
 import Link from 'next/link';
 import Breadcrumbs from '@/components/Breadcrumbs/Breadcrumbs';
 import RunnFormFields from './RunnFormFields';
+import TransformerInfo from './TransformerInfo';
 
 const cellTypesByVoltage: Record<number, string[]> = {
   10: ['ЩО-70', 'ЩО-90', 'ПР11', 'РУНН-1', 'РУНН-2'],
@@ -20,8 +21,9 @@ export default function RunnConfigurator() {
 
   return (
     <div className="h-[calc(100vh-110px)] overflow-y-auto px-6 py-6 bg-gray-50">
+      <TransformerInfo />
       <Breadcrumbs />
-      <h1 className="text-2xl font-bold mb-4">Конфигурация РУНН ({voltage} кВ)</h1>
+      <h1 className="text-2xl font-bold mb-4">Конфигурация РУНН (0.4 кВ)</h1>
 
       <div className="mb-4 flex items-center justify-between">
         <button

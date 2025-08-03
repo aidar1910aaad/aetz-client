@@ -2,12 +2,15 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   getAllCalculationGroups,
   createCalculationGroup,
+  updateCalculationGroup,
+  deleteCalculationGroup,
   createCalculation,
   getCalculationsByGroup,
   getCalculationBySlugs,
   Calculation,
   CalculationGroup,
   CreateCalculationGroupRequest,
+  UpdateCalculationGroupRequest,
   CreateCalculationRequest,
 } from '@/api/calculations';
 import { showToast } from '@/shared/modals/ToastProvider';
@@ -88,6 +91,32 @@ export function useCalculations() {
     }
   };
 
+  // ✅ Обновление группы
+  const handleUpdateGroup = async (slug: string, data: UpdateCalculationGroupRequest) => {
+    try {
+      const token = localStorage.getItem('token') || '';
+      await updateCalculationGroup(slug, data, token);
+      await fetchGroups();
+      showToast('Группа обновлена!', 'success');
+    } catch (err: unknown) {
+      const error = err as Error;
+      showToast(error.message || 'Ошибка при обновлении группы', 'error');
+    }
+  };
+
+  // ✅ Удаление группы
+  const handleDeleteGroup = async (id: number) => {
+    try {
+      const token = localStorage.getItem('token') || '';
+      await deleteCalculationGroup(id, token);
+      await fetchGroups();
+      showToast('Группа удалена!', 'success');
+    } catch (err: unknown) {
+      const error = err as Error;
+      showToast(error.message || 'Ошибка при удалении группы', 'error');
+    }
+  };
+
   // ✅ Создание калькуляции
   const handleCreateCalculation = async (data: CreateCalculationRequest) => {
     try {
@@ -125,6 +154,8 @@ export function useCalculations() {
     debouncedSearch,
     loading,
     handleCreateGroup,
+    handleUpdateGroup,
+    handleDeleteGroup,
     handleCreateCalculation,
     fetchCalculation,
     selectedCalculation,
