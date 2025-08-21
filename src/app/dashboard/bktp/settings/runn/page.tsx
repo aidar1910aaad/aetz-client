@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Save, Power, Settings2, Gauge } from 'lucide-react';
+import { ChevronLeft, Save, Power, Settings2, Gauge, Zap } from 'lucide-react';
 import { useRunnSettings } from '@/hooks/useRunnSettings';
 import { RunnSettingsSection } from '@/components/settings/RunnSettingsSection';
 
@@ -117,6 +117,21 @@ export default function RunnSettingsPage() {
             }
             allCategories={allCategories.counter || []}
             selectedCategories={selectedCategories?.counter || []}
+            onAddCategory={handleAddCategory}
+            onRemoveCategory={handleRemoveCategory}
+            onToggleVisibility={handleToggleVisibility}
+          />
+
+          <RunnSettingsSection
+            title="РПС левый"
+            type="rpsLeft"
+            icon={
+              <div className="p-2 bg-purple-50 rounded-lg">
+                <Zap className="w-6 h-6 text-purple-600" />
+              </div>
+            }
+            allCategories={allCategories.rpsLeft || []}
+            selectedCategories={selectedCategories?.rpsLeft || []}
             onAddCategory={handleAddCategory}
             onRemoveCategory={handleRemoveCategory}
             onToggleVisibility={handleToggleVisibility}

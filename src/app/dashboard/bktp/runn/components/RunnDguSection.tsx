@@ -1,9 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { RunnCell } from '@/store/useRunnStore';
 import TogglerWithInput from '../TogglerWithInput';
 import { Material } from '@/api/material';
+import {
+  calculateNominalCurrentForDgu,
+  findBestMaterialByNominalCurrent,
+} from '../utils/runnDguMaterialFinder';
 
 interface RunnDguSectionProps {
   categoryMaterials?: Material[];
@@ -32,12 +36,42 @@ export default function RunnDguSection({
     price: 0, // Цена
   });
 
-  // Расчет номинального тока для 0.4 кВ
-  const calculateNominalCurrent = (powerKva: number) => {
-    if (powerKva <= 0) return 0;
-    // Формула: I = S / (U * √3) где S - мощность в кВА, U = 0.4 кВ
-    return (powerKva * 1000) / (400 * Math.sqrt(3));
-  };
+  // Состояние для автоматически выбранного материала
+  const [autoSelectedMaterial, setAutoSelectedMaterial] = useState<Material | null>(null);
+  const [nominalCurrent, setNominalCurrent] = useState<number>(0);
+
+  // Автоматический выбор материала при изменении мощности
+  useEffect(() => {
+    if (runnDguSettings.nominalPowerKva > 0 && categoryMaterials.length > 0) {
+      const calculatedCurrent = calculateNominalCurrentForDgu(runnDguSettings.nominalPowerKva);
+      setNominalCurrent(calculatedCurrent);
+      
+      const bestMaterial = findBestMaterialByNominalCurrent(categoryMaterials, calculatedCurrent);
+      setAutoSelectedMaterial(bestMaterial);
+      
+      // Автоматически устанавливаем выбранный материал для ввода
+      // Всегда обновляем для ячейки Ввод, так как это автоматический выбор
+      if (bestMaterial) {
+        setRunnDguInputCell(prev => ({
+          ...prev,
+          breaker: bestMaterial.name
+        }));
+      }
+    } else {
+      setNominalCurrent(0);
+      setAutoSelectedMaterial(null);
+    }
+  }, [runnDguSettings.nominalPowerKva, categoryMaterials]);
+
+  // Отдельный useEffect для обновления поля автомата в ячейке Ввод
+  useEffect(() => {
+    if (autoSelectedMaterial && runnDguInputCell.breaker !== autoSelectedMaterial.name) {
+      setRunnDguInputCell(prev => ({
+        ...prev,
+        breaker: autoSelectedMaterial.name
+      }));
+    }
+  }, [autoSelectedMaterial, runnDguInputCell.breaker]);
 
   // Создаем опции автоматов из реальных материалов
   const breakerOptions = categoryMaterials.map((material) => material.name);
@@ -48,18 +82,31 @@ export default function RunnDguSection({
   const MaterialSummaryTable = ({ cell }: { cell: RunnCell }) => {
     const selectedMaterials = [];
 
+
+
     // Добавляем автомат выкатной
     if (cell.breaker) {
       const breakerMaterial = categoryMaterials.find((m) => m.name === cell.breaker);
+      
       if (breakerMaterial) {
+        const parsedPrice = typeof breakerMaterial.price === 'string'
+          ? parseFloat(breakerMaterial.price)
+          : breakerMaterial.price;
+        
         selectedMaterials.push({
           name: cell.breaker,
-          price:
-            typeof breakerMaterial.price === 'string'
-              ? parseFloat(breakerMaterial.price)
-              : breakerMaterial.price,
+          price: parsedPrice,
           quantity: cell.quantity || 1,
-          unit: breakerMaterial.unit,
+          unit: breakerMaterial.unit || 'шт',
+          type: 'Автомат выкатной',
+        });
+      } else {
+        // Добавляем материал без цены, если не найден
+        selectedMaterials.push({
+          name: cell.breaker,
+          price: 0,
+          quantity: cell.quantity || 1,
+          unit: 'шт',
           type: 'Автомат выкатной',
         });
       }
@@ -263,22 +310,39 @@ export default function RunnDguSection({
       label: string,
       value: string,
       onChange: (v: string) => void,
-      options: string[]
+      options: string[],
+      isAutoSelected?: boolean,
+      isReadOnly?: boolean
     ) => (
       <div className="flex flex-col gap-1 min-w-[120px]">
-        <span className="text-xs font-medium text-[#3A55DF]">{label}</span>
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
-        >
-          <option value="">—</option>
-          {options.map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
+        <span className="text-xs font-medium text-[#3A55DF]">
+          {label}
+          {isAutoSelected && (
+            <span className="ml-1 text-green-600 text-[10px]">(авто)</span>
+          )}
+        </span>
+        {isReadOnly ? (
+          <div className="border border-green-300 bg-green-50 rounded px-2 py-1 text-sm text-gray-700 cursor-not-allowed">
+            {value || "—"}
+          </div>
+        ) : (
+          <select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className={`border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF] ${
+              isAutoSelected 
+                ? 'border-green-300 bg-green-50' 
+                : 'border-gray-300'
+            }`}
+          >
+            <option value="">—</option>
+            {options.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
     );
 
@@ -288,7 +352,9 @@ export default function RunnDguSection({
           'Автомат выкатной',
           cell.breaker,
           (val) => cell.update('breaker', val),
-          breakerOptions
+          breakerOptions,
+          cell.purpose === 'РУНН-ДГУ-Ввод' && autoSelectedMaterial && cell.breaker === autoSelectedMaterial.name,
+          cell.purpose === 'РУНН-ДГУ-Ввод' // Только для чтения в ячейке Ввод
         )}
 
         {renderSelectBlock(
@@ -376,10 +442,38 @@ export default function RunnDguSection({
               <div className="flex flex-col gap-1 min-w-[150px]">
                 <span className="text-xs font-medium text-[#3A55DF]">Номинальный ток (А)</span>
                 <div className="border border-gray-300 rounded px-2 py-1 text-sm bg-gray-50 text-gray-700">
-                  {calculateNominalCurrent(runnDguSettings.nominalPowerKva).toFixed(2)} А
+                  {nominalCurrent.toFixed(2)} А
                 </div>
               </div>
             </div>
+
+            {/* Блок автоматического выбора материала */}
+            {autoSelectedMaterial && (
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
+                <h4 className="text-sm font-medium text-green-800 mb-2">
+                  Автоматический выбор материала для ячейки Ввод:
+                </h4>
+                <div className="space-y-1">
+                  <div className="text-xs text-green-700">
+                    Номинальная мощность: <span className="font-medium">{runnDguSettings.nominalPowerKva} кВА</span>
+                  </div>
+                  <div className="text-xs text-green-700">
+                    Рекомендуемый ток для ввода: <span className="font-medium">{nominalCurrent.toFixed(2)} А</span>
+                  </div>
+                  <div className="text-xs text-green-700">
+                    Автоматически выбран: <span className="font-medium">{autoSelectedMaterial.name}</span>
+                  </div>
+                  <div className="text-xs text-green-700">
+                    Цена: <span className="font-medium">
+                      {typeof autoSelectedMaterial.price === 'string' 
+                        ? parseFloat(autoSelectedMaterial.price).toLocaleString() 
+                        : autoSelectedMaterial.price.toLocaleString()
+                      } ₸
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </TogglerWithInput>
 
           <TogglerWithInput label="РУНН-ДГУ: Ввод" defaultEnabled>

@@ -2,207 +2,36 @@
 
 import { useRunnStore } from '@/store/useRunnStore';
 import { useRunnSettings } from '@/hooks/useRunnSettings';
-import { getMaterialsByCategoryId, Material } from '@/api/material';
-import { useAutoMaterialSelection } from '@/hooks/useAutoMaterialSelection';
-import { useState, useEffect } from 'react';
-import RunnCellTable from './RunnCellTable';
-import TogglerWithInput from './TogglerWithInput';
+import { Material } from '@/api/material';
 
-export default function RunnGlobalConfig() {
+interface RunnGlobalConfigProps {
+  materials?: Material[];
+  autoSelectedMaterial?: Material | null;
+  autoSelectedSvMaterial?: Material | null;
+  transformerPower?: number;
+  recommendedCurrent?: number;
+  recommendedSvCurrent?: number;
+}
+
+export default function RunnGlobalConfig({
+  materials = [],
+  autoSelectedMaterial,
+  autoSelectedSvMaterial,
+  transformerPower,
+  recommendedCurrent,
+  recommendedSvCurrent,
+}: RunnGlobalConfigProps = {}) {
   const { global, setGlobal } = useRunnStore();
   const { selectedCategories, loading } = useRunnSettings();
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [materialsLoading, setMaterialsLoading] = useState(false);
-  const [meterMaterials, setMeterMaterials] = useState<Material[]>([]);
-  const [meterMaterialsLoading, setMeterMaterialsLoading] = useState(false);
 
   // Получаем категории из настроек РУНН
   const withdrawableOptions = selectedCategories?.avtomatVyk?.map((cat) => cat.name) || [];
   const moldedOptions = selectedCategories?.avtomatLity?.map((cat) => cat.name) || [];
   const meterOptions = selectedCategories?.counter?.map((cat) => cat.name) || [];
 
-  // Используем хук для автоматического выбора материала
-  const {
-    autoSelectedMaterial,
-    autoSelectedSvMaterial,
-    transformerPower,
-    recommendedCurrent,
-    recommendedSvCurrent,
-  } = useAutoMaterialSelection({
-    categoryMaterials: materials,
-    categoryName: global.withdrawableBreaker || '',
-  });
 
-  // Функция для получения материалов по выбранной категории
-  const fetchMaterialsByCategory = async (categoryName: string) => {
-    if (!categoryName || !selectedCategories) {
-      setMaterials([]);
-      return;
-    }
 
-    setMaterialsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.error('Токен не найден');
-        return;
-      }
 
-      // Находим категорию по имени и получаем её id
-      const category = selectedCategories.avtomatVyk?.find((cat) => cat.name === categoryName);
-      if (!category) {
-        console.log('Категория не найдена в настройках РУНН:', categoryName);
-        setMaterials([]);
-        return;
-      }
-
-      console.log('Получаем материалы для категории:', categoryName, 'с ID:', category.id);
-      const materialsData = await getMaterialsByCategoryId(parseInt(category.id), token);
-      console.log('Полученные материалы:', materialsData);
-      setMaterials(materialsData);
-    } catch (error) {
-      console.error('Ошибка получения материалов:', error);
-      setMaterials([]);
-    } finally {
-      setMaterialsLoading(false);
-    }
-  };
-
-  // Функция для получения материалов счетчика по выбранной категории
-  const fetchMeterMaterialsByCategory = async (categoryName: string) => {
-    if (!categoryName || !selectedCategories) {
-      setMeterMaterials([]);
-      return;
-    }
-
-    setMeterMaterialsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.error('Токен не найден');
-        return;
-      }
-
-      // Находим категорию счетчика по имени и получаем её id
-      const category = selectedCategories.counter?.find((cat) => cat.name === categoryName);
-      if (!category) {
-        console.log('Категория счетчика не найдена в настройках РУНН:', categoryName);
-        setMeterMaterials([]);
-        return;
-      }
-
-      console.log('Получаем материалы счетчика для категории:', categoryName, 'с ID:', category.id);
-      const materialsData = await getMaterialsByCategoryId(parseInt(category.id), token);
-      console.log('Полученные материалы счетчика:', materialsData);
-      setMeterMaterials(materialsData);
-    } catch (error) {
-      console.error('Ошибка получения материалов счетчика:', error);
-      setMeterMaterials([]);
-    } finally {
-      setMeterMaterialsLoading(false);
-    }
-  };
-
-  // При изменении выбранной категории автомата выкатного
-  useEffect(() => {
-    if (global.withdrawableBreaker && selectedCategories) {
-      // Проверяем, существует ли выбранная категория в настройках РУНН
-      const categoryExists = selectedCategories.avtomatVyk?.some(
-        (cat) => cat.name === global.withdrawableBreaker
-      );
-
-      if (!categoryExists) {
-        console.log(
-          'Категория не найдена в настройках РУНН, очищаем выбор:',
-          global.withdrawableBreaker
-        );
-        setGlobal('withdrawableBreaker', '');
-        setMaterials([]);
-        return;
-      }
-
-      fetchMaterialsByCategory(global.withdrawableBreaker);
-    } else {
-      setMaterials([]);
-    }
-  }, [global.withdrawableBreaker, selectedCategories]);
-
-  // При изменении выбранной категории счетчика
-  useEffect(() => {
-    if (global.meterType && selectedCategories) {
-      // Проверяем, существует ли выбранная категория в настройках РУНН
-      const categoryExists = selectedCategories.counter?.some(
-        (cat) => cat.name === global.meterType
-      );
-
-      if (!categoryExists) {
-        console.log(
-          'Категория счетчика не найдена в настройках РУНН, очищаем выбор:',
-          global.meterType
-        );
-        setGlobal('meterType', '');
-        setMeterMaterials([]);
-        return;
-      }
-
-      fetchMeterMaterialsByCategory(global.meterType);
-    } else {
-      setMeterMaterials([]);
-    }
-  }, [global.meterType, selectedCategories]);
-
-  // Проверка и очистка несуществующих категорий при загрузке настроек
-  useEffect(() => {
-    if (selectedCategories) {
-      let hasChanges = false;
-
-      // Проверяем автомат выкатной
-      if (global.withdrawableBreaker) {
-        const categoryExists = selectedCategories.avtomatVyk?.some(
-          (cat) => cat.name === global.withdrawableBreaker
-        );
-        if (!categoryExists) {
-          console.log(
-            'Очищаем несуществующую категорию автомата выкатного:',
-            global.withdrawableBreaker
-          );
-          setGlobal('withdrawableBreaker', '');
-          hasChanges = true;
-        }
-      }
-
-      // Проверяем автомат литой корпус
-      if (global.moldedCaseBreaker) {
-        const categoryExists = selectedCategories.avtomatLity?.some(
-          (cat) => cat.name === global.moldedCaseBreaker
-        );
-        if (!categoryExists) {
-          console.log(
-            'Очищаем несуществующую категорию автомата литого корпуса:',
-            global.moldedCaseBreaker
-          );
-          setGlobal('moldedCaseBreaker', '');
-          hasChanges = true;
-        }
-      }
-
-      // Проверяем счетчик
-      if (global.meterType) {
-        const categoryExists = selectedCategories.counter?.some(
-          (cat) => cat.name === global.meterType
-        );
-        if (!categoryExists) {
-          console.log('Очищаем несуществующую категорию счетчика:', global.meterType);
-          setGlobal('meterType', '');
-          hasChanges = true;
-        }
-      }
-
-      if (hasChanges) {
-        console.log('Очищены несуществующие категории из глобального состояния');
-      }
-    }
-  }, [selectedCategories]);
 
   if (loading) {
     return (
@@ -244,25 +73,7 @@ export default function RunnGlobalConfig() {
           ))}
         </select>
 
-        {/* Отображение материалов по выбранной категории */}
-        {global.withdrawableBreaker && (
-          <div className="mt-4 p-4 bg-gray-50 rounded border">
-            <h4 className="font-medium mb-2">
-              Материалы категории &quot;{global.withdrawableBreaker}&quot;:
-            </h4>
-            {materialsLoading ? (
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#3A55DF]"></div>
-            ) : materials.length > 0 ? (
-              <div className="bg-white p-3 rounded border">
-                <pre className="text-xs overflow-auto max-h-60">
-                  {JSON.stringify(materials, null, 2)}
-                </pre>
-              </div>
-            ) : (
-              <p className="text-gray-500 text-sm">Материалы не найдены</p>
-            )}
-          </div>
-        )}
+
 
         {/* Информация об автоматическом выборе материала */}
         {transformerPower && recommendedCurrent && (
@@ -350,7 +161,6 @@ export default function RunnGlobalConfig() {
           value={global.meterType || ''}
           onChange={(e) => setGlobal('meterType', e.target.value)}
           className="w-full border px-3 py-2 rounded"
-          disabled={meterMaterialsLoading}
         >
           <option value="">Выберите</option>
           {meterOptions.map((opt) => (
@@ -359,28 +169,7 @@ export default function RunnGlobalConfig() {
             </option>
           ))}
         </select>
-        {meterMaterialsLoading && (
-          <p className="text-sm text-gray-500 mt-1">Загрузка материалов...</p>
-        )}
       </div>
-
-      <RunnCellTable
-        categoryMaterials={materials}
-        autoSelectedMaterial={autoSelectedMaterial}
-        autoSelectedSvMaterial={autoSelectedSvMaterial}
-        meterMaterials={meterMaterials}
-        meterMaterialsLoading={meterMaterialsLoading}
-      />
-
-      <TogglerWithInput label="Шинный мост (м)">
-        <input
-          type="number"
-          min={0}
-          value={global.busBridgeLength}
-          onChange={(e) => setGlobal('busBridgeLength', Number(e.target.value))}
-          className="w-full border px-3 py-2 rounded"
-        />
-      </TogglerWithInput>
     </section>
   );
 }

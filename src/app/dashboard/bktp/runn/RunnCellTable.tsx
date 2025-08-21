@@ -16,6 +16,7 @@ interface RunnCellTableProps {
   autoSelectedSvMaterial?: Material | null;
   meterMaterials?: Material[];
   meterMaterialsLoading?: boolean;
+  rpsLeftMaterials?: Material[];
 }
 
 export default function RunnCellTable({
@@ -24,6 +25,7 @@ export default function RunnCellTable({
   autoSelectedSvMaterial,
   meterMaterials = [],
   meterMaterialsLoading = false,
+  rpsLeftMaterials = [],
 }: RunnCellTableProps = {}) {
   const { cellConfigs, addCell, updateCell, removeCell } = useRunnStore();
   const [openCellMap, setOpenCellMap] = useState<Record<string, string>>({});
@@ -424,6 +426,7 @@ export default function RunnCellTable({
         categoryMaterials={categoryMaterials}
         meterMaterials={meterMaterials}
         meterMaterialsLoading={meterMaterialsLoading}
+        rpsLeftMaterials={rpsLeftMaterials}
       />
 
       <RunnDguSection categoryMaterials={categoryMaterials} meterMaterials={meterMaterials} />

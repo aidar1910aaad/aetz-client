@@ -28,11 +28,11 @@ interface CellMaterial {
   price: number;
   unit: string;
   code: string;
-  type: 'switch' | 'rza' | 'counter' | 'sr' | 'tsn' | 'tn' | 'tt';
+  type: 'switch' | 'rza' | 'counter' | 'sr' | 'tsn' | 'tn' | 'tt' | 'pu' | 'disconnector' | 'busbar' | 'busbridge' | 'withdrawable_breaker' | 'molded_case_breaker';
 }
 
 interface CellConfiguration {
-  type: '0.4kv' | '10kv' | '20kv' | 'rza';
+  type: '0.4kv' | '10kv' | '20kv' | 'rza' | 'pu' | 'disconnector' | 'busbar' | 'busbridge' | 'switch' | 'tn' | 'tsn' | 'input' | 'section_switch' | 'outgoing';
   materials: {
     switch?: CellMaterial[];
     rza?: CellMaterial[];
@@ -40,6 +40,13 @@ interface CellConfiguration {
     sr?: CellMaterial[];
     tsn?: CellMaterial[];
     tn?: CellMaterial[];
+    tt?: CellMaterial[];
+    pu?: CellMaterial[];
+    disconnector?: CellMaterial[];
+    busbar?: CellMaterial[];
+    busbridge?: CellMaterial[];
+    withdrawable_breaker?: CellMaterial[];
+    molded_case_breaker?: CellMaterial[];
   };
 }
 
@@ -99,15 +106,13 @@ export default function CalculationDetailPage() {
         'switch',
         'tn',
         'tsn',
+        'input',
+        'section_switch',
+        'outgoing',
       ] as const;
       const cellType = updatedCalculation.data.cellConfig?.type;
 
-      console.log('🔍 DEBUG: Original cell type from calculation:', cellType);
-      console.log('🔍 DEBUG: Valid cell types:', validCellTypes);
-
       const validCellType = validCellTypes.includes(cellType as any) ? cellType : '10kv';
-
-      console.log('🔍 DEBUG: Validated cell type:', validCellType);
 
       const payload = {
         name: updatedCalculation.name,
@@ -139,8 +144,7 @@ export default function CalculationDetailPage() {
         },
       };
 
-      console.log('🔍 DEBUG: Final payload cellConfig:', payload.data.cellConfig);
-      console.log('🔍 DEBUG: Full payload:', JSON.stringify(payload, null, 2));
+
 
       await updateCalculation(groupSlug, calcSlug, payload, token);
       await fetchCalculation(groupSlug, calcSlug);
@@ -218,6 +222,9 @@ export default function CalculationDetailPage() {
                         {selectedCalculation.data.cellConfig.type === 'tn' &&
                           'Трансформатор напряжения'}
                         {selectedCalculation.data.cellConfig.type === 'tsn' && 'ТСН'}
+                        {selectedCalculation.data.cellConfig.type === 'input' && 'Ввод'}
+                        {selectedCalculation.data.cellConfig.type === 'section_switch' && 'Секционный выключатель'}
+                        {selectedCalculation.data.cellConfig.type === 'outgoing' && 'Отходящая'}
                       </span>
                     </div>
                     <div className="space-y-2">
@@ -261,6 +268,64 @@ export default function CalculationDetailPage() {
                                         .reduce((sum, item) => sum + item.price, 0)
                                         .toLocaleString()
                                     : selectedCalculation.data.cellConfig.materials.switch?.price?.toLocaleString() ||
+                                      '0'}{' '}
+                                  ₸
+                                </td>
+                              </tr>
+                            )}
+                          {selectedCalculation.data.cellConfig.materials.withdrawable_breaker &&
+                            selectedCalculation.data.cellConfig.materials.withdrawable_breaker.length > 0 && (
+                              <tr>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  Автомат выкатной
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-900">
+                                  {Array.isArray(
+                                    selectedCalculation.data.cellConfig.materials.withdrawable_breaker
+                                  )
+                                    ? selectedCalculation.data.cellConfig.materials.withdrawable_breaker
+                                        .map((item: CellMaterial) => item.name)
+                                        .join(', ')
+                                    : selectedCalculation.data.cellConfig.materials.withdrawable_breaker?.name ||
+                                      ''}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                                  {Array.isArray(
+                                    selectedCalculation.data.cellConfig.materials.withdrawable_breaker
+                                  )
+                                    ? selectedCalculation.data.cellConfig.materials.withdrawable_breaker
+                                        .reduce((sum, item) => sum + item.price, 0)
+                                        .toLocaleString()
+                                    : selectedCalculation.data.cellConfig.materials.withdrawable_breaker?.price?.toLocaleString() ||
+                                      '0'}{' '}
+                                  ₸
+                                </td>
+                              </tr>
+                            )}
+                          {selectedCalculation.data.cellConfig.materials.molded_case_breaker &&
+                            selectedCalculation.data.cellConfig.materials.molded_case_breaker.length > 0 && (
+                              <tr>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  Автомат литой корпус
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-900">
+                                  {Array.isArray(
+                                    selectedCalculation.data.cellConfig.materials.molded_case_breaker
+                                  )
+                                    ? selectedCalculation.data.cellConfig.materials.molded_case_breaker
+                                        .map((item: CellMaterial) => item.name)
+                                        .join(', ')
+                                    : selectedCalculation.data.cellConfig.materials.molded_case_breaker?.name ||
+                                      ''}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                                  {Array.isArray(
+                                    selectedCalculation.data.cellConfig.materials.molded_case_breaker
+                                  )
+                                    ? selectedCalculation.data.cellConfig.materials.molded_case_breaker
+                                        .reduce((sum, item) => sum + item.price, 0)
+                                        .toLocaleString()
+                                    : selectedCalculation.data.cellConfig.materials.molded_case_breaker?.price?.toLocaleString() ||
                                       '0'}{' '}
                                   ₸
                                 </td>

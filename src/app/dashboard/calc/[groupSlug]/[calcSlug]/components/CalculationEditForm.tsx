@@ -67,6 +67,9 @@ export function CalculationEditForm({ calculation, onSave, onCancel }: Calculati
     'switch',
     'tn',
     'tsn',
+    'input',
+    'section_switch',
+    'outgoing',
   ];
   const getValidCellType = (type: string | undefined): CellType => {
     return validCellTypes.includes(type as CellType) ? (type as CellType) : '10kv';

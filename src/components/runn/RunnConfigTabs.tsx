@@ -1,17 +1,17 @@
 'use client';
 
 import React from 'react';
-import { useRusnStore } from '@/store/useRusnStore';
+import { useRunnStore } from '@/store/useRunnStore';
 
 type TabType = 'global' | 'cells' | 'bus-bridge';
 
-interface RusnConfigTabsProps {
+interface RunnConfigTabsProps {
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
 }
 
-export const RusnConfigTabs: React.FC<RusnConfigTabsProps> = ({ activeTab, onTabChange }) => {
-  const { global, cellConfigs } = useRusnStore();
+export const RunnConfigTabs: React.FC<RunnConfigTabsProps> = ({ activeTab, onTabChange }) => {
+  const { global, cellConfigs } = useRunnStore();
 
   const tabs = [
     {
@@ -26,7 +26,7 @@ export const RusnConfigTabs: React.FC<RusnConfigTabsProps> = ({ activeTab, onTab
           />
         </svg>
       ),
-      hasData: !!(global.breaker || global.rza || global.meterType),
+      hasData: !!(global.withdrawableBreaker || global.moldedCaseBreaker || global.meterType),
     },
     {
       id: 'cells' as TabType,
@@ -55,7 +55,8 @@ export const RusnConfigTabs: React.FC<RusnConfigTabsProps> = ({ activeTab, onTab
           />
         </svg>
       ),
-      hasData: global.busBridge.totalWeight > 0,
+      hasData: (global.busbar?.enabled && global.busbar?.material) || 
+               (global.busBridge?.enabled && global.busBridge?.material && global.busBridge?.bridges?.length > 0),
     },
   ];
 
@@ -98,3 +99,4 @@ export const RusnConfigTabs: React.FC<RusnConfigTabsProps> = ({ activeTab, onTab
     </div>
   );
 };
+
