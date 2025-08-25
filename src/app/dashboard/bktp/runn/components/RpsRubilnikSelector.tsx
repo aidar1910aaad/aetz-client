@@ -1,10 +1,12 @@
 import { RunnCell } from '@/store/useRunnStore';
+import { Material } from '@/api/material';
 
 interface RpsRubilnikSelectorProps {
   cell: RunnCell & { update: (field: keyof RunnCell, val: string | number | string[]) => void; remove: () => void; };
+  rpsLeftMaterials?: Material[];
 }
 
-export default function RpsRubilnikSelector({ cell }: RpsRubilnikSelectorProps) {
+export default function RpsRubilnikSelector({ cell, rpsLeftMaterials = [] }: RpsRubilnikSelectorProps) {
   // Функция для извлечения тока из названия материала
   const extractCurrentFromName = (name: string): number | null => {
     // Проверяем, что name существует и является строкой
@@ -34,7 +36,11 @@ export default function RpsRubilnikSelector({ cell }: RpsRubilnikSelectorProps) 
 
   // Функция для получения доступных рубильников с ограничениями
   const getAvailableRubilnikOptions = (position: 'left' | 'right', rubilnikIndex: number) => {
-    const allOptions = ['Рубильник 630А', 'Рубильник 400А', 'Рубильник 250А', 'Рубильник 100А'];
+    // Используем реальные материалы из категории "РПС левый" или статичный список
+    const allOptions = rpsLeftMaterials.length > 0 
+      ? rpsLeftMaterials.map(material => material.name)
+      : ['Рубильник 630А', 'Рубильник 400А', 'Рубильник 250А', 'Рубильник 100А'];
+    
     const selectedRubilniki = cell.rubilniki || [];
     
     // Фильтруем только валидные значения

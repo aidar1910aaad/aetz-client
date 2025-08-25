@@ -8,7 +8,7 @@ import SwitchingDeviceLogic from './SwitchingDeviceLogic';
 interface CellItemProps {
   cell: RunnCell;
   idx: number;
-  updateCell: (id: string, field: keyof RunnCell, value: string | number) => void;
+  updateCell: (id: string, field: keyof RunnCell, value: string | number | string[]) => void;
   removeCell: (id: string) => void;
   categoryMaterials: Material[];
   meterMaterials: Material[];
@@ -16,6 +16,7 @@ interface CellItemProps {
   breakerOptions: string[];
   meterOptions: string[];
   switchingDeviceOptions: string[];
+  rpsLeftMaterials?: Material[];
 }
 
 export default function CellItem({ 
@@ -28,11 +29,12 @@ export default function CellItem({
   meterMaterialsLoading, 
   breakerOptions, 
   meterOptions, 
-  switchingDeviceOptions 
+  switchingDeviceOptions,
+  rpsLeftMaterials = []
 }: CellItemProps) {
   const cellWithMethods = {
     ...cell,
-    update: (field: keyof RunnCell, val: string | number) => updateCell(cell.id, field, val),
+    update: (field: keyof RunnCell, val: string | number | string[]) => updateCell(cell.id, field, val),
     remove: () => removeCell(cell.id),
   };
 
@@ -53,11 +55,12 @@ export default function CellItem({
           meterOptions={meterOptions} 
           meterMaterialsLoading={meterMaterialsLoading}
           categoryMaterials={categoryMaterials}
+          rpsLeftMaterials={rpsLeftMaterials}
         />
       </div>
 
-      <SwitchingDeviceLogic cell={cellWithMethods} categoryMaterials={categoryMaterials} />
-      <MaterialSummaryTable cell={cell} categoryMaterials={categoryMaterials} meterMaterials={meterMaterials} />
+      <SwitchingDeviceLogic cell={cellWithMethods} categoryMaterials={categoryMaterials} rpsLeftMaterials={rpsLeftMaterials} />
+      <MaterialSummaryTable cell={cell} categoryMaterials={categoryMaterials} meterMaterials={meterMaterials} rpsLeftMaterials={rpsLeftMaterials} />
     </div>
   );
 } 

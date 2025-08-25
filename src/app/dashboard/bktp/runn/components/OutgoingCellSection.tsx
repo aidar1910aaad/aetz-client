@@ -9,12 +9,14 @@ interface OutgoingCellSectionProps {
   categoryMaterials?: Material[];
   meterMaterials?: Material[];
   meterMaterialsLoading?: boolean;
+  rpsLeftMaterials?: Material[];
 }
 
 export default function OutgoingCellSection({
   categoryMaterials = [],
   meterMaterials = [],
   meterMaterialsLoading = false,
+  rpsLeftMaterials = [],
 }: OutgoingCellSectionProps) {
   const { cellConfigs, addCell, updateCell, removeCell } = useRunnStore();
 
@@ -54,6 +56,7 @@ export default function OutgoingCellSection({
           breakerOptions={breakerOptions}
           meterOptions={meterOptions}
           switchingDeviceOptions={switchingDeviceOptions}
+          rpsLeftMaterials={rpsLeftMaterials}
         />
       ))}
 

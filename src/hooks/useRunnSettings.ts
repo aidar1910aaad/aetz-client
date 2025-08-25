@@ -13,12 +13,14 @@ interface RunnSettings {
   avtomatVyk: CategorySetting[];
   avtomatLity: CategorySetting[];
   counter: CategorySetting[];
+  rpsLeft: CategorySetting[];
 }
 
 interface AllCategories {
   avtomatVyk: string[];
   avtomatLity: string[];
   counter: string[];
+  rpsLeft: string[];
 }
 
 export function useRunnSettings() {
@@ -26,6 +28,7 @@ export function useRunnSettings() {
     avtomatVyk: [],
     avtomatLity: [],
     counter: [],
+    rpsLeft: [],
   });
   const [selectedCategories, setSelectedCategories] = useState<RunnSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,6 +57,7 @@ export function useRunnSettings() {
           avtomatVyk: allCategoryNames,
           avtomatLity: allCategoryNames,
           counter: allCategoryNames,
+          rpsLeft: allCategoryNames,
         };
 
         console.log('Все категории доступны для выбора:', categorized);
@@ -66,6 +70,7 @@ export function useRunnSettings() {
           avtomatVyk: [],
           avtomatLity: [],
           counter: [],
+          rpsLeft: [],
         };
         setAllCategories(emptyCategories);
       }
@@ -143,6 +148,7 @@ export function useRunnSettings() {
         avtomatVyk: [],
         avtomatLity: [],
         counter: [],
+        rpsLeft: [],
       };
 
       // Группируем настройки по типам и находим названия категорий
@@ -166,6 +172,9 @@ export function useRunnSettings() {
               break;
             case 'counter':
               transformedSettings.counter.push(categorySetting);
+              break;
+            case 'rpsLeft':
+              transformedSettings.rpsLeft.push(categorySetting);
               break;
             default:
               console.warn('Неизвестный тип настройки:', setting.type);

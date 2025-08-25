@@ -5,12 +5,14 @@ interface MaterialSummaryTableProps {
   cell: RunnCell;
   categoryMaterials: Material[];
   meterMaterials: Material[];
+  rpsLeftMaterials?: Material[];
 }
 
 export default function MaterialSummaryTable({ 
   cell, 
   categoryMaterials, 
-  meterMaterials 
+  meterMaterials,
+  rpsLeftMaterials = []
 }: MaterialSummaryTableProps) {
   // Функция для извлечения тока из названия материала
   const extractCurrentFromName = (name: string): number | null => {
@@ -103,11 +105,15 @@ export default function MaterialSummaryTable({
   // Добавляем рубильники для РПС
   if (cell.rubilniki && cell.rubilniki.length > 0 && cell.switchingDevice === 'РПС') {
     cell.rubilniki.forEach((rubilnik, index) => {
+      // Ищем материал по названию в rpsLeftMaterials
+      const rubilnikMaterial = rpsLeftMaterials.find(material => material.name === rubilnik);
+      
       selectedMaterials.push({
         name: `${rubilnik} (${index + 1})`,
-        price: 0, // Цена не привязана к материалу
+        price: rubilnikMaterial ? 
+          (typeof rubilnikMaterial.price === 'string' ? parseFloat(rubilnikMaterial.price) : rubilnikMaterial.price) : 0,
         quantity: cell.quantity || 1,
-        unit: 'шт',
+        unit: rubilnikMaterial?.unit || 'шт',
         type: 'Рубильник',
       });
     });

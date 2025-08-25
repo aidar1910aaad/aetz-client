@@ -18,7 +18,10 @@ export type CellType =
   | 'busbridge'
   | 'switch'
   | 'tn'
-  | 'tsn';
+  | 'tsn'
+  | 'input'
+  | 'section_switch'
+  | 'outgoing';
 export type MaterialType =
   | 'switch'
   | 'rza'
@@ -30,7 +33,9 @@ export type MaterialType =
   | 'pu' // ПУ
   | 'disconnector' // Разъединитель
   | 'busbar' // Сборные шины
-  | 'busbridge'; // Шинный мост
+  | 'busbridge' // Шинный мост
+  | 'withdrawable_breaker' // Автомат выкатной
+  | 'molded_case_breaker'; // Автомат литой корпус
 
 export interface CellMaterial {
   id: number;
@@ -55,6 +60,8 @@ export interface CellConfiguration {
     disconnector?: CellMaterial[];
     busbar?: CellMaterial[];
     busbridge?: CellMaterial[];
+    withdrawable_breaker?: CellMaterial[];
+    molded_case_breaker?: CellMaterial[];
   };
   categoryId?: number;
 }

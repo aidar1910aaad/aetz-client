@@ -9,6 +9,7 @@ interface CellParametersProps {
   meterOptions: string[];
   meterMaterialsLoading: boolean;
   categoryMaterials: Material[];
+  rpsLeftMaterials?: Material[];
 }
 
 export default function CellParameters({ 
@@ -16,7 +17,8 @@ export default function CellParameters({
   breakerOptions, 
   meterOptions, 
   meterMaterialsLoading,
-  categoryMaterials
+  categoryMaterials,
+  rpsLeftMaterials = []
 }: CellParametersProps) {
   // Функция для извлечения тока из названия материала
   const extractCurrentFromName = (name: string): number | null => {
@@ -175,7 +177,7 @@ export default function CellParameters({
 
       {/* Показываем селектор рубильников только если выбран РПС */}
       {cell.switchingDevice === 'РПС' && (
-        <RpsRubilnikSelector cell={cell} />
+        <RpsRubilnikSelector cell={cell} rpsLeftMaterials={rpsLeftMaterials} />
       )}
 
       {/* Показываем селектор рубильников для "Литой корпус + Рубильник" */}

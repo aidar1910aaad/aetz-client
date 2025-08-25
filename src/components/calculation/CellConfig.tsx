@@ -66,6 +66,51 @@ const CELL_TYPE_GROUPS = [
         ),
       },
       { value: 'rza', label: 'РЗА', icon: <CubeIcon className="w-5 h-5 mr-1 text-indigo-500" /> },
+      {
+        value: 'input',
+        label: 'Ввод',
+        icon: (
+          <svg
+            className="w-5 h-5 mr-1 text-green-500"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+          </svg>
+        ),
+      },
+      {
+        value: 'section_switch',
+        label: 'Секционный выключатель',
+        icon: (
+          <svg
+            className="w-5 h-5 mr-1 text-purple-500"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+          </svg>
+        ),
+      },
+      {
+        value: 'outgoing',
+        label: 'Отходящая',
+        icon: (
+          <svg
+            className="w-5 h-5 mr-1 text-orange-500"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M7 16l4-4m0 0l4 4m-4-4v12" />
+          </svg>
+        ),
+      },
     ],
   },
   {
@@ -144,6 +189,8 @@ const CELL_TYPE_GROUPS = [
 const CELL_MATERIALS: Record<CellType, { type: MaterialType; label: string }[]> = {
   '10kv': [
     { type: 'switch', label: 'Вакуумный выключатель' },
+    { type: 'withdrawable_breaker', label: 'Автомат выкатной' },
+    { type: 'molded_case_breaker', label: 'Автомат литой корпус' },
     { type: 'disconnector', label: 'Разъединитель' },
     { type: 'busbar', label: 'Сборные шины' },
     { type: 'busbridge', label: 'Шинный мост' },
@@ -155,6 +202,8 @@ const CELL_MATERIALS: Record<CellType, { type: MaterialType; label: string }[]> 
   ],
   '20kv': [
     { type: 'switch', label: 'Вакуумный выключатель' },
+    { type: 'withdrawable_breaker', label: 'Автомат выкатной' },
+    { type: 'molded_case_breaker', label: 'Автомат литой корпус' },
     { type: 'disconnector', label: 'Разъединитель' },
     { type: 'busbar', label: 'Сборные шины' },
     { type: 'busbridge', label: 'Шинный мост' },
@@ -166,6 +215,8 @@ const CELL_MATERIALS: Record<CellType, { type: MaterialType; label: string }[]> 
   ],
   '0.4kv': [
     { type: 'switch', label: 'Вакуумный выключатель' },
+    { type: 'withdrawable_breaker', label: 'Автомат выкатной' },
+    { type: 'molded_case_breaker', label: 'Автомат литой корпус' },
     { type: 'disconnector', label: 'Разъединитель' },
     { type: 'busbar', label: 'Сборные шины' },
     { type: 'busbridge', label: 'Шинный мост' },
@@ -177,6 +228,8 @@ const CELL_MATERIALS: Record<CellType, { type: MaterialType; label: string }[]> 
   ],
   rza: [
     { type: 'switch', label: 'Вакуумный выключатель' },
+    { type: 'withdrawable_breaker', label: 'Автомат выкатной' },
+    { type: 'molded_case_breaker', label: 'Автомат литой корпус' },
     { type: 'disconnector', label: 'Разъединитель' },
     { type: 'busbar', label: 'Сборные шины' },
     { type: 'busbridge', label: 'Шинный мост' },
@@ -193,6 +246,45 @@ const CELL_MATERIALS: Record<CellType, { type: MaterialType; label: string }[]> 
   switch: [{ type: 'switch', label: 'Выключатель' }],
   tn: [{ type: 'tn', label: 'Трансформатор напряжения' }],
   tsn: [{ type: 'tsn', label: 'ТСН' }],
+  input: [
+    { type: 'switch', label: 'Вакуумный выключатель' },
+    { type: 'withdrawable_breaker', label: 'Автомат выкатной' },
+    { type: 'molded_case_breaker', label: 'Автомат литой корпус' },
+    { type: 'disconnector', label: 'Разъединитель' },
+    { type: 'busbar', label: 'Сборные шины' },
+    { type: 'busbridge', label: 'Шинный мост' },
+    { type: 'pu', label: 'ПУ' },
+    { type: 'rza', label: 'РЗА' },
+    { type: 'counter', label: 'Счетчик' },
+    { type: 'sr', label: 'СР' },
+    { type: 'tt', label: 'Трансформатор тока' },
+  ],
+  section_switch: [
+    { type: 'switch', label: 'Вакуумный выключатель' },
+    { type: 'withdrawable_breaker', label: 'Автомат выкатной' },
+    { type: 'molded_case_breaker', label: 'Автомат литой корпус' },
+    { type: 'disconnector', label: 'Разъединитель' },
+    { type: 'busbar', label: 'Сборные шины' },
+    { type: 'busbridge', label: 'Шинный мост' },
+    { type: 'pu', label: 'ПУ' },
+    { type: 'rza', label: 'РЗА' },
+    { type: 'counter', label: 'Счетчик' },
+    { type: 'sr', label: 'СР' },
+    { type: 'tt', label: 'Трансформатор тока' },
+  ],
+  outgoing: [
+    { type: 'switch', label: 'Вакуумный выключатель' },
+    { type: 'withdrawable_breaker', label: 'Автомат выкатной' },
+    { type: 'molded_case_breaker', label: 'Автомат литой корпус' },
+    { type: 'disconnector', label: 'Разъединитель' },
+    { type: 'busbar', label: 'Сборные шины' },
+    { type: 'busbridge', label: 'Шинный мост' },
+    { type: 'pu', label: 'ПУ' },
+    { type: 'rza', label: 'РЗА' },
+    { type: 'counter', label: 'Счетчик' },
+    { type: 'sr', label: 'СР' },
+    { type: 'tt', label: 'Трансформатор тока' },
+  ],
 };
 
 export default function CellConfig({
@@ -216,6 +308,9 @@ export default function CellConfig({
     'switch',
     'tn',
     'tsn',
+    'input',
+    'section_switch',
+    'outgoing',
   ];
   const normalizedCellType: CellType = validCellTypes.includes(cellType as CellType)
     ? (cellType as CellType)
@@ -237,6 +332,8 @@ export default function CellConfig({
       tsn: [],
       tn: [],
       tt: [],
+      withdrawable_breaker: [],
+      molded_case_breaker: [],
     };
 
     if (!configuration.materials) {
@@ -251,14 +348,15 @@ export default function CellConfig({
     // Sync selectedCellType with configuration.type
     if (configuration.type && validCellTypes.includes(configuration.type as CellType)) {
       setSelectedCellType(configuration.type as CellType);
-    } else if (normalizedCellType !== cellType) {
-      // If the original cell type was invalid, update it to the normalized one
+    } else {
+      // If no type is set or invalid, use the normalized cell type
+      setSelectedCellType(normalizedCellType);
       onConfigurationChange({
         ...configuration,
         type: normalizedCellType,
       });
     }
-  }, [configuration.type]);
+  }, [configuration.type, normalizedCellType]);
 
   const handleCellTypeChange = (type: CellType) => {
     setSelectedCellType(type);
@@ -338,7 +436,9 @@ export default function CellConfig({
           <span className="text-sm font-medium text-gray-700">{label}</span>
           <div className="relative">
             <button
-              ref={(el) => (buttonRefs.current[materialType] = el)}
+              ref={(el) => {
+                buttonRefs.current[materialType] = el;
+              }}
               onClick={() => setSelectedMaterialType(materialType)}
               className="px-4 py-2 bg-[#3A55DF] text-white rounded-lg hover:bg-[#2A45CF] transition-colors"
             >
@@ -418,8 +518,8 @@ export default function CellConfig({
       <div className="text-sm text-gray-500 font-semibold mt-2">
         Текущий тип ячейки:{' '}
         {
-          CELL_TYPE_GROUPS.flatMap((g) => g.types).find((t) => t.value === configuration.type)
-            ?.label
+          CELL_TYPE_GROUPS.flatMap((g) => g.types).find((t) => t.value === selectedCellType)
+            ?.label || selectedCellType
         }
       </div>
       <div className="space-y-6">

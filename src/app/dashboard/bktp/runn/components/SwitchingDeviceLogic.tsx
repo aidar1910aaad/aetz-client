@@ -1,17 +1,25 @@
 import { RunnCell } from '@/store/useRunnStore';
 import { Material } from '@/api/material';
 import AirSwitchingDeviceLogic from './switching-devices/AirSwitchingDeviceLogic';
+import SimplifiedRpsSelector from './SimplifiedRpsSelector';
 
 interface SwitchingDeviceLogicProps {
-  cell: RunnCell & { update: (field: keyof RunnCell, val: string | number) => void; remove: () => void; };
+  cell: RunnCell & { update: (field: keyof RunnCell, val: string | number | string[]) => void; remove: () => void; };
   categoryMaterials: Material[];
+  rpsLeftMaterials?: Material[];
 }
 
 export default function SwitchingDeviceLogic({ 
   cell, 
-  categoryMaterials 
+  categoryMaterials,
+  rpsLeftMaterials = []
 }: SwitchingDeviceLogicProps) {
   const switchingDevice = cell.switchingDevice;
+
+  // Отладочная информация для РПС
+  if (switchingDevice === 'РПС') {
+    console.log('🔍 РПС выбрано! Материалы:', rpsLeftMaterials.length, 'шт.');
+  }
 
   switch (switchingDevice) {
     case 'Воздушный':
@@ -39,6 +47,19 @@ export default function SwitchingDeviceLogic({
           <div className="mt-2 text-xs text-green-600">
             <p className="font-medium">Выберите конфигурацию в поле "Автомат выкатной" выше</p>
           </div>
+        </div>
+      );
+    case 'РПС':
+      return (
+        <div className="p-3 bg-purple-50 rounded border">
+          <h5 className="text-sm font-medium text-purple-800 mb-3">Логика для РПС (Разъединитель Переключатель Секций):</h5>
+          <div className="text-xs text-purple-700 space-y-1 mb-4">
+            <p>• Разъединение и переключение секций</p>
+            <p>• Ручное управление</p>
+            <p>• Высокая надежность</p>
+            <p>• Видимый разрыв цепи</p>
+          </div>
+          <SimplifiedRpsSelector cell={cell} rpsLeftMaterials={rpsLeftMaterials} />
         </div>
       );
     default:

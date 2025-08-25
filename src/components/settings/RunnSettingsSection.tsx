@@ -15,7 +15,7 @@ interface CategoryObject {
 
 interface RunnSettingsSectionProps {
   title: string;
-  type: 'avtomatVyk' | 'avtomatLity' | 'counter';
+  type: 'avtomatVyk' | 'avtomatLity' | 'counter' | 'rpsLeft';
   icon: React.ReactNode;
   allCategories: CategoryObject[] | string[];
   selectedCategories: Category[];
