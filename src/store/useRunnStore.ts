@@ -21,6 +21,7 @@ export interface RunnCell {
   nominalPower?: number; // Номинальная мощность в кВт
   price?: number; // Цена в тенге
   quantity?: number; // Количество
+  rubilniki?: string[]; // Рубильники для РПС (массив)
 }
 
 interface RunnState {

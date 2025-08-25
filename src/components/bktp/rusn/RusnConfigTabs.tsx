@@ -45,7 +45,7 @@ export const RusnConfigTabs: React.FC<RusnConfigTabsProps> = ({ activeTab, onTab
     },
     {
       id: 'bus-bridge' as TabType,
-      label: 'Шинный мост',
+      label: 'Сборные шины',
       icon: (
         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
           <path

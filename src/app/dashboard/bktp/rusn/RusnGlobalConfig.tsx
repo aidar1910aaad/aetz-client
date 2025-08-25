@@ -62,6 +62,7 @@ export default function RusnGlobalConfig() {
           rusnSettings={rusnSettings}
           global={global}
           onGlobalChange={handleGlobalChange}
+          voltage={voltageNum}
         />
       </div>
     </div>
