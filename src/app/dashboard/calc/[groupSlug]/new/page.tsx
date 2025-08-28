@@ -64,6 +64,15 @@ export default function CreateCalculationPage() {
             plannedProfitPercentage: Number(calculation.data.calculation.plannedProfitPercentage),
             ndsPercentage: Number(calculation.data.calculation.ndsPercentage),
           },
+          cellConfig: calculation.data.cellConfig ? {
+            type: calculation.data.cellConfig.type || '10kv',
+            materials: calculation.data.cellConfig.materials && typeof calculation.data.cellConfig.materials === 'object' && !Array.isArray(calculation.data.cellConfig.materials)
+              ? calculation.data.cellConfig.materials
+              : {},
+          } : {
+            type: '10kv',
+            materials: {},
+          },
         },
       };
 
@@ -91,6 +100,10 @@ export default function CreateCalculationPage() {
         adminPercentage: 15,
         plannedProfitPercentage: 10,
         ndsPercentage: 12,
+      },
+      cellConfig: {
+        type: '10kv',
+        materials: {},
       },
     },
   };

@@ -29,7 +29,7 @@ export interface CalculationData {
   };
   cellConfig?: {
     type?: string;
-    materials?: Record<string, unknown>;
+    materials?: Record<string, any>;
   };
 }
 
@@ -278,6 +278,9 @@ export async function updateCalculation(
 ): Promise<Calculation> {
   try {
     console.log('Updating calculation:', { groupSlug, calcSlug, data });
+    console.log('🔍 Debug - data.cellConfig?.materials type:', typeof data.data?.cellConfig?.materials);
+    console.log('🔍 Debug - data.cellConfig?.materials isArray:', Array.isArray(data.data?.cellConfig?.materials));
+    console.log('🔍 Debug - data.cellConfig?.materials value:', data.data?.cellConfig?.materials);
     const response = await fetch(`${api}/calculations/${groupSlug}/${calcSlug}`, {
       method: 'PATCH',
       headers: {

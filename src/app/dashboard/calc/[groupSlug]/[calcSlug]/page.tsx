@@ -114,6 +114,11 @@ export default function CalculationDetailPage() {
 
       const validCellType = validCellTypes.includes(cellType as any) ? cellType : '10kv';
 
+      // Отладочная информация
+      console.log('🔍 Debug - cellConfig.materials type:', typeof updatedCalculation.data.cellConfig?.materials);
+      console.log('🔍 Debug - cellConfig.materials isArray:', Array.isArray(updatedCalculation.data.cellConfig?.materials));
+      console.log('🔍 Debug - cellConfig.materials value:', updatedCalculation.data.cellConfig?.materials);
+
       const payload = {
         name: updatedCalculation.name,
         data: {
@@ -140,9 +145,14 @@ export default function CalculationDetailPage() {
           cellConfig: {
             ...updatedCalculation.data.cellConfig,
             type: validCellType,
+            materials: updatedCalculation.data.cellConfig?.materials && typeof updatedCalculation.data.cellConfig.materials === 'object' && !Array.isArray(updatedCalculation.data.cellConfig.materials)
+              ? updatedCalculation.data.cellConfig.materials
+              : {},
           },
         },
       };
+
+      console.log('🔍 Debug - Final payload cellConfig.materials:', payload.data.cellConfig.materials);
 
 
 

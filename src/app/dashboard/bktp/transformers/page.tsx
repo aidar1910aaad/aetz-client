@@ -35,8 +35,6 @@ export default function TransformerConfigurator() {
     return false;
   });
 
-  const wasTransformerChoiceMade = skip || selectedTransformer !== null;
-
   // Загрузка трансформаторов
   useEffect(() => {
     const loadTransformers = async () => {
@@ -52,6 +50,17 @@ export default function TransformerConfigurator() {
     };
     loadTransformers();
   }, []);
+
+  // Синхронизация состояния skip с localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (skip) {
+        localStorage.setItem('transformer-skip', 'true');
+      } else {
+        localStorage.removeItem('transformer-skip');
+      }
+    }
+  }, [skip]);
 
   // Получаем уникальные значения для фильтров
   const voltages = [...new Set(transformers.map((t) => t.voltage))].sort(
@@ -147,6 +156,9 @@ export default function TransformerConfigurator() {
         price: matched.price,
         quantity,
       });
+    } else if (!skip && !isComplete) {
+      showToast('Пожалуйста, выберите все параметры трансформатора', 'error');
+      return;
     }
     router.push('/dashboard/bktp/rusn');
   };
@@ -160,39 +172,37 @@ export default function TransformerConfigurator() {
       <div className="px-6 pt-6 pb-2">
         <Breadcrumbs />
         <h2 className="text-2xl font-semibold mt-2">Силовой трансформатор</h2>
-        {!wasTransformerChoiceMade && (
-          <>
-            <p className="mt-2 text-sm text-gray-600 mb-2">Будет ли трансформатор?</p>
-            <div className="flex gap-4 mb-4">
-              <button
-                onClick={() => setSkip(false)}
-                className={`px-4 py-2 rounded text-sm font-medium border ${
-                  !skip
-                    ? 'bg-[#3A55DF] text-white border-[#3A55DF]'
-                    : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
-                }`}
-              >
-                Да
-              </button>
-              <button
-                onClick={() => {
-                  setSkip(true);
-                  localStorage.setItem('transformer-skip', 'true');
-                  setSelected({ voltage: null, type: null, power: null, manufacturer: null });
-                  setQuantity(2);
-                  skipTransformer();
-                }}
-                className={`px-4 py-2 rounded text-sm font-medium border ${
-                  skip
-                    ? 'bg-red-100 text-red-700 border-red-300'
-                    : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
-                }`}
-              >
-                Нет
-              </button>
-            </div>
-          </>
-        )}
+        <div className="mb-4">
+          <p className="mt-2 text-sm text-gray-600 mb-2">Будет ли трансформатор?</p>
+          <div className="flex gap-4 mb-4">
+            <button
+              onClick={() => {
+                setSkip(false);
+              }}
+              className={`px-4 py-2 rounded text-sm font-medium border ${
+                !skip
+                  ? 'bg-[#3A55DF] text-white border-[#3A55DF]'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
+              }`}
+            >
+              Да
+            </button>
+            <button
+              onClick={() => {
+                setSkip(true);
+                setSelected({ voltage: null, type: null, power: null, manufacturer: null });
+                setQuantity(2);
+              }}
+              className={`px-4 py-2 rounded text-sm font-medium border ${
+                skip
+                  ? 'bg-red-100 text-red-700 border-red-300'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
+              }`}
+            >
+              Нет
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
@@ -242,7 +252,12 @@ export default function TransformerConfigurator() {
       <div className="p-4 bg-white w-[400px] ">
         <button
           onClick={handleSubmit}
-          className="w-full px-6 py-3 rounded-lg text-lg font-medium text-white bg-[#3A55DF] hover:bg-[#2e46c5] transition-colors"
+          disabled={!skip && !isComplete}
+          className={`w-full px-6 py-3 rounded-lg text-lg font-medium transition-colors ${
+            skip || isComplete
+              ? 'text-white bg-[#3A55DF] hover:bg-[#2e46c5]'
+              : 'text-gray-400 bg-gray-200 cursor-not-allowed'
+          }`}
         >
           {skip ? 'Далее' : 'Добавить в спецификацию'}
         </button>
