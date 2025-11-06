@@ -96,8 +96,8 @@ export default function SimplifiedRpsSelector({ cell, rpsLeftMaterials }: Simpli
                   className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
                 >
                   <option value="">Выберите рубильник</option>
-                  {rpsOptions.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
+                  {rpsOptions.map((opt, optIndex) => (
+                    <option key={`${opt}-${optIndex}`} value={opt}>{opt}</option>
                   ))}
                 </select>
               </div>

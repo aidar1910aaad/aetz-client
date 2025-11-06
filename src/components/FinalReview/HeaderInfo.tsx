@@ -10,7 +10,7 @@ type Props = {
 export default function HeaderInfo({ bktp }: Props) {
   return (
     <header className="border-b pb-4 mb-4">
-      <h1 className="text-2xl font-bold text-[#3A55DF]">Спецификация оборудования</h1>
+      <h1 className="text-2xl font-bold text-[#90bd20]">Спецификация оборудования</h1>
       <p className="text-gray-600">Объект: {bktp.client || '—'}</p>
       <div className="flex justify-between text-sm text-gray-500 mt-2">
         <div>Утверждаю: {bktp.executor || '—'}</div>

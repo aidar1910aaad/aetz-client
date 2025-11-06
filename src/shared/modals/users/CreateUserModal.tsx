@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { CreateUserRequest } from '@/api/users';
 import { showToast } from '@/shared/modals/ToastProvider';
+import { UserRole, UserRoleLabels } from '@/types/user';
 
 interface Props {
   onClose: () => void;
@@ -21,7 +22,7 @@ export default function CreateUserModal({ onClose, onCreate }: Props) {
     country: '',
     city: '',
     postalCode: '',
-    role: 'pto',
+    role: UserRole.PTO,
   });
 
   const handleSubmit = async () => {
@@ -70,8 +71,9 @@ export default function CreateUserModal({ onClose, onCreate }: Props) {
           onChange={(e) => setForm({ ...form, role: e.target.value })}
           className="border p-2 rounded w-full mb-4 text-sm"
         >
-          <option value="pto">ПТО</option>
-          <option value="admin">Админ</option>
+          <option value={UserRole.PTO}>{UserRoleLabels[UserRole.PTO]}</option>
+          <option value={UserRole.ADMIN}>{UserRoleLabels[UserRole.ADMIN]}</option>
+          <option value={UserRole.MANAGER}>{UserRoleLabels[UserRole.MANAGER]}</option>
         </select>
 
         <div className="flex justify-end gap-2">

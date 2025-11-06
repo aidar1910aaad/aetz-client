@@ -67,7 +67,6 @@ export function useMaterialCategoriesHandlers(
           },
           token
         );
-        console.log('Created category:', created);
         setCategories((prev) => [...prev, created]);
         setNewCategory({ name: '', description: '', id: 0 });
         showToast('Категория создана!', 'success');
@@ -108,7 +107,6 @@ export function useMaterialCategoriesHandlers(
 
   const handleUpdate = useCallback(
     async (cat: Category) => {
-      console.log('Starting category update for:', cat);
 
       const result = await showEditModal({
         title: 'Редактировать категорию',
@@ -133,11 +131,9 @@ export function useMaterialCategoriesHandlers(
       });
 
       if (!result) {
-        console.log('Edit modal cancelled');
         return;
       }
 
-      console.log('Edit modal result:', result);
 
       const { name, description } = result;
       const trimmedName = name.trim();
@@ -161,11 +157,9 @@ export function useMaterialCategoriesHandlers(
           name: trimmedName,
         };
 
-        console.log('Sending update request with data:', updateData);
 
         await updateCategory(cat.id, updateData, token);
 
-        console.log('Update successful, updating local state');
 
         setCategories((prev) =>
           prev.map((item) =>

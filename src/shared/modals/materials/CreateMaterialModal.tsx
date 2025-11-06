@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { CreateMaterialRequest } from '@/api/material';
+import { CreateMaterialRequest } from '@/api/material/index';
 import { useMaterials } from '@/hooks/useMaterials';
 import { showToast } from '@/shared/modals/ToastProvider';
 

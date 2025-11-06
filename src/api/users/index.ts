@@ -1,4 +1,5 @@
 import { api } from '../baseUrl';
+import { UserRole } from '@/types/user';
 
 export interface User {
   id: number;
@@ -11,7 +12,7 @@ export interface User {
   country: string;
   city: string;
   postalCode: string;
-  role: string;
+  role: UserRole | string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -27,7 +28,7 @@ export interface CreateUserRequest {
   country: string;
   city: string;
   postalCode: string;
-  role: string;
+  role: UserRole | string;
 }
 
 export interface UpdateUserRequest extends Partial<CreateUserRequest> {}
@@ -119,4 +120,38 @@ export async function deleteUser(id: number, token: string): Promise<void> {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.message || 'Ошибка при удалении пользователя');
   }
+}
+
+// ✅ Обновить свой профиль
+export interface UpdateProfileRequest {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  position?: string;
+  country?: string;
+  city?: string;
+  postalCode?: string;
+  password?: string;
+}
+
+export async function updateMyProfile(
+  data: UpdateProfileRequest,
+  token: string
+): Promise<User> {
+  const response = await fetch(`${api}/users/profile/me`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || 'Ошибка при обновлении профиля');
+  }
+
+  return response.json();
 }

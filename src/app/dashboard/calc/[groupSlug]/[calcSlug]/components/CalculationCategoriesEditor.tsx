@@ -5,7 +5,7 @@ import { Material as ApiMaterial } from '@/api/material';
 import React, { useRef } from 'react';
 
 interface CalculationMaterial {
-  id: number;
+  id?: number; // ID может быть undefined до выбора материала
   name: string;
   unit: string;
   price: number;
@@ -52,20 +52,19 @@ export default function CalculationCategoriesEditor({ categories, setCategories 
       ...updatedCategories[categoryIndex],
       items: [
         ...updatedCategories[categoryIndex].items,
-        { id: Date.now(), name: '', unit: '', price: 0, quantity: 1 },
+        { id: undefined, name: '', unit: '', price: 0, quantity: 1 }, // ID будет установлен при выборе материала
       ],
     };
     setCategories(updatedCategories);
   };
 
-  const handleMaterialSelect = (material: {
-    id: string;
-    name: string;
-    price: number;
-    unit: string;
-  }) => {
-    console.log('CalculationCategoriesEditor: handleMaterialSelect', material);
-    if (selectedCategoryIndex === null || selectedItemIndex === null) return;
+     const handleMaterialSelect = (material: {
+     id: string;
+     name: string;
+     price: number;
+     unit: string;
+   }) => {
+     if (selectedCategoryIndex === null || selectedItemIndex === null) return;
     const updatedCategories = [...categories];
     updatedCategories[selectedCategoryIndex] = {
       ...updatedCategories[selectedCategoryIndex],
@@ -73,6 +72,7 @@ export default function CalculationCategoriesEditor({ categories, setCategories 
         index === selectedItemIndex
           ? {
               ...item,
+              id: Number(material.id), // Правильно передаем ID материала
               name: material.name,
               price: material.price,
               unit: material.unit,
@@ -246,11 +246,7 @@ export default function CalculationCategoriesEditor({ categories, setCategories 
                           }
                           className="w-full px-3 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                         />
-                        {}
-                        {(() => {
-                          console.log('Render input unit:', item.unit, 'для', item.name);
-                          return null;
-                        })()}
+                        
                       </td>
                       <td className="px-6 py-4">
                         <input

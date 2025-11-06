@@ -31,10 +31,10 @@ export function TransformerFilters<T extends string | number>({
               className={`px-4 py-2 rounded-full border font-medium text-sm transition-all duration-200
                 ${
                   selected === item
-                    ? 'bg-[#3A55DF] text-white border-[#3A55DF]'
+                    ? 'bg-[#8eba1e] text-white border-[#8eba1e] shadow-lg'
                     : isDisabled
                     ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                    : 'bg-white hover:bg-[#E8F0FF] text-gray-800 border-gray-300'
+                    : 'bg-white hover:bg-[#8eba1e]/10 hover:border-[#8eba1e] text-gray-800 border-gray-300'
                 }`}
             >
               {item}

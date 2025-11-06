@@ -15,6 +15,8 @@ export default function BmzPage() {
       try {
         const settings = await bmzApi.getSettings();
         bmz.setSettings(settings);
+        // Инициализируем дефолтные значения оборудования
+        bmz.initializeDefaultEquipment();
       } catch (error) {
         console.error('Failed to load BMZ settings:', error);
       }

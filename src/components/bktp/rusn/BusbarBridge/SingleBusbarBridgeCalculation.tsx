@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { BusMaterial } from '@/types/rusn';
 import { Switchgear } from '@/api/switchgear';
 import { calculateCost } from '@/utils/calculationUtils';
-import MaterialsTable from '@/app/dashboard/bktp/rusn/components/MaterialsTable';
+import MaterialsTable from '@/app/dashboard/bktp/rusn/calculations/MaterialsTable';
 
 interface BusbarBridge {
   id: string;

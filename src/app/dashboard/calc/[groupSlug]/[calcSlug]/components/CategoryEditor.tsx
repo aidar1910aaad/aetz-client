@@ -15,13 +15,13 @@ export function CategoryEditor({ category, categoryIndex, onUpdate, onRemove }: 
       ...category,
       items: [
         ...category.items,
-        {
-          id: Date.now(),
-          name: 'Новый материал',
-          quantity: 1,
-          price: 0,
-          unit: 'шт'
-        }
+                 {
+           id: `item-${Math.floor(Math.random() * 1000000)}`,
+           name: 'Новый материал',
+           quantity: 1,
+           price: 0,
+           unit: 'шт'
+         }
       ]
     });
   };

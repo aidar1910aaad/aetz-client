@@ -9,21 +9,11 @@ import {
   PackagePlus,
   Calculator,
   DollarSign,
+  Settings,
 } from 'lucide-react';
 
 export const sidebarLinks = [
-  {
-    type: 'group',
-    label: 'Основные модули',
-    icon: Cpu,
-    submenu: [
-      { label: 'Трансформатор', href: '/dashboard/module1' },
-      { label: 'Среднее напряжение', href: '/dashboard/module2' },
-      { label: 'Низкое напряжение', href: '/dashboard/module2' },
-      { label: 'БМЗ', href: '/dashboard/module2' },
-      { label: 'Доп. оборудование', href: '/dashboard/module2' },
-    ],
-  },
+ 
   {
     type: 'link',
     label: 'Новая заявка',
@@ -50,18 +40,6 @@ export const sidebarLinks = [
   },
   {
     type: 'link',
-    label: 'Форма заявки',
-    icon: FileText,
-    href: '/dashboard/form',
-  },
-  {
-    type: 'link',
-    label: 'Чек лист',
-    icon: ClipboardList,
-    href: '/dashboard/checklist',
-  },
-  {
-    type: 'link',
     label: 'История заявок',
     icon: History,
     href: '/dashboard/requests',
@@ -77,5 +55,11 @@ export const sidebarLinks = [
     label: 'Курсы валют',
     icon: DollarSign,
     href: '/dashboard/currency',
+  },
+  {
+    type: 'link',
+    label: 'Настройки БКТП',
+    icon: Settings,
+    href: '/dashboard/bktp/settings',
   },
 ];

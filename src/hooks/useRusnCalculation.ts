@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '@/api/baseUrl';
+import { Decimal } from 'decimal.js';
 
 interface CalculationItem {
   id: number | null;
@@ -54,6 +55,7 @@ export function useRusnCalculation(groupSlug?: string) {
 
   useEffect(() => {
     const fetchCalculations = async () => {
+      
       if (!groupSlug) {
         setLoading(false);
         return;
@@ -61,14 +63,16 @@ export function useRusnCalculation(groupSlug?: string) {
 
       try {
         const token = localStorage.getItem('token') || '';
-        const response = await fetch(`${api}/calculations/groups/${groupSlug}/calculations`, {
+        const url = `${api}/calculations/groups/${groupSlug}/calculations`;
+        
+        const response = await fetch(url, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
 
         if (!response.ok) {
-          throw new Error('Failed to fetch calculations');
+          throw new Error(`Failed to fetch calculations: ${response.status} ${response.statusText}`);
         }
 
         const data: Calculation[] = await response.json();
@@ -83,7 +87,7 @@ export function useRusnCalculation(groupSlug?: string) {
 
         setCalculations(groupedCalculations);
       } catch (error) {
-        console.error('Error fetching calculations:', error);
+        console.error('❌ Error fetching calculations:', error);
         setError(error instanceof Error ? error.message : 'Failed to fetch calculations');
       } finally {
         setLoading(false);
@@ -98,25 +102,27 @@ export function useRusnCalculation(groupSlug?: string) {
     if (!calculation) return 0;
 
     // Получаем отпускную цену из данных калькуляции
-    const totalMaterialsCost = calculation.data.categories.reduce((total, category) => {
+    let totalMaterialsCost = calculation.data.categories.reduce((total, category) => {
       return total + category.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     }, 0);
 
     const calculationData = calculation.data.calculation;
     if (!calculationData) return totalMaterialsCost;
 
-    // Calculate the total cost including all materials
-    const totalSalary = calculationData.manufacturingHours * calculationData.hourlyRate;
-    const overheadCost = (totalMaterialsCost * calculationData.overheadPercentage) / 100;
-    const productionCost = totalMaterialsCost + totalSalary + overheadCost;
-    const adminCost = (totalMaterialsCost * calculationData.adminPercentage) / 100;
-    const fullCost = productionCost + adminCost;
-    const plannedProfit = (fullCost * calculationData.plannedProfitPercentage) / 100;
-    const wholesalePrice = fullCost + plannedProfit;
-    const ndsAmount = (wholesalePrice * calculationData.ndsPercentage) / 100;
-    const finalPrice = wholesalePrice + ndsAmount;
+    // Calculate the total cost using precise decimal arithmetic
+    const totalSalary = new Decimal(calculationData.manufacturingHours).mul(calculationData.hourlyRate);
+    const overheadCost = new Decimal(totalMaterialsCost).mul(calculationData.overheadPercentage).div(100);
+    const productionCost = new Decimal(totalMaterialsCost).add(totalSalary).add(overheadCost);
+    const adminCost = new Decimal(totalMaterialsCost).mul(calculationData.adminPercentage).div(100);
+    const fullCost = productionCost.add(adminCost);
+    const plannedProfit = fullCost.mul(calculationData.plannedProfitPercentage).div(100);
+    const wholesalePrice = fullCost.add(plannedProfit);
+    const ndsAmount = wholesalePrice.mul(calculationData.ndsPercentage).div(100);
+    const finalPrice = wholesalePrice.add(ndsAmount);
 
-    return finalPrice;
+
+    // Возвращаем рассчитанную цену
+    return finalPrice.toNumber();
   };
 
   return {

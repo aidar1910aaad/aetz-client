@@ -18,8 +18,10 @@ export type AdditionalEquipmentSelected = Record<
 interface AdditionalEquipmentState {
   selected: AdditionalEquipmentSelected;
   equipmentList: AdditionalEquipmentItem[];
-  setSelected: (selected: AdditionalEquipmentSelected) => void;
+  isInitialized: boolean;
+  setSelected: (selected: AdditionalEquipmentSelected | ((prev: AdditionalEquipmentSelected) => AdditionalEquipmentSelected)) => void;
   setEquipmentList: (list: AdditionalEquipmentItem[]) => void;
+  setInitialized: (initialized: boolean) => void;
   reset: () => void;
 }
 
@@ -30,12 +32,44 @@ export const useAdditionalEquipmentStore = create<AdditionalEquipmentState>()(
     (set) => ({
       selected: {},
       equipmentList: [],
-      setSelected: (selected) => set({ selected }),
-      setEquipmentList: (equipmentList) => set({ equipmentList }),
-      reset: () => set({ selected: {}, equipmentList: [] }),
+      isInitialized: false,
+      setSelected: (selected) => {
+        const newSelected = typeof selected === 'function' ? selected(useAdditionalEquipmentStore.getState().selected) : selected;
+        console.log('💾 Store setSelected:', Object.keys(newSelected).length, 'items');
+        set((state) => ({ 
+          selected: newSelected
+        }));
+      },
+      setEquipmentList: (equipmentList) => {
+        console.log('💾 Store: обновляем equipmentList');
+        set({ equipmentList });
+      },
+      setInitialized: (isInitialized) => {
+        console.log('🏁 Store: устанавливаем isInitialized =', isInitialized);
+        set({ isInitialized });
+      },
+      reset: () => {
+        console.log('🗑️ Store: сброс данных');
+        set({ selected: {}, equipmentList: [], isInitialized: false });
+      },
     }),
     {
       name: 'additional-equipment-storage',
+      onRehydrateStorage: () => (state) => {
+        console.log('🔄 Store: восстановление из localStorage', state);
+        if (state && state.selected) {
+          console.log('✅ Данные успешно восстановлены:', Object.keys(state.selected).length, 'элементов');
+          Object.entries(state.selected).forEach(([name, data]) => {
+            if (data.checked && data.count > 0) {
+              console.log(`  - ${name}: ${data.count} шт, цена: ${data.price}₸`);
+            }
+          });
+        } else {
+          console.log('❌ Данные не найдены в localStorage');
+        }
+      },
+      // Добавляем partialize чтобы сохранять selected и isInitialized
+      partialize: (state) => ({ selected: state.selected, isInitialized: state.isInitialized }),
     }
   )
 );

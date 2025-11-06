@@ -1,9 +1,12 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Save, Power, Settings2, Gauge, Zap } from 'lucide-react';
+import { ChevronLeft, Save, Power, Settings2, Gauge, Zap, Shield, Activity, ToggleLeft } from 'lucide-react';
 import { useRunnSettings } from '@/hooks/useRunnSettings';
 import { RunnSettingsSection } from '@/components/settings/RunnSettingsSection';
+import { ZeroBusbarSection } from '@/components/runn/ZeroBusbarSection';
+import RoleGuard from '@/components/common/RoleGuard';
+import { UserRole } from '@/types/user';
 
 export default function RunnSettingsPage() {
   const router = useRouter();
@@ -38,7 +41,12 @@ export default function RunnSettingsPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-110px)] overflow-y-auto bg-gray-50">
+    <RoleGuard
+      allowedRoles={[UserRole.ADMIN, UserRole.PTO]}
+      redirectTo="/dashboard"
+      pagePath="/dashboard/bktp/settings/runn"
+    >
+      <div className="h-[calc(100vh-110px)] overflow-y-auto bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -136,8 +144,57 @@ export default function RunnSettingsPage() {
             onRemoveCategory={handleRemoveCategory}
             onToggleVisibility={handleToggleVisibility}
           />
+
+          <RunnSettingsSection
+            title="Предохранители ПН"
+            type="fusesPn"
+            icon={
+              <div className="p-2 bg-orange-50 rounded-lg">
+                <Shield className="w-6 h-6 text-orange-600" />
+              </div>
+            }
+            allCategories={allCategories.fusesPn || []}
+            selectedCategories={selectedCategories?.fusesPn || []}
+            onAddCategory={handleAddCategory}
+            onRemoveCategory={handleRemoveCategory}
+            onToggleVisibility={handleToggleVisibility}
+          />
+
+          <RunnSettingsSection
+            title="Трансформатор тока НН"
+            type="currentTransformer"
+            icon={
+              <div className="p-2 bg-indigo-50 rounded-lg">
+                <Activity className="w-6 h-6 text-indigo-600" />
+              </div>
+            }
+            allCategories={allCategories.currentTransformer || []}
+            selectedCategories={selectedCategories?.currentTransformer || []}
+            onAddCategory={handleAddCategory}
+            onRemoveCategory={handleRemoveCategory}
+            onToggleVisibility={handleToggleVisibility}
+          />
+
+          <RunnSettingsSection
+            title="Рубильник для литого корпуса"
+            type="moldedCaseSwitch"
+            icon={
+              <div className="p-2 bg-teal-50 rounded-lg">
+                <ToggleLeft className="w-6 h-6 text-teal-600" />
+              </div>
+            }
+            allCategories={allCategories.moldedCaseSwitch || []}
+            selectedCategories={selectedCategories?.moldedCaseSwitch || []}
+            onAddCategory={handleAddCategory}
+            onRemoveCategory={handleRemoveCategory}
+            onToggleVisibility={handleToggleVisibility}
+          />
+
+          {/* Сборные шины N */}
+         
         </div>
       </div>
     </div>
+    </RoleGuard>
   );
 }

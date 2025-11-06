@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { transformersApi, Transformer } from '@/api/transformers';
 import { showToast } from '@/shared/modals/ToastProvider';
 import { showConfirm } from '@/components/ui/confirm';
+import RoleGuard from '@/components/common/RoleGuard';
+import { UserRole } from '@/types/user';
 
 export default function TransformerSettingsPage() {
   const [transformers, setTransformers] = useState<Transformer[]>([]);
@@ -147,108 +149,127 @@ export default function TransformerSettingsPage() {
   };
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold">Трансформаторы</h1>
-        <button
-          onClick={() => handleOpenModal()}
-          className="px-4 py-2 bg-[#3A55DF] text-white rounded hover:bg-[#2e46c5] transition-colors"
-        >
-          Добавить трансформатор
-        </button>
-      </div>
+    <RoleGuard
+      allowedRoles={[UserRole.ADMIN, UserRole.PTO]}
+      redirectTo="/dashboard"
+      pagePath="/dashboard/settings/transformer"
+    >
+      <div className="h-[calc(100vh-65px)] overflow-y-auto bg-gradient-to-br from-white via-gray-50/30 to-blue-50/20">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-6">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-[#8eba1e] rounded-xl flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-[#8eba1e]">Трансформаторы</h1>
+              <p className="text-sm text-gray-600 mt-1">Настройка трансформаторов для расчетов</p>
+            </div>
+          </div>
+          <button
+            onClick={() => handleOpenModal()}
+            className="px-4 py-2 text-sm font-medium text-white bg-[#8eba1e] rounded-lg hover:bg-[#7aa31a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8eba1e] transition-all duration-200 shadow-md hover:shadow-lg"
+          >
+            Добавить трансформатор
+          </button>
+        </div>
 
-      {/* Фильтры и поиск */}
-      <div className="flex gap-4 mb-6">
-        <input
-          type="text"
-          placeholder="Поиск..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="border rounded px-3 py-2"
-        />
-        <select
-          value={filterVoltage}
-          onChange={(e) => setFilterVoltage(e.target.value)}
-          className="border rounded px-3 py-2"
-        >
-          <option value="">Все напряжения</option>
-          {uniqueVoltages.map((voltage) => (
-            <option key={voltage} value={voltage}>
-              {voltage}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filterType}
-          onChange={(e) => setFilterType(e.target.value)}
-          className="border rounded px-3 py-2"
-        >
-          <option value="">Все типы</option>
-          {uniqueTypes.map((type) => (
-            <option key={type} value={type}>
-              {type}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filterManufacturer}
-          onChange={(e) => setFilterManufacturer(e.target.value)}
-          className="border rounded px-3 py-2"
-        >
-          <option value="">Все производители</option>
-          {uniqueManufacturers.map((manufacturer) => (
-            <option key={manufacturer} value={manufacturer}>
-              {manufacturer}
-            </option>
-          ))}
-        </select>
-      </div>
+        {/* Фильтры и поиск */}
+        <div className="bg-white rounded-xl shadow-lg border border-[#8eba1e]/20 p-6 mb-6">
+          <div className="flex gap-4">
+            <input
+              type="text"
+              placeholder="Поиск..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8eba1e]/30 focus:border-[#8eba1e] transition-all"
+            />
+            <select
+              value={filterVoltage}
+              onChange={(e) => setFilterVoltage(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8eba1e]/30 focus:border-[#8eba1e] transition-all"
+            >
+              <option value="">Все напряжения</option>
+              {uniqueVoltages.map((voltage) => (
+                <option key={voltage} value={voltage}>
+                  {voltage}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8eba1e]/30 focus:border-[#8eba1e] transition-all"
+            >
+              <option value="">Все типы</option>
+              {uniqueTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filterManufacturer}
+              onChange={(e) => setFilterManufacturer(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8eba1e]/30 focus:border-[#8eba1e] transition-all"
+            >
+              <option value="">Все производители</option>
+              {uniqueManufacturers.map((manufacturer) => (
+                <option key={manufacturer} value={manufacturer}>
+                  {manufacturer}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
 
       {/* Таблица */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+        <div>
+          <table className="w-full divide-y divide-gray-200 table-auto">
             <thead className="bg-gray-50">
               <tr>
                 <th
                   onClick={() => handleSort('model')}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-1/6"
                 >
                   Модель {sortField === 'model' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
                 <th
                   onClick={() => handleSort('voltage')}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-1/6"
                 >
                   Напряжение {sortField === 'voltage' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
                 <th
                   onClick={() => handleSort('type')}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-1/6"
                 >
                   Тип {sortField === 'type' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
                 <th
                   onClick={() => handleSort('power')}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-1/6"
                 >
                   Мощность {sortField === 'power' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
                 <th
                   onClick={() => handleSort('manufacturer')}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-1/6"
                 >
                   Производитель{' '}
                   {sortField === 'manufacturer' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
                 <th
                   onClick={() => handleSort('price')}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-1/6"
                 >
                   Цена {sortField === 'price' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-1/6">
                   Действия
                 </th>
               </tr>
@@ -269,34 +290,34 @@ export default function TransformerSettingsPage() {
               ) : (
                 filteredTransformers.map((transformer) => (
                   <tr key={transformer.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-4 text-sm text-gray-900 truncate">
                       {transformer.model}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-4 text-sm text-gray-900 truncate">
                       {transformer.voltage}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-4 text-sm text-gray-900 truncate">
                       {transformer.type}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-4 text-sm text-gray-900 truncate">
                       {transformer.power}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-4 text-sm text-gray-900 truncate">
                       {transformer.manufacturer}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-4 text-sm text-gray-900 truncate">
                       {transformer.price.toLocaleString()} тг
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="px-3 py-4 text-right text-sm font-medium">
                       <button
                         onClick={() => handleOpenModal(transformer)}
-                        className="text-[#3A55DF] hover:text-[#2e46c5] mr-4"
+                        className="text-[#8eba1e] hover:text-[#7aa31a] mr-2 text-xs"
                       >
                         Редактировать
                       </button>
                       <button
                         onClick={() => handleDelete(transformer.id)}
-                        className="text-red-600 hover:text-red-900"
+                        className="text-red-600 hover:text-red-900 text-xs"
                       >
                         Удалить
                       </button>
@@ -347,7 +368,7 @@ export default function TransformerSettingsPage() {
                       type="text"
                       value={formData.model}
                       onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#3A55DF] focus:ring-[#3A55DF] sm:text-sm"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8eba1e] focus:ring-[#8eba1e] sm:text-sm"
                       required
                     />
                   </div>
@@ -357,9 +378,25 @@ export default function TransformerSettingsPage() {
                       type="text"
                       value={formData.voltage}
                       onChange={(e) => setFormData({ ...formData, voltage: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#3A55DF] focus:ring-[#3A55DF] sm:text-sm"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8eba1e] focus:ring-[#8eba1e] sm:text-sm"
                       required
                     />
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, voltage: '10' })}
+                        className="px-3 py-1 text-xs font-medium text-[#8eba1e] bg-[#8eba1e]/10 border border-[#8eba1e]/30 rounded-md hover:bg-[#8eba1e]/20 transition-colors"
+                      >
+                        10
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, voltage: '20' })}
+                        className="px-3 py-1 text-xs font-medium text-[#8eba1e] bg-[#8eba1e]/10 border border-[#8eba1e]/30 rounded-md hover:bg-[#8eba1e]/20 transition-colors"
+                      >
+                        20
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Тип</label>
@@ -367,9 +404,25 @@ export default function TransformerSettingsPage() {
                       type="text"
                       value={formData.type}
                       onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#3A55DF] focus:ring-[#3A55DF] sm:text-sm"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8eba1e] focus:ring-[#8eba1e] sm:text-sm"
                       required
                     />
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, type: 'ТМГ' })}
+                        className="px-3 py-1 text-xs font-medium text-[#8eba1e] bg-[#8eba1e]/10 border border-[#8eba1e]/30 rounded-md hover:bg-[#8eba1e]/20 transition-colors"
+                      >
+                        ТМГ
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, type: 'ТСЛ' })}
+                        className="px-3 py-1 text-xs font-medium text-[#8eba1e] bg-[#8eba1e]/10 border border-[#8eba1e]/30 rounded-md hover:bg-[#8eba1e]/20 transition-colors"
+                      >
+                        ТСЛ
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Мощность</label>
@@ -377,7 +430,7 @@ export default function TransformerSettingsPage() {
                       type="number"
                       value={formData.power}
                       onChange={(e) => setFormData({ ...formData, power: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#3A55DF] focus:ring-[#3A55DF] sm:text-sm"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8eba1e] focus:ring-[#8eba1e] sm:text-sm"
                       required
                     />
                   </div>
@@ -387,9 +440,32 @@ export default function TransformerSettingsPage() {
                       type="text"
                       value={formData.manufacturer}
                       onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#3A55DF] focus:ring-[#3A55DF] sm:text-sm"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8eba1e] focus:ring-[#8eba1e] sm:text-sm"
                       required
                     />
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, manufacturer: 'Alageum' })}
+                        className="px-3 py-1 text-xs font-medium text-[#8eba1e] bg-[#8eba1e]/10 border border-[#8eba1e]/30 rounded-md hover:bg-[#8eba1e]/20 transition-colors"
+                      >
+                        Alageum
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, manufacturer: 'ZBB' })}
+                        className="px-3 py-1 text-xs font-medium text-[#8eba1e] bg-[#8eba1e]/10 border border-[#8eba1e]/30 rounded-md hover:bg-[#8eba1e]/20 transition-colors"
+                      >
+                        ZBB
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, manufacturer: 'АЭТЗ' })}
+                        className="px-3 py-1 text-xs font-medium text-[#8eba1e] bg-[#8eba1e]/10 border border-[#8eba1e]/30 rounded-md hover:bg-[#8eba1e]/20 transition-colors"
+                      >
+                        АЭТЗ
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Цена</label>
@@ -397,7 +473,7 @@ export default function TransformerSettingsPage() {
                       type="number"
                       value={formData.price}
                       onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#3A55DF] focus:ring-[#3A55DF] sm:text-sm"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8eba1e] focus:ring-[#8eba1e] sm:text-sm"
                       required
                     />
                   </div>
@@ -411,7 +487,7 @@ export default function TransformerSettingsPage() {
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-2 text-sm font-medium text-white bg-[#3A55DF] border border-transparent rounded-md hover:bg-[#2e46c5] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#3A55DF]"
+                      className="px-4 py-2 text-sm font-medium text-white bg-[#8eba1e] border border-transparent rounded-md hover:bg-[#7aa31a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8eba1e]"
                     >
                       {editingTransformer ? 'Сохранить' : 'Создать'}
                     </button>
@@ -422,6 +498,8 @@ export default function TransformerSettingsPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
+    </RoleGuard>
   );
 }

@@ -37,34 +37,5 @@ export default function AirSwitchingDeviceLogic({
     return current !== null && current >= 630 && current <= 6300;
   });
 
-  return (
-    <div className="p-3 bg-blue-50 rounded border">
-      <h5 className="text-sm font-medium text-blue-800 mb-2">Логика для Воздушного аппарата:</h5>
-      <div className="text-xs text-blue-700 space-y-1">
-        <p>• Используется для воздушных линий</p>
-        <p>• Номинальный ток: 630А-6300А</p>
-        <p>• Напряжение: 0.4кВ</p>
-        <p>• Требуется дополнительная защита</p>
-      </div>
-      
-      <div className="mt-3">
-        <label className="text-xs font-medium text-blue-800 block mb-2">
-          Выберите выкатной автомат (630А-6300А):
-        </label>
-        <select
-          value={cell.breaker || ''}
-          onChange={(e) => cell.update('breaker', e.target.value)}
-          className="w-full border border-blue-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Выберите автомат</option>
-          {airBreakers.map((breaker) => (
-            <option key={breaker.id} value={breaker.name}>{breaker.name}</option>
-          ))}
-        </select>
-        {airBreakers.length === 0 && (
-          <p className="text-xs text-red-600 mt-1">Нет доступных автоматов в диапазоне 630А-6300А</p>
-        )}
-      </div>
-    </div>
-  );
+  return null;
 } 

@@ -1,11 +1,17 @@
 'use client';
 
 import React from 'react';
-import TransformerSection from '@/components/FinalReview/TransformerSection';
-import RusnSection from '@/components/FinalReview/RusnSection';
-import BmzSection from '@/components/FinalReview/BmzSection';
-import AdditionalEquipmentTable from '@/components/FinalReview/AdditionalEquipmentTable';
-import WorksTable from '@/components/FinalReview/WorksTable';
+import UniversalTable from '@/components/FinalReview/UniversalTable';
+import RusnUniversalTable from '@/components/FinalReview/RusnUniversalTable';
+import { useWorksStore } from '@/store/useWorksStore';
+import {
+  bmzTableConfig,
+  transformerTableConfig,
+  additionalEquipmentTableConfig,
+  worksTableConfig,
+  emptyBmzTableConfig,
+  runnTableConfig,
+} from '@/components/FinalReview/tableConfigs';
 import type { BmzData } from '@/utils/bmzCalculations';
 import type { Transformer } from '@/api/transformers';
 import type { RusnState } from '@/store/useRusnStore';
@@ -13,7 +19,8 @@ import type {
   AdditionalEquipmentState,
   AdditionalEquipmentItem,
 } from '@/store/useAdditionalEquipmentStore';
-import type { WorksState, WorkItem } from '@/store/useWorksStore';
+import type { WorkItem } from '@/store/useWorksStore';
+import { useRunnStore } from '@/store/useRunnStore';
 
 interface FinalReviewContentProps {
   bmzStore: BmzData;
@@ -21,7 +28,7 @@ interface FinalReviewContentProps {
   rusnStore: RusnState;
   selectedEquipment: AdditionalEquipmentState['selected'];
   equipmentList: AdditionalEquipmentItem[];
-  selectedWorks: WorksState['selected'];
+  selectedWorks: Record<string, { checked: boolean; count: number }>;
   worksList: WorkItem[];
 }
 
@@ -34,26 +41,93 @@ export default function FinalReviewContent({
   selectedWorks,
   worksList,
 }: FinalReviewContentProps) {
+  // Выбираем конфигурацию БМЗ в зависимости от типа
+  const bmzConfig = bmzStore.buildingType && bmzStore.buildingType !== 'none' 
+    ? bmzTableConfig 
+    : emptyBmzTableConfig;
+  const runn = useRunnStore();
+  const [businessTravelTotal, setBusinessTravelTotal] = React.useState<number>(0);
+  const [isHydrated, setIsHydrated] = React.useState(false);
+  const worksRows = React.useMemo(() => {
+    return worksTableConfig.dataMapper(
+      { selected: selectedWorks, worksList },
+      { businessTravelTotal }
+    );
+  }, [selectedWorks, worksList, businessTravelTotal]);
+
+  // Читаем командировочные только на клиенте и передаём в таблицу работ через additionalData
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const saved = window.localStorage.getItem('businessTravelTotal');
+    const parsed = saved ? Number(saved) : 0;
+    if (!Number.isNaN(parsed)) setBusinessTravelTotal(parsed);
+    setIsHydrated(true);
+  }, []);
+
+  // Авто-бэкаповка сводок РУНН на финальной странице, если конфигурации есть, а сводок нет
+  React.useEffect(() => {
+    if (!isHydrated) return;
+    if (!runn) return;
+    if ((runn.cellSummaries || []).length > 0) return;
+    if (!runn.setCellSummary) return;
+    const cells = runn.cellConfigs || [];
+    if (cells.length === 0) return;
+
+    cells.forEach((c: any, idx: number) => {
+      const qty = c.quantity || 1;
+      const inferredTotal = ['breakerPrice','meterPrice','rzaPrice','transformerPrice']
+        .reduce((sum: number, key: string) => sum + (Number(c?.[key]) || 0), 0);
+      if (inferredTotal <= 0) return; // не создаём пустые
+      const name = c.selectedCalculationName || c.calculationName || c.purpose || `Ячейка ${idx + 1}`;
+      runn.setCellSummary({
+        cellId: c.id || String(idx),
+        name,
+        quantity: qty,
+        pricePerUnit: inferredTotal / (qty || 1),
+        totalPrice: inferredTotal,
+      });
+    });
+  }, [isHydrated, runn]);
+
   return (
     <div className="space-y-6">
-      <BmzSection bmz={bmzStore} />
-      <TransformerSection
-        transformer={
-          selectedTransformer
-            ? {
-                model: selectedTransformer.model,
-                spec: `${selectedTransformer.voltage}кВ, ${selectedTransformer.power}кВА, ${selectedTransformer.manufacturer}, ${selectedTransformer.type}`,
-                price: selectedTransformer.price,
-                quantity: 2, // По умолчанию 2 трансформатора
-              }
-            : null
-        }
+      {/* БМЗ */}
+      <UniversalTable 
+        config={bmzConfig}
+        data={bmzStore}
       />
-      <RusnSection voltage="10" />
+      
+      {/* Трансформатор */}
+      <UniversalTable 
+        config={transformerTableConfig}
+        data={selectedTransformer}
+      />
+      
+      {/* РУСН */}
+      <RusnUniversalTable voltage="10" />
+      
+      {/* Общая сводка РУНН - РУ-0.4кВ */}
+      {isHydrated && (
+        <UniversalTable 
+          config={runnTableConfig}
+          data={runn}
+        />
+      )}
+      
       {/* Дополнительное оборудование */}
-      <AdditionalEquipmentTable selected={selectedEquipment} equipmentList={equipmentList} />
-      {/* Работы и транспортные расходы */}
-      <WorksTable selected={selectedWorks} worksList={worksList} />
+      <UniversalTable 
+        config={additionalEquipmentTableConfig}
+        data={{ selected: selectedEquipment, equipmentList }}
+      />
+      
+      {/* Работы и транспортные расходы - показываем если есть строки (включая командировочные) после гидратации */}
+      {isHydrated && worksRows.length > 0 && (
+        <UniversalTable 
+          config={worksTableConfig}
+          data={{ selected: selectedWorks, worksList }}
+          additionalData={{ businessTravelTotal }}
+        />
+      )}
     </div>
   );
 }

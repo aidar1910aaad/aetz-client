@@ -29,7 +29,20 @@ export interface CalculationData {
   };
   cellConfig?: {
     type?: string;
-    materials?: Record<string, any>;
+    materials?: Record<string, any> | {
+      withdrawable_breaker?: Array<{
+        id: number;
+        name: string;
+        price: number;
+        type: string;
+      }>;
+      counter?: Array<{
+        id: number;
+        name: string;
+        price: number;
+        type: string;
+      }>;
+    };
   };
 }
 
@@ -72,7 +85,6 @@ export async function createCalculationGroup(
   token: string
 ): Promise<CalculationGroup> {
   try {
-    console.log('Creating calculation group:', group);
     const response = await fetch(`${api}/calculations/groups`, {
       method: 'POST',
       headers: {
@@ -89,7 +101,6 @@ export async function createCalculationGroup(
     }
 
     const result = await response.json();
-    console.log('Created group:', result);
     return result as CalculationGroup;
   } catch (err: unknown) {
     const error = err as Error;
@@ -104,7 +115,6 @@ export async function updateCalculationGroup(
   token: string
 ): Promise<CalculationGroup> {
   try {
-    console.log('Updating calculation group:', { slug, data });
     const response = await fetch(`${api}/calculations/groups/${slug}`, {
       method: 'PATCH',
       headers: {
@@ -121,7 +131,6 @@ export async function updateCalculationGroup(
     }
 
     const result = await response.json();
-    console.log('Updated group:', result);
     return result as CalculationGroup;
   } catch (err: unknown) {
     const error = err as Error;
@@ -132,7 +141,6 @@ export async function updateCalculationGroup(
 
 export async function deleteCalculationGroup(id: number, token: string): Promise<void> {
   try {
-    console.log('Deleting calculation group:', id);
     const response = await fetch(`${api}/calculations/groups/${id}`, {
       method: 'DELETE',
       headers: {
@@ -145,8 +153,6 @@ export async function deleteCalculationGroup(id: number, token: string): Promise
       console.error('Error deleting group:', error);
       throw new Error(error.message || 'Ошибка при удалении группы калькуляций');
     }
-
-    console.log('Group deleted successfully');
   } catch (err: unknown) {
     const error = err as Error;
     console.error('Error in deleteCalculationGroup:', error);
@@ -156,7 +162,6 @@ export async function deleteCalculationGroup(id: number, token: string): Promise
 
 export async function getAllCalculationGroups(token: string): Promise<CalculationGroup[]> {
   try {
-    console.log('Fetching all calculation groups...');
     const response = await fetch(`${api}/calculations/groups`, {
       method: 'GET',
       headers: {
@@ -171,7 +176,6 @@ export async function getAllCalculationGroups(token: string): Promise<Calculatio
     }
 
     const result = await response.json();
-    console.log('Fetched groups:', result);
     return result as CalculationGroup[];
   } catch (err: unknown) {
     const error = err as Error;
@@ -185,7 +189,6 @@ export async function createCalculation(
   token: string
 ): Promise<Calculation> {
   try {
-    console.log('Creating calculation:', data);
     const response = await fetch(`${api}/calculations`, {
       method: 'POST',
       headers: {
@@ -202,7 +205,6 @@ export async function createCalculation(
     }
 
     const result = await response.json();
-    console.log('Created calculation:', result);
     return result as Calculation;
   } catch (err: unknown) {
     const error = err as Error;
@@ -216,7 +218,6 @@ export async function getCalculationsByGroup(
   token: string
 ): Promise<Calculation[]> {
   try {
-    console.log('Fetching calculations for group:', groupSlug);
     const response = await fetch(`${api}/calculations/groups/${groupSlug}/calculations`, {
       method: 'GET',
       headers: {
@@ -231,7 +232,7 @@ export async function getCalculationsByGroup(
     }
 
     const result = await response.json();
-    console.log('Fetched calculations:', result);
+    
     return result as Calculation[];
   } catch (err: unknown) {
     const error = err as Error;
@@ -246,7 +247,6 @@ export async function getCalculationBySlugs(
   token: string
 ): Promise<Calculation> {
   try {
-    console.log('Fetching calculation:', { groupSlug, calcSlug });
     const response = await fetch(`${api}/calculations/${groupSlug}/${calcSlug}`, {
       method: 'GET',
       headers: {
@@ -261,7 +261,6 @@ export async function getCalculationBySlugs(
     }
 
     const result = await response.json();
-    console.log('Fetched calculation:', result);
     return result as Calculation;
   } catch (err: unknown) {
     const error = err as Error;
@@ -277,10 +276,6 @@ export async function updateCalculation(
   token: string
 ): Promise<Calculation> {
   try {
-    console.log('Updating calculation:', { groupSlug, calcSlug, data });
-    console.log('🔍 Debug - data.cellConfig?.materials type:', typeof data.data?.cellConfig?.materials);
-    console.log('🔍 Debug - data.cellConfig?.materials isArray:', Array.isArray(data.data?.cellConfig?.materials));
-    console.log('🔍 Debug - data.cellConfig?.materials value:', data.data?.cellConfig?.materials);
     const response = await fetch(`${api}/calculations/${groupSlug}/${calcSlug}`, {
       method: 'PATCH',
       headers: {
@@ -297,11 +292,35 @@ export async function updateCalculation(
     }
 
     const result = await response.json();
-    console.log('Updated calculation:', result);
     return result as Calculation;
   } catch (err: unknown) {
     const error = err as Error;
     console.error('Error in updateCalculation:', error);
+    throw new Error(error.message);
+  }
+}
+
+export async function deleteCalculation(
+  groupSlug: string,
+  calcSlug: string,
+  token: string
+): Promise<void> {
+  try {
+    const response = await fetch(`${api}/calculations/${groupSlug}/${calcSlug}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      console.error('Error deleting calculation:', error);
+      throw new Error(error.message || 'Ошибка при удалении калькуляции');
+    }
+  } catch (err: unknown) {
+    const error = err as Error;
+    console.error('Error in deleteCalculation:', error);
     throw new Error(error.message);
   }
 }

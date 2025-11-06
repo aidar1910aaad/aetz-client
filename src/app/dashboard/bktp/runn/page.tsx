@@ -1,113 +1,98 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTransformerStore } from '@/store/useTransformerStore';
 import { useRunnStore } from '@/store/useRunnStore';
-import Link from 'next/link';
-import Breadcrumbs from '@/components/Breadcrumbs/Breadcrumbs';
 import RunnFormFields from './RunnFormFields';
 import { RunnNotConfigured } from '@/components/runn/RunnNotConfigured';
 import { RunnNextStepButton } from '@/components/runn/RunnNextStepButton';
-import { RunnHeader } from '@/components/runn/RunnHeader';
-import { RunnModeSelector } from '@/components/runn/RunnModeSelector';
+import RunnHeaderSimple from './components/RunnHeaderSimple';
+import RunnModeSelector from './components/RunnModeSelector';
 
-type RunnMode = 'not-configured' | 'configured';
+type RunnMode = 'configured' | 'not-configured';
 
 export default function RunnConfigurator() {
   const { selectedTransformer } = useTransformerStore();
-  const { cellConfigs } = useRunnStore();
+  const { cellConfigs, clearAllCells } = useRunnStore();
   const voltage = selectedTransformer?.voltage || 0.4;
 
-  // Определяем режим на основе наличия конфигурации, но сохраняем в localStorage
-  const [mode, setMode] = useState<RunnMode>(() => {
-    if (typeof window !== 'undefined') {
-      const savedMode = localStorage.getItem('runn-mode') as RunnMode;
-      if (savedMode) return savedMode;
-    }
-    return cellConfigs.length > 0 ? 'configured' : 'not-configured';
-  });
+  // Определяем режим на основе наличия конфигурации
+  const [mode, setMode] = useState<RunnMode>(
+    cellConfigs.length > 0 ? 'configured' : 'not-configured'
+  );
+
+  // Синхронизируем режим с состоянием store при изменении cellConfigs
+  useEffect(() => {
+    const hasConfiguration = cellConfigs.length > 0;
+    setMode(hasConfiguration ? 'configured' : 'not-configured');
+  }, [cellConfigs]);
+  
+  // Текущая активная вкладка
+  const [currentTab, setCurrentTab] = useState<'main' | 'bus-bridge' | 'dgu'>('main');
 
   const handleModeChange = (newMode: RunnMode) => {
     setMode(newMode);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('runn-mode', newMode);
-    }
     if (newMode === 'not-configured') {
       // Очищаем конфигурацию при выборе "не предусмотрено"
-      // Можно добавить подтверждение
+      clearAllCells();
     }
   };
 
   return (
-    <div className="h-[calc(100vh-110px)] overflow-y-auto bg-gray-50">
-      {/* Breadcrumbs */}
-      <div className="px-6 pt-6">
-        <Breadcrumbs />
-      </div>
-      
-      {/* Header */}
-      <RunnHeader voltage={voltage} cellCount={cellConfigs.length} />
+    <div className="h-[calc(100vh-64px)] bg-white overflow-y-auto">
+      <div className="p-6">
+        {/* Header */}
+        <RunnHeaderSimple voltage={voltage} cellCount={cellConfigs.length} />
 
-      {/* Mode Selector */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <RunnModeSelector mode={mode} onModeChange={handleModeChange} />
-      </div>
+        {/* Mode Selector */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-lg mb-6">
+          <RunnModeSelector mode={mode} onModeChange={handleModeChange} />
+        </div>
 
-      {/* Main Content */}
-      <div className="px-6 py-6">
-        {mode === 'configured' && (
-          <div className="space-y-6">
-            {/* Configuration Card */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    Конфигурация РУНН-{voltage}кВ
-                  </h2>
-                  <div className="flex items-center gap-4 text-sm text-gray-500">
-                    <span>Ячеек: {cellConfigs.length}</span>
-                    <span>•</span>
-                    <span>Доступно типов: {voltage === 0.4 ? '3' : '5'}</span>
+        {/* Main Content */}
+        <div className="space-y-6">
+          {mode === 'configured' ? (
+            <div className="space-y-6">
+              {/* Configuration Form */}
+              <div className="bg-white border border-gray-200 rounded-2xl shadow-lg">
+                <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200">
+                  <div className="p-2 bg-gray-100 rounded-lg">
+                    <svg className="w-5 h-5 text-[#8eba1e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                   </div>
+                  <h2 className="text-lg font-bold text-gray-900">
+                    Конфигурация РУНН Сборные шины
+                  </h2>
+                </div>
+                <div className="p-6">
+                  <RunnFormFields onTabChange={setCurrentTab} />
                 </div>
               </div>
-              <div className="p-6">
-                <RunnFormFields />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Not Configured Component */}
+              <div className="bg-white border border-gray-200 rounded-2xl shadow-lg">
+                <div className="p-6">
+                  <RunnNotConfigured />
+                </div>
               </div>
             </div>
+          )}
+
+          {/* Navigation */}
+          <div className="mt-8 flex justify-start">
+            <RunnNextStepButton 
+              skip={mode === 'not-configured'} 
+              currentTab={currentTab}
+              onSwitchToBusbar={() => {
+                // Переключаемся на вкладку "Сборные шины" в RunnFormFields
+                const event = new CustomEvent('switchToBusbar');
+                window.dispatchEvent(event);
+              }}
+            />
           </div>
-        )}
-
-        {mode === 'not-configured' && (
-          <div className="space-y-6">
-            {/* Not Configured Component */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">РУНН-{voltage}кВ</h2>
-              </div>
-              <div className="p-6">
-                <RunnNotConfigured />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Navigation */}
-        <div className="mt-8 flex justify-between items-center">
-          <Link href="/dashboard/bktp/rusn">
-            <button className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors text-sm font-medium flex items-center gap-2">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              Назад к РУСН
-            </button>
-          </Link>
-
-          <RunnNextStepButton skip={mode === 'not-configured'} />
         </div>
       </div>
     </div>

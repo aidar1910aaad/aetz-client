@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { Building2, Calculator, ArrowRight } from 'lucide-react';
 import { useBmzStore } from '@/store/useBmzStore';
 import { useBktpStore } from '@/store/useBktpStore';
 import Breadcrumbs from '@/components/Breadcrumbs/Breadcrumbs';
@@ -31,6 +32,9 @@ export default function BmzConfigPage() {
         console.log('Setting BMZ settings in store...');
         bmz.setSettings(settings);
         console.log('Settings set in store:', bmz.settings);
+        
+        // Инициализируем дефолтные значения оборудования
+        bmz.initializeDefaultEquipment();
       } catch (error) {
         console.error('Error loading BMZ settings:', error);
       }
@@ -66,6 +70,10 @@ export default function BmzConfigPage() {
     if (type === 'bmz') {
       bmz.setThickness(50);
       bmz.setBlockCount(4);
+      // Инициализируем дефолтные значения оборудования для БМЗ
+      if (bmz.settings) {
+        bmz.initializeDefaultEquipment();
+      }
     } else if (type === 'tp') {
       bmz.setThickness(50);
       bmz.setBlockCount(4);
@@ -75,6 +83,8 @@ export default function BmzConfigPage() {
         if (insulatedFloor) {
           bmz.setEquipmentState(insulatedFloor.name, false);
         }
+        // Инициализируем дефолтные значения оборудования для ТП
+        bmz.initializeDefaultEquipment();
       }
     } else {
       bmz.reset();
@@ -149,142 +159,178 @@ export default function BmzConfigPage() {
   const totalPrice = calculateTotalPrice();
 
   return (
-    <div className="h-[calc(100vh-110px)] overflow-y-auto px-6 py-6 bg-gray-50">
-      <Breadcrumbs />
-      <h1 className="text-2xl font-bold mb-4">
-        <span className="text-[#3A55DF]">{filename}</span> параметры здания
-      </h1>
-
-      <div className="max-w-[1200px] mx-auto space-y-6">
-        <BmzBuildingType onChange={handleBuildingTypeChange} selectedType={bmz.buildingType} />
-
-        {bmz.buildingType !== 'none' ? (
-          <>
-            <BmzDimensions
-              width={bmz.width}
-              length={bmz.length}
-              height={bmz.buildingType !== 'tp' ? bmz.height : undefined}
-              thickness={bmz.thickness}
-              blockCount={bmz.blockCount}
-              onLengthChange={bmz.setLength}
-              onWidthChange={bmz.setWidth}
-              onHeightChange={bmz.setHeight}
-              onThicknessChange={bmz.setThickness}
-              onBlockCountChange={bmz.setBlockCount}
-              buildingType={bmz.buildingType}
-            />
-
-            {isFormValid() && (
-              <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Расчёт стоимости</h3>
-                <table className="w-full table-auto border text-sm">
-                  <thead className="bg-[#3A55DF] text-white">
-                    <tr>
-                      <th className="p-2 text-left">Наименование</th>
-                      <th className="p-2">Ед. изм.</th>
-                      <th className="p-2">Кол-во</th>
-                      <th className="p-2">Цена</th>
-                      <th className="p-2">Сумма</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-center">
-                    {bmz.buildingType === 'bmz' && (
-                      <tr>
-                        <td className="p-2 text-left">
-                          Здание БМЗ ({bmz.length}×{bmz.width}×{bmz.height} мм, толщина{' '}
-                          {bmz.thickness} мм, {bmz.blockCount} блоков)
-                        </td>
-                        <td className="p-2">м²</td>
-                        <td className="p-2">{roundedArea}</td>
-                        <td className="p-2">{unitPrice.toLocaleString()} тг</td>
-                        <td className="p-2">{(unitPrice * roundedArea).toLocaleString()} тг</td>
-                      </tr>
-                    )}
-                    {bmz.buildingType === 'tp' && (
-                      <tr>
-                        <td className="p-2 text-left">
-                          Здание ТП ({bmz.length}×{bmz.width}×{bmz.height} мм)
-                        </td>
-                        <td className="p-2">м²</td>
-                        <td className="p-2">{roundedArea}</td>
-                        <td className="p-2">—</td>
-                        <td className="p-2">—</td>
-                      </tr>
-                    )}
-
-                    {bmz.settings?.equipment.map((equipment) => {
-                      const stateKey = equipment.name.toLowerCase().replace(/\s+/g, '');
-                      if (!bmz.equipmentState[stateKey]) return null;
-
-                      let price = 0;
-                      let quantity = 0;
-                      let unit = '';
-
-                      if (equipment.priceType === 'perSquareMeter') {
-                        price = equipment.pricePerSquareMeter || 0;
-                        quantity = roundedArea;
-                        unit = 'м²';
-                      } else if (equipment.priceType === 'perHalfSquareMeter') {
-                        price = equipment.pricePerSquareMeter || 0;
-                        quantity = roundedArea / 2;
-                        unit = 'м²';
-                      } else if (equipment.priceType === 'fixed') {
-                        price = equipment.fixedPrice || 0;
-                        quantity = 1;
-                        unit = 'компл.';
-                      }
-
-                      const totalPrice = price * quantity;
-
-                      return (
-                        <tr key={equipment.name}>
-                          <td className="p-2 text-left">{equipment.name}</td>
-                          <td className="p-2">{unit}</td>
-                          <td className="p-2">{quantity.toFixed(2)}</td>
-                          <td className="p-2">{price.toLocaleString()} тг</td>
-                          <td className="p-2">{totalPrice.toLocaleString()} тг</td>
-                        </tr>
-                      );
-                    })}
-
-                    <tr className="bg-[#f3f4f6] font-semibold">
-                      <td colSpan={4} className="text-right pr-4">
-                        ВСЕГО:
-                      </td>
-                      <td className="text-right pr-4">{totalPrice.toLocaleString()} тг</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            <BmzOptions
-              state={bmz.equipmentState}
-              setField={bmz.setEquipmentState}
-              disabled={!isFormValid()}
-              buildingType={bmz.buildingType}
-              length={bmz.length}
-              width={bmz.width}
-            />
-          </>
-        ) : (
-          <div className="text-center py-8 text-gray-500 bg-white border border-gray-200 rounded-lg shadow-sm">
-            Здание не предусмотрено
+    <div className="h-[calc(100vh-64px)] bg-white overflow-y-auto relative z-0">
+      <div className="p-6 pb-20 relative z-10">
+        <Breadcrumbs />
+        
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="p-3 bg-gray-100 rounded-xl">
+              <Building2 className="w-6 h-6 text-[#8eba1e]" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Параметры здания</h1>
+              <p className="text-gray-600">Настройте параметры здания подстанции</p>
+            </div>
           </div>
-        )}
+          
+          <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-[#8eba1e] rounded-lg">
+                <Calculator className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-700">Заявка</p>
+                <p className="text-sm text-[#8eba1e] font-semibold">{filename}</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
-        <div className="pt-6">
-          <button
-            onClick={handleAddToSpec}
-            disabled={!isFormValid()}
-            className={`px-6 py-3 rounded-lg text-lg font-medium transition-colors ${
-              isFormValid()
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
-          >
-            {bmz.buildingType === 'none' ? 'Далее' : 'Добавить в спецификацию'}
-          </button>
+        <div className=" mx-auto space-y-6">
+          <BmzBuildingType onChange={handleBuildingTypeChange} selectedType={bmz.buildingType} />
+
+          {bmz.buildingType !== 'none' ? (
+            <>
+              <BmzDimensions
+                width={bmz.width}
+                length={bmz.length}
+                height={bmz.buildingType !== 'tp' ? bmz.height : undefined}
+                thickness={bmz.thickness}
+                blockCount={bmz.blockCount}
+                onLengthChange={bmz.setLength}
+                onWidthChange={bmz.setWidth}
+                onHeightChange={bmz.setHeight}
+                onThicknessChange={bmz.setThickness}
+                onBlockCountChange={bmz.setBlockCount}
+                buildingType={bmz.buildingType}
+              />
+
+              <BmzOptions
+                state={bmz.equipmentState}
+                setField={bmz.setEquipmentState}
+                disabled={!isFormValid()}
+                buildingType={bmz.buildingType}
+                length={bmz.length}
+                width={bmz.width}
+              />
+
+              {isFormValid() && (
+                <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-lg">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 bg-gray-100 rounded-lg">
+                      <Calculator className="w-5 h-5 text-[#8eba1e]" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">Расчёт стоимости</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full table-auto border border-gray-200 rounded-lg overflow-hidden">
+                      <thead className="bg-[#8eba1e] text-white">
+                        <tr>
+                          <th className="p-4 text-left font-semibold">Наименование</th>
+                          <th className="p-4 text-center font-semibold">Ед. изм.</th>
+                          <th className="p-4 text-center font-semibold">Кол-во</th>
+                          <th className="p-4 text-center font-semibold">Цена</th>
+                          <th className="p-4 text-center font-semibold">Сумма</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white">
+                        {bmz.buildingType === 'bmz' && (
+                          <tr className="border-b border-gray-100 hover:bg-gray-50">
+                            <td className="p-4 text-left font-medium">
+                              Здание БМЗ ({bmz.length}×{bmz.width}×{bmz.height} мм, толщина{' '}
+                              {bmz.thickness} мм, {bmz.blockCount} блоков)
+                            </td>
+                            <td className="p-4 text-center text-gray-600">м²</td>
+                            <td className="p-4 text-center font-semibold">{roundedArea}</td>
+                            <td className="p-4 text-center text-[#8eba1e] font-semibold">{unitPrice.toLocaleString()} тг</td>
+                            <td className="p-4 text-center text-[#8eba1e] font-bold">{(unitPrice * roundedArea).toLocaleString()} тг</td>
+                          </tr>
+                        )}
+                        {bmz.buildingType === 'tp' && (
+                          <tr className="border-b border-gray-100 hover:bg-gray-50">
+                            <td className="p-4 text-left font-medium">
+                              Здание ТП ({bmz.length}×{bmz.width}×{bmz.height} мм)
+                            </td>
+                            <td className="p-4 text-center text-gray-600">м²</td>
+                            <td className="p-4 text-center font-semibold">{roundedArea}</td>
+                            <td className="p-4 text-center text-gray-400">—</td>
+                            <td className="p-4 text-center text-gray-400">—</td>
+                          </tr>
+                        )}
+
+                        {bmz.settings?.equipment.map((equipment) => {
+                          const stateKey = equipment.name.toLowerCase().replace(/\s+/g, '');
+                          if (!bmz.equipmentState[stateKey]) return null;
+
+                          let price = 0;
+                          let quantity = 0;
+                          let unit = '';
+
+                          if (equipment.priceType === 'perSquareMeter') {
+                            price = equipment.pricePerSquareMeter || 0;
+                            quantity = roundedArea;
+                            unit = 'м²';
+                          } else if (equipment.priceType === 'perHalfSquareMeter') {
+                            price = equipment.pricePerSquareMeter || 0;
+                            quantity = roundedArea / 2;
+                            unit = 'м²';
+                          } else if (equipment.priceType === 'fixed') {
+                            price = equipment.fixedPrice || 0;
+                            quantity = 1;
+                            unit = 'компл.';
+                          }
+
+                          const totalPrice = price * quantity;
+
+                          return (
+                            <tr key={equipment.name} className="border-b border-gray-100 hover:bg-gray-50">
+                              <td className="p-4 text-left font-medium">{equipment.name}</td>
+                              <td className="p-4 text-center text-gray-600">{unit}</td>
+                              <td className="p-4 text-center font-semibold">{quantity.toFixed(2)}</td>
+                              <td className="p-4 text-center text-[#8eba1e] font-semibold">{price.toLocaleString()} тг</td>
+                              <td className="p-4 text-center text-[#8eba1e] font-bold">{totalPrice.toLocaleString()} тг</td>
+                            </tr>
+                          );
+                        })}
+
+                        <tr className="bg-[#8eba1e]/10 font-bold border-t-2 border-[#8eba1e]">
+                          <td colSpan={4} className="text-right pr-4 p-4 text-lg">
+                            ВСЕГО:
+                          </td>
+                          <td className="text-right pr-4 p-4 text-lg text-[#8eba1e]">{totalPrice.toLocaleString()} тг</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-12 bg-white border border-gray-200 rounded-2xl shadow-lg">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Building2 className="w-8 h-8 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Здание не предусмотрено</h3>
+              <p className="text-gray-600">Для данной заявки здание не требуется</p>
+            </div>
+          )}
+
+          <div className="pt-6 pb-8">
+            <button
+              onClick={handleAddToSpec}
+              disabled={!isFormValid()}
+              className={`flex items-center gap-2 px-8 py-4 rounded-xl text-lg font-semibold transition-all duration-200 ${
+                isFormValid()
+                  ? 'bg-[#8eba1e] hover:bg-[#7aa31a] text-white shadow-lg hover:shadow-xl transform hover:scale-105'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              <ArrowRight className="w-5 h-5" />
+              {bmz.buildingType === 'none' ? 'Далее' : 'Добавить в спецификацию'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

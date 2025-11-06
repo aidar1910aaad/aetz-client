@@ -11,6 +11,8 @@ import { BusbarEmpty } from '@/components/Busbar/BusbarEmpty';
 import { BusbarSaveButton } from '@/components/Busbar/BusbarSaveButton';
 import { AddSwitchgearModal } from './components/AddSwitchgearModal';
 import { getAllCalculationGroups } from '@/api/calculations';
+import RoleGuard from '@/components/common/RoleGuard';
+import { UserRole } from '@/types/user';
 
 interface NewSwitchgearConfig {
   type: string;
@@ -337,46 +339,77 @@ export default function BusbarSettingsPage() {
     : [];
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Конфигурации РУ</h1>
+    <RoleGuard
+      allowedRoles={[UserRole.ADMIN, UserRole.PTO]}
+      redirectTo="/dashboard"
+      pagePath="/dashboard/bktp/settings/busbar"
+    >
+      <div className="h-[calc(100vh-65px)] overflow-y-auto bg-gradient-to-br from-white via-gray-50/30 to-blue-50/20">
+      <div className="px-4 sm:px-6 lg:px-8 py-6">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-6">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-[#8eba1e] rounded-xl flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-[#8eba1e]">Конфигурации РУ</h1>
+              <p className="text-sm text-gray-600 mt-1">Настройка конфигураций для РУ панели</p>
+            </div>
+          </div>
+        </div>
 
-      <SwitchgearFilters
-        filters={filters}
-        onFilterChange={setFilters}
-        configurations={allSwitchgearConfigs}
-      />
-
-      <button
-        onClick={handleOpenAddModal}
-        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mb-4"
-      >
-        Добавить конфигурацию
-      </button>
-      <AddSwitchgearModal
-        open={isAddModalOpen}
-        onClose={handleCloseAddModal}
-        onAdd={handleAddRow}
-        type={filters.type}
-        allTypes={allTypes}
-      />
-
-      {!filters.type ? (
-        <div className="text-center text-gray-500 my-8 text-lg">Выберите тип</div>
-      ) : (
-        <>
-          <BusbarTable
-            data={filteredTableData}
-            columnHeaders={filteredColumnHeaders}
-            onInputChange={handleInputChange}
-            filterType={filters.type}
-            filterAmperage={filters.amperage}
-            filterGroup={filters.group}
-            onDeleteColumn={handleDeleteColumn}
+        {/* Content */}
+        <div className="space-y-6">
+          <SwitchgearFilters
+            filters={filters}
+            onFilterChange={setFilters}
+            configurations={allSwitchgearConfigs}
           />
-          {filteredTableData.length === 0 && <BusbarEmpty />}
-          <BusbarSaveButton onClick={handleSave} loading={loading} />
-        </>
-      )}
+
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-800">Конфигурации</h2>
+            <button
+              onClick={handleOpenAddModal}
+              className="px-4 py-2 text-sm font-medium text-white bg-[#8eba1e] rounded-lg hover:bg-[#7aa31a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8eba1e] transition-all duration-200 shadow-md hover:shadow-lg"
+            >
+              Добавить конфигурацию
+            </button>
+          </div>
+          <AddSwitchgearModal
+            open={isAddModalOpen}
+            onClose={handleCloseAddModal}
+            onAdd={handleAddRow}
+            type={filters.type}
+            allTypes={allTypes}
+          />
+
+          {!filters.type ? (
+            <div className="bg-white rounded-xl shadow-lg border border-[#8eba1e]/20 p-8">
+              <div className="text-center text-gray-500 text-lg">Выберите тип</div>
+            </div>
+          ) : (
+            <>
+              <div className="bg-white rounded-xl shadow-lg border border-[#8eba1e]/20 overflow-hidden">
+                <BusbarTable
+                  data={filteredTableData}
+                  columnHeaders={filteredColumnHeaders}
+                  onInputChange={handleInputChange}
+                  filterType={filters.type}
+                  filterAmperage={filters.amperage}
+                  filterGroup={filters.group}
+                  onDeleteColumn={handleDeleteColumn}
+                />
+                {filteredTableData.length === 0 && <BusbarEmpty />}
+              </div>
+              <BusbarSaveButton onClick={handleSave} loading={loading} />
+            </>
+          )}
+        </div>
+      </div>
     </div>
+    </RoleGuard>
   );
 }

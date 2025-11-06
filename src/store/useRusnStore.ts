@@ -68,9 +68,28 @@ export interface RusnCell {
     name: string;
     price: number;
   };
+  sr?: {
+    id: string;
+    name: string;
+    price: number;
+  };
   count: number;
   calculationId?: number;
   totalPrice: number; // Итоговая цена ячейки (Отпускная расчетная цена)
+  calculationBreakdown?: {
+    main: {
+      name: string;
+      price: number;
+    };
+    additional: {
+      name: string;
+      price: number;
+    };
+    total: number;
+  };
+  // Специальные поля для 8DJH
+  siemens8DJH_R?: number;
+  siemens8DJH_L?: number;
 }
 
 export interface RusnBusbarSummary {
@@ -102,6 +121,7 @@ interface RusnState {
   addCell: (cell: Omit<RusnCell, 'id'>) => void;
   updateCell: (id: string, key: keyof RusnCell, value: RusnCell[keyof RusnCell]) => void;
   removeCell: (id: string) => void;
+  clearAllCells: () => void;
   setBusMaterial: (material: BusMaterial) => void;
   updateBusBridge: () => void;
   reset: () => void;
@@ -115,6 +135,7 @@ interface RusnState {
   setCellSummary: (summary: RusnCellSummary) => void;
   removeCellSummary: (cellId: string) => void;
   clearCellSummaries: () => void;
+  clearOldKso366Summaries: () => void;
   busBridges: BusbarBridge[];
   setBusBridges: (bridges: BusbarBridge[]) => void;
 }
@@ -188,7 +209,6 @@ export const useRusnStore = create<RusnState>()(
 
       setGlobal: (key, value) =>
         set((state) => {
-          console.log('useRusnStore.setGlobal', key, value);
           return {
             global: { ...state.global, [key]: value },
           };
@@ -200,16 +220,46 @@ export const useRusnStore = create<RusnState>()(
         })),
 
       updateCell: (id: string, key: keyof RusnCell, value: RusnCell[keyof RusnCell]) =>
-        set((state) => ({
-          cellConfigs: state.cellConfigs.map((cell) =>
-            cell.id === id ? { ...cell, [key]: value } : cell
-          ),
-        })),
+        set((state) => {
+          const index = state.cellConfigs.findIndex((cell) => cell.id === id);
+          if (index === -1) return state;
+
+          const cell = state.cellConfigs[index];
+          const currentValue = cell[key] as unknown as Record<string, unknown> | string | number | null | undefined;
+
+          // Избегаем лишних обновлений, если значение не изменилось
+          const isEqual = (() => {
+            if (currentValue === value) return true;
+            const isObject = (v: unknown) => v !== null && typeof v === 'object';
+            if (isObject(currentValue) && isObject(value)) {
+              try {
+                return JSON.stringify(currentValue) === JSON.stringify(value);
+              } catch {
+                return false;
+              }
+            }
+            return false;
+          })();
+
+          if (isEqual) return state;
+
+          const newCells = state.cellConfigs.map((c) =>
+            c.id === id ? { ...c, [key]: value } : c
+          );
+          return { cellConfigs: newCells };
+        }),
 
       removeCell: (id: string) =>
         set((state) => ({
           cellConfigs: state.cellConfigs.filter((cell) => cell.id !== id),
         })),
+      
+      clearAllCells: () =>
+        set((state) => {
+          return {
+            cellConfigs: [],
+          };
+        }),
 
       setBusMaterial: (material: BusMaterial) =>
         set((state) => ({
@@ -310,11 +360,6 @@ export const useRusnStore = create<RusnState>()(
         }),
       setBusBridgeSummary: (summary) =>
         set((state) => {
-          console.log('useRusnStore - setBusBridgeSummary:', {
-            currentSummary: state.busBridgeSummary,
-            newSummary: summary,
-            isEqual: JSON.stringify(state.busBridgeSummary) === JSON.stringify(summary),
-          });
 
           // Проверяем, изменились ли данные
           if (JSON.stringify(state.busBridgeSummary) === JSON.stringify(summary)) {
@@ -338,15 +383,26 @@ export const useRusnStore = create<RusnState>()(
             return { cellSummaries: newSummaries };
           }
           // Добавляем новую запись
-          return {
-            cellSummaries: [...state.cellSummaries, summary],
-          };
+          const newSummaries = [...state.cellSummaries, summary];
+          return { cellSummaries: newSummaries };
         }),
       removeCellSummary: (cellId) =>
-        set((state) => ({
-          cellSummaries: state.cellSummaries.filter((s) => s.cellId !== cellId),
-        })),
-      clearCellSummaries: () => set({ cellSummaries: [] }),
+        set((state) => {
+          const newSummaries = state.cellSummaries.filter((s) => s.cellId !== cellId);
+          return { cellSummaries: newSummaries };
+        }),
+      clearCellSummaries: () => 
+        set((state) => {
+          return { cellSummaries: [] };
+        }),
+      clearOldKso366Summaries: () =>
+        set((state) => {
+          const filteredSummaries = state.cellSummaries.filter(summary => {
+            const isOldKso366Entry = summary.name.includes('Ячейка Секционный разьединитель Камера КСО 366');
+            return !isOldKso366Entry;
+          });
+          return { cellSummaries: filteredSummaries };
+        }),
       setBusBridges: (bridges) => set({ busBridges: bridges }),
     }),
     {

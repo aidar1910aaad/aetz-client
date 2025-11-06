@@ -4,11 +4,13 @@ import { BusMaterial } from '@/types/rusn';
 import { switchgearApi, Switchgear } from '@/api/switchgear';
 import { useRusnCalculation } from '@/hooks/useRusnCalculation';
 import { calculateCost } from '@/utils/calculationUtils';
+import { useMaterialPrices } from '@/hooks/useMaterialPrices';
 
 export const useBusbarCalculation = () => {
   const rusn = useRusnStore();
   const { busBridge } = rusn.global;
   const [switchgearConfigs, setSwitchgearConfigs] = useState<Switchgear[]>([]);
+  const { aluminum: aluminumPrice, copper: copperPrice } = useMaterialPrices();
 
   // Получаем выбранную группу из localStorage
   const [selectedGroupSlug] = useState<string>(() => {
@@ -36,13 +38,13 @@ export const useBusbarCalculation = () => {
   const inputCell = rusn.cellConfigs.find((cell) => cell.purpose === 'Ввод');
   const selectedBreaker = inputCell?.breaker;
 
-  // Получаем цену за кг
+  // Получаем цену за кг (динамически из API)
   const getPricePerKg = (material: BusMaterial) => {
     if (material === 'АД' || material === 'АД2') {
-      return 2800;
+      return aluminumPrice;
     }
     if (material === 'МТ' || material === 'МТ2') {
-      return 5600;
+      return copperPrice;
     }
     return 0;
   };
@@ -208,9 +210,7 @@ export const useBusbarCalculation = () => {
       );
 
       if (busbarCalculation) {
-        console.log('Калькуляция для сборных шин:', busbarCalculation);
       } else {
-        console.log('Калькуляция с типом "busbar" не найдена');
       }
     }
   }, [selectedGroupSlug, calculations, calculationsLoading]);

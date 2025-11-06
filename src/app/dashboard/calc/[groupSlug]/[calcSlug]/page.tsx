@@ -8,9 +8,11 @@ import { CalculationEditForm } from './components/CalculationEditForm';
 import { Toast } from './components/Toast';
 import { updateCalculation } from '@/api/calculations';
 import { CalculationSummary } from './components/CalculationSummary';
+import RoleGuard from '@/components/common/RoleGuard';
+import { UserRole } from '@/types/user';
 
 interface CalculationMaterial {
-  id: number | null;
+  id?: number;
   name: string;
   unit: string;
   price: number;
@@ -28,7 +30,7 @@ interface CellMaterial {
   price: number;
   unit: string;
   code: string;
-  type: 'switch' | 'rza' | 'counter' | 'sr' | 'tsn' | 'tn' | 'tt' | 'pu' | 'disconnector' | 'busbar' | 'busbridge' | 'withdrawable_breaker' | 'molded_case_breaker';
+  type: 'switch' | 'rza' | 'counter' | 'sr' | 'tsn' | 'tn' | 'tt' | 'pu' | 'disconnector' | 'busbar' | 'busbridge' | 'withdrawable_breaker' | 'molded_case_breaker' | 'rps' | 'rubilnik';
 }
 
 interface CellConfiguration {
@@ -47,6 +49,8 @@ interface CellConfiguration {
     busbridge?: CellMaterial[];
     withdrawable_breaker?: CellMaterial[];
     molded_case_breaker?: CellMaterial[];
+    rps?: CellMaterial[];
+    rubilnik?: CellMaterial[];
   };
 }
 
@@ -72,6 +76,62 @@ interface Calculation {
   updatedAt?: string;
 }
 
+// Компонент-хелпер для отображения строки материала ячейки
+interface MaterialRowProps {
+  materials: CellMaterial[] | undefined;
+  label: string;
+  showSeparator?: boolean;
+}
+
+const MaterialRow = ({ materials, label, showSeparator }: MaterialRowProps) => {
+  if (!materials || materials.length === 0) return null;
+  
+  return (
+    <>
+      {materials.map((material, index) => (
+        <tr key={`${material.id}-${index}`}>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+            {index === 0 ? label : ''}
+          </td>
+          <td className="px-6 py-4 text-sm text-gray-900">
+            {material.name}
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+            {material.price.toLocaleString()} ₸
+          </td>
+        </tr>
+      ))}
+      {showSeparator && (
+        <tr>
+          <td colSpan={3} className="px-6 py-2">
+            <div className="border-t border-gray-100"></div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+};
+
+// Конфигурация материалов для отображения
+const MATERIAL_CONFIG = [
+  { key: 'switch', label: 'Выключатель' },
+  { key: 'withdrawable_breaker', label: 'Автомат выкатной' },
+  { key: 'molded_case_breaker', label: 'Автомат литой корпус' },
+  { key: 'rza', label: 'РЗА' },
+  { key: 'counter', label: 'Счетчик' },
+  { key: 'sr', label: 'СР' },
+  { key: 'tsn', label: 'ТСН' },
+  { key: 'tn', label: 'ТН' },
+  { key: 'tt', label: 'Трансформатор тока' },
+  { key: 'pu', label: 'ПУ' },
+  { key: 'disconnector', label: 'Разъединитель' },
+  { key: 'busbar', label: 'Сборные шины' },
+  { key: 'busbridge', label: 'Шинный мост' },
+  { key: 'rps', label: 'РПС' },
+  { key: 'rubilnik', label: 'Рубильник' },
+] as const;
+
+
 export default function CalculationDetailPage() {
   const { groupSlug, calcSlug } = useParams() as { groupSlug: string; calcSlug: string };
   const { fetchCalculation, selectedCalculation } = useCalculations();
@@ -92,6 +152,18 @@ export default function CalculationDetailPage() {
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No token found');
+
+      // Проверяем, что все материалы имеют валидные ID (только если есть материалы)
+      if (updatedCalculation.data.categories.some(cat => cat.items.length > 0)) {
+        const materialsWithoutId = updatedCalculation.data.categories.flatMap(cat => 
+          cat.items.filter(item => !item.id || item.id <= 0)
+        );
+        
+        if (materialsWithoutId.length > 0) {
+          const materialNames = materialsWithoutId.map(item => item.name || 'Без названия').join(', ');
+          throw new Error(`Следующие материалы не выбраны: ${materialNames}. Пожалуйста, выберите материалы из списка.`);
+        }
+      }
 
       // Validate and fix cell type if needed
       const validCellTypes = [
@@ -122,16 +194,18 @@ export default function CalculationDetailPage() {
       const payload = {
         name: updatedCalculation.name,
         data: {
-          categories: updatedCalculation.data.categories.map((cat: CalculationCategory) => ({
-            name: cat.name,
-            items: cat.items.map((item: CalculationMaterial) => ({
-              id: item.id || null,
-              name: item.name,
-              unit: item.unit,
-              price: Number(item.price),
-              quantity: Number(item.quantity),
+          categories: updatedCalculation.data.categories
+            .filter(cat => cat.items.length > 0) // Фильтруем только категории с материалами
+            .map((cat: CalculationCategory) => ({
+              name: cat.name,
+              items: cat.items.map((item: CalculationMaterial) => ({
+                id: item.id, // ID уже проверен выше, используем как есть
+                name: item.name,
+                unit: item.unit,
+                price: Number(item.price),
+                quantity: Number(item.quantity),
+              })),
             })),
-          })),
           calculation: {
             manufacturingHours: Number(updatedCalculation.data.calculation.manufacturingHours),
             hourlyRate: Number(updatedCalculation.data.calculation.hourlyRate),
@@ -153,20 +227,32 @@ export default function CalculationDetailPage() {
       };
 
       console.log('🔍 Debug - Final payload cellConfig.materials:', payload.data.cellConfig.materials);
-
-
+      console.log('🔍 Debug - Final payload categories:', payload.data.categories);
+      console.log('🔍 Debug - Complete payload:', JSON.stringify(payload, null, 2));
 
       await updateCalculation(groupSlug, calcSlug, payload, token);
       await fetchCalculation(groupSlug, calcSlug);
-      setIsEditing(false);
+      // setIsEditing(false); // Убираем, чтобы остаться в режиме редактирования
       setToast({ message: 'Калькуляция успешно обновлена', type: 'success' });
     } catch (error) {
       console.error('❌ Error updating calculation:', error);
       setToast({ message: 'Ошибка при обновлении калькуляции', type: 'error' });
+      // При ошибке предлагаем пользователю решить, остаться в режиме редактирования или выйти
+      if (confirm('Произошла ошибка при сохранении. Хотите остаться в режиме редактирования для исправления ошибки?')) {
+        // Пользователь хочет остаться в режиме редактирования
+        console.log('Пользователь остался в режиме редактирования для исправления ошибки');
+      } else {
+        // Пользователь хочет выйти из режима редактирования
+        setIsEditing(false);
+      }
     }
   };
 
   const handleCancel = () => {
+    setIsEditing(false);
+  };
+
+  const handleFinishEditing = () => {
     setIsEditing(false);
   };
 
@@ -198,16 +284,50 @@ export default function CalculationDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <RoleGuard
+      allowedRoles={[UserRole.ADMIN, UserRole.PTO]}
+      redirectTo="/dashboard"
+      pagePath={`/dashboard/calc/${groupSlug}/${calcSlug}`}
+    >
+      <div className="h-[calc(100vh-65px)] overflow-y-auto bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-lg shadow-sm p-6">
           <CalculationHeader name={selectedCalculation.name} onEdit={handleEdit} />
 
           {isEditing ? (
             <CalculationEditForm
-              calculation={selectedCalculation}
+              calculation={{
+                id: selectedCalculation.id,
+                name: selectedCalculation.name,
+                slug: selectedCalculation.slug,
+                data: {
+                  categories: selectedCalculation.data.categories.map(cat => ({
+                    name: cat.name,
+                    items: cat.items.map(item => ({
+                      id: (item as any).id,
+                      name: item.name,
+                      unit: item.unit,
+                      price: item.price,
+                      quantity: item.quantity,
+                    })),
+                  })),
+                  calculation: {
+                    manufacturingHours: selectedCalculation.data.calculation?.manufacturingHours || 1,
+                    hourlyRate: selectedCalculation.data.calculation?.hourlyRate || 2000,
+                    overheadPercentage: selectedCalculation.data.calculation?.overheadPercentage || 10,
+                    adminPercentage: selectedCalculation.data.calculation?.adminPercentage || 15,
+                    plannedProfitPercentage: selectedCalculation.data.calculation?.plannedProfitPercentage || 10,
+                    ndsPercentage: selectedCalculation.data.calculation?.ndsPercentage || 12,
+                  },
+                  cellConfig: selectedCalculation.data.cellConfig ? {
+                    type: (selectedCalculation.data.cellConfig.type as any) || '10kv',
+                    materials: selectedCalculation.data.cellConfig.materials || {},
+                  } as CellConfiguration : undefined,
+                },
+              }}
               onSave={handleSave}
               onCancel={handleCancel}
+              onFinishEditing={handleFinishEditing}
             />
           ) : (
             <div className="space-y-8">
@@ -254,354 +374,17 @@ export default function CalculationDetailPage() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {selectedCalculation.data.cellConfig.materials.switch &&
-                            selectedCalculation.data.cellConfig.materials.switch.length > 0 && (
-                              <tr>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                  Выключатель
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                  {Array.isArray(
-                                    selectedCalculation.data.cellConfig.materials.switch
-                                  )
-                                    ? selectedCalculation.data.cellConfig.materials.switch
-                                        .map((item: CellMaterial) => item.name)
-                                        .join(', ')
-                                    : selectedCalculation.data.cellConfig.materials.switch?.name ||
-                                      ''}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                                  {Array.isArray(
-                                    selectedCalculation.data.cellConfig.materials.switch
-                                  )
-                                    ? selectedCalculation.data.cellConfig.materials.switch
-                                        .reduce((sum, item) => sum + item.price, 0)
-                                        .toLocaleString()
-                                    : selectedCalculation.data.cellConfig.materials.switch?.price?.toLocaleString() ||
-                                      '0'}{' '}
-                                  ₸
-                                </td>
-                              </tr>
-                            )}
-                          {selectedCalculation.data.cellConfig.materials.withdrawable_breaker &&
-                            selectedCalculation.data.cellConfig.materials.withdrawable_breaker.length > 0 && (
-                              <tr>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                  Автомат выкатной
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                  {Array.isArray(
-                                    selectedCalculation.data.cellConfig.materials.withdrawable_breaker
-                                  )
-                                    ? selectedCalculation.data.cellConfig.materials.withdrawable_breaker
-                                        .map((item: CellMaterial) => item.name)
-                                        .join(', ')
-                                    : selectedCalculation.data.cellConfig.materials.withdrawable_breaker?.name ||
-                                      ''}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                                  {Array.isArray(
-                                    selectedCalculation.data.cellConfig.materials.withdrawable_breaker
-                                  )
-                                    ? selectedCalculation.data.cellConfig.materials.withdrawable_breaker
-                                        .reduce((sum, item) => sum + item.price, 0)
-                                        .toLocaleString()
-                                    : selectedCalculation.data.cellConfig.materials.withdrawable_breaker?.price?.toLocaleString() ||
-                                      '0'}{' '}
-                                  ₸
-                                </td>
-                              </tr>
-                            )}
-                          {selectedCalculation.data.cellConfig.materials.molded_case_breaker &&
-                            selectedCalculation.data.cellConfig.materials.molded_case_breaker.length > 0 && (
-                              <tr>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                  Автомат литой корпус
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                  {Array.isArray(
-                                    selectedCalculation.data.cellConfig.materials.molded_case_breaker
-                                  )
-                                    ? selectedCalculation.data.cellConfig.materials.molded_case_breaker
-                                        .map((item: CellMaterial) => item.name)
-                                        .join(', ')
-                                    : selectedCalculation.data.cellConfig.materials.molded_case_breaker?.name ||
-                                      ''}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                                  {Array.isArray(
-                                    selectedCalculation.data.cellConfig.materials.molded_case_breaker
-                                  )
-                                    ? selectedCalculation.data.cellConfig.materials.molded_case_breaker
-                                        .reduce((sum, item) => sum + item.price, 0)
-                                        .toLocaleString()
-                                    : selectedCalculation.data.cellConfig.materials.molded_case_breaker?.price?.toLocaleString() ||
-                                      '0'}{' '}
-                                  ₸
-                                </td>
-                              </tr>
-                            )}
-                          {selectedCalculation.data.cellConfig.materials.rza &&
-                            selectedCalculation.data.cellConfig.materials.rza.length > 0 && (
-                              <tr>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                  РЗА
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                  {Array.isArray(selectedCalculation.data.cellConfig.materials.rza)
-                                    ? selectedCalculation.data.cellConfig.materials.rza
-                                        .map((item: CellMaterial) => item.name)
-                                        .join(', ')
-                                    : selectedCalculation.data.cellConfig.materials.rza?.name || ''}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                                  {Array.isArray(selectedCalculation.data.cellConfig.materials.rza)
-                                    ? selectedCalculation.data.cellConfig.materials.rza
-                                        .reduce((sum, item) => sum + item.price, 0)
-                                        .toLocaleString()
-                                    : selectedCalculation.data.cellConfig.materials.rza?.price?.toLocaleString() ||
-                                      '0'}{' '}
-                                  ₸
-                                </td>
-                              </tr>
-                            )}
-                          {selectedCalculation.data.cellConfig.materials.counter &&
-                            selectedCalculation.data.cellConfig.materials.counter.length > 0 && (
-                              <tr>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                  Счетчик
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                  {Array.isArray(
-                                    selectedCalculation.data.cellConfig.materials.counter
-                                  )
-                                    ? selectedCalculation.data.cellConfig.materials.counter
-                                        .map((item: CellMaterial) => item.name)
-                                        .join(', ')
-                                    : selectedCalculation.data.cellConfig.materials.counter?.name ||
-                                      ''}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                                  {Array.isArray(
-                                    selectedCalculation.data.cellConfig.materials.counter
-                                  )
-                                    ? selectedCalculation.data.cellConfig.materials.counter
-                                        .reduce((sum, item) => sum + item.price, 0)
-                                        .toLocaleString()
-                                    : selectedCalculation.data.cellConfig.materials.counter?.price?.toLocaleString() ||
-                                      '0'}{' '}
-                                  ₸
-                                </td>
-                              </tr>
-                            )}
-                          {selectedCalculation.data.cellConfig.materials.sr &&
-                            selectedCalculation.data.cellConfig.materials.sr.length > 0 && (
-                              <tr>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                  СР
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                  {Array.isArray(selectedCalculation.data.cellConfig.materials.sr)
-                                    ? selectedCalculation.data.cellConfig.materials.sr
-                                        .map((item: CellMaterial) => item.name)
-                                        .join(', ')
-                                    : selectedCalculation.data.cellConfig.materials.sr?.name || ''}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                                  {Array.isArray(selectedCalculation.data.cellConfig.materials.sr)
-                                    ? selectedCalculation.data.cellConfig.materials.sr
-                                        .reduce((sum, item) => sum + item.price, 0)
-                                        .toLocaleString()
-                                    : selectedCalculation.data.cellConfig.materials.sr?.price?.toLocaleString() ||
-                                      '0'}{' '}
-                                  ₸
-                                </td>
-                              </tr>
-                            )}
-                          {selectedCalculation.data.cellConfig.materials.tsn &&
-                            selectedCalculation.data.cellConfig.materials.tsn.length > 0 && (
-                              <tr>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                  ТСН
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                  {Array.isArray(selectedCalculation.data.cellConfig.materials.tsn)
-                                    ? selectedCalculation.data.cellConfig.materials.tsn
-                                        .map((item: CellMaterial) => item.name)
-                                        .join(', ')
-                                    : selectedCalculation.data.cellConfig.materials.tsn?.name || ''}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                                  {Array.isArray(selectedCalculation.data.cellConfig.materials.tsn)
-                                    ? selectedCalculation.data.cellConfig.materials.tsn
-                                        .reduce((sum, item) => sum + item.price, 0)
-                                        .toLocaleString()
-                                    : selectedCalculation.data.cellConfig.materials.tsn?.price?.toLocaleString() ||
-                                      '0'}{' '}
-                                  ₸
-                                </td>
-                              </tr>
-                            )}
-                          {selectedCalculation.data.cellConfig.materials.tn &&
-                            selectedCalculation.data.cellConfig.materials.tn.length > 0 && (
-                              <tr>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                  ТН
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                  {Array.isArray(selectedCalculation.data.cellConfig.materials.tn)
-                                    ? selectedCalculation.data.cellConfig.materials.tn
-                                        .map((item: CellMaterial) => item.name)
-                                        .join(', ')
-                                    : selectedCalculation.data.cellConfig.materials.tn?.name || ''}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                                  {Array.isArray(selectedCalculation.data.cellConfig.materials.tn)
-                                    ? selectedCalculation.data.cellConfig.materials.tn
-                                        .reduce((sum, item) => sum + item.price, 0)
-                                        .toLocaleString()
-                                    : selectedCalculation.data.cellConfig.materials.tn?.price?.toLocaleString() ||
-                                      '0'}{' '}
-                                  ₸
-                                </td>
-                              </tr>
-                            )}
-                          {selectedCalculation.data.cellConfig.materials.tt &&
-                            selectedCalculation.data.cellConfig.materials.tt.length > 0 && (
-                              <tr>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                  Трансформатор тока
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                  {Array.isArray(selectedCalculation.data.cellConfig.materials.tt)
-                                    ? selectedCalculation.data.cellConfig.materials.tt
-                                        .map((item: CellMaterial) => item.name)
-                                        .join(', ')
-                                    : selectedCalculation.data.cellConfig.materials.tt?.name || ''}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                                  {Array.isArray(selectedCalculation.data.cellConfig.materials.tt)
-                                    ? selectedCalculation.data.cellConfig.materials.tt
-                                        .reduce((sum, item) => sum + item.price, 0)
-                                        .toLocaleString()
-                                    : selectedCalculation.data.cellConfig.materials.tt?.price?.toLocaleString() ||
-                                      '0'}{' '}
-                                  ₸
-                                </td>
-                              </tr>
-                            )}
-                          {selectedCalculation.data.cellConfig.materials.pu &&
-                            selectedCalculation.data.cellConfig.materials.pu.length > 0 && (
-                              <tr>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                  ПУ
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                  {Array.isArray(selectedCalculation.data.cellConfig.materials.pu)
-                                    ? selectedCalculation.data.cellConfig.materials.pu
-                                        .map((item: CellMaterial) => item.name)
-                                        .join(', ')
-                                    : selectedCalculation.data.cellConfig.materials.pu?.name || ''}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                                  {Array.isArray(selectedCalculation.data.cellConfig.materials.pu)
-                                    ? selectedCalculation.data.cellConfig.materials.pu
-                                        .reduce((sum, item) => sum + item.price, 0)
-                                        .toLocaleString()
-                                    : selectedCalculation.data.cellConfig.materials.pu?.price?.toLocaleString() ||
-                                      '0'}{' '}
-                                  ₸
-                                </td>
-                              </tr>
-                            )}
-                          {selectedCalculation.data.cellConfig.materials.disconnector &&
-                            selectedCalculation.data.cellConfig.materials.disconnector.length >
-                              0 && (
-                              <tr>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                  Разъединитель
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                  {Array.isArray(
-                                    selectedCalculation.data.cellConfig.materials.disconnector
-                                  )
-                                    ? selectedCalculation.data.cellConfig.materials.disconnector
-                                        .map((item: CellMaterial) => item.name)
-                                        .join(', ')
-                                    : selectedCalculation.data.cellConfig.materials.disconnector
-                                        ?.name || ''}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                                  {Array.isArray(
-                                    selectedCalculation.data.cellConfig.materials.disconnector
-                                  )
-                                    ? selectedCalculation.data.cellConfig.materials.disconnector
-                                        .reduce((sum, item) => sum + item.price, 0)
-                                        .toLocaleString()
-                                    : selectedCalculation.data.cellConfig.materials.disconnector?.price?.toLocaleString() ||
-                                      '0'}{' '}
-                                  ₸
-                                </td>
-                              </tr>
-                            )}
-                          {selectedCalculation.data.cellConfig.materials.busbar &&
-                            selectedCalculation.data.cellConfig.materials.busbar.length > 0 && (
-                              <tr>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                  Сборные шины
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                  {Array.isArray(
-                                    selectedCalculation.data.cellConfig.materials.busbar
-                                  )
-                                    ? selectedCalculation.data.cellConfig.materials.busbar
-                                        .map((item: CellMaterial) => item.name)
-                                        .join(', ')
-                                    : selectedCalculation.data.cellConfig.materials.busbar?.name ||
-                                      ''}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                                  {Array.isArray(
-                                    selectedCalculation.data.cellConfig.materials.busbar
-                                  )
-                                    ? selectedCalculation.data.cellConfig.materials.busbar
-                                        .reduce((sum, item) => sum + item.price, 0)
-                                        .toLocaleString()
-                                    : selectedCalculation.data.cellConfig.materials.busbar?.price?.toLocaleString() ||
-                                      '0'}{' '}
-                                  ₸
-                                </td>
-                              </tr>
-                            )}
-                          {selectedCalculation.data.cellConfig.materials.busbridge &&
-                            selectedCalculation.data.cellConfig.materials.busbridge.length > 0 && (
-                              <tr>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                  Шинный мост
-                                </td>
-                                <td className="px-6 py-4 text-sm text-gray-900">
-                                  {Array.isArray(
-                                    selectedCalculation.data.cellConfig.materials.busbridge
-                                  )
-                                    ? selectedCalculation.data.cellConfig.materials.busbridge
-                                        .map((item: CellMaterial) => item.name)
-                                        .join(', ')
-                                    : selectedCalculation.data.cellConfig.materials.busbridge
-                                        ?.name || ''}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                                  {Array.isArray(
-                                    selectedCalculation.data.cellConfig.materials.busbridge
-                                  )
-                                    ? selectedCalculation.data.cellConfig.materials.busbridge
-                                        .reduce((sum, item) => sum + item.price, 0)
-                                        .toLocaleString()
-                                    : selectedCalculation.data.cellConfig.materials.busbridge?.price?.toLocaleString() ||
-                                      '0'}{' '}
-                                  ₸
-                                </td>
-                              </tr>
-                            )}
+                          {MATERIAL_CONFIG.map(({ key, label }, index) => {
+                            const materials = selectedCalculation.data.cellConfig?.materials[key as keyof typeof selectedCalculation.data.cellConfig.materials];
+                            return (
+                              <MaterialRow
+                                key={key}
+                                materials={materials}
+                                label={label}
+                                showSeparator={index < MATERIAL_CONFIG.length - 1 && materials && materials.length > 0}
+                              />
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -690,7 +473,14 @@ export default function CalculationDetailPage() {
                 totalMaterialsCost={calculateTotalMaterialsCost()}
                 onValuesChange={() => {}}
                 isReadOnly={true}
-                initialValues={selectedCalculation.data?.calculation}
+                initialValues={{
+                  manufacturingHours: selectedCalculation.data?.calculation?.manufacturingHours || 1,
+                  hourlyRate: selectedCalculation.data?.calculation?.hourlyRate || 2000,
+                  overheadPercentage: selectedCalculation.data?.calculation?.overheadPercentage || 10,
+                  adminPercentage: selectedCalculation.data?.calculation?.adminPercentage || 15,
+                  plannedProfitPercentage: selectedCalculation.data?.calculation?.plannedProfitPercentage || 10,
+                  ndsPercentage: selectedCalculation.data?.calculation?.ndsPercentage || 12,
+                }}
               />
             </div>
           )}
@@ -699,5 +489,6 @@ export default function CalculationDetailPage() {
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
+    </RoleGuard>
   );
 }

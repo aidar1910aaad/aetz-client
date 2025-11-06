@@ -7,7 +7,7 @@ import CalculationEditActions from './CalculationEditActions';
 import { CellConfiguration, CellType } from '@/types/calculation';
 
 interface CalculationMaterial {
-  id: number;
+  id?: number;
   name: string;
   unit: string;
   price: number;
@@ -41,11 +41,12 @@ interface Calculation {
 
 interface CalculationEditFormProps {
   calculation: Calculation;
-  onSave: (updatedCalculation: Calculation) => void;
+  onSave: (updatedCalculation: Calculation) => Promise<void>;
   onCancel: () => void;
+  onFinishEditing?: () => void; // Новая опция для завершения редактирования
 }
 
-export function CalculationEditForm({ calculation, onSave, onCancel }: CalculationEditFormProps) {
+export function CalculationEditForm({ calculation, onSave, onCancel, onFinishEditing }: CalculationEditFormProps) {
   const [name, setName] = useState(calculation.name);
   const [categories, setCategories] = useState<CalculationCategory[]>(calculation.data.categories);
   const [cellConfig, setCellConfig] = useState<CellConfiguration | undefined>(
@@ -99,7 +100,16 @@ export function CalculationEditForm({ calculation, onSave, onCancel }: Calculati
     }, 0);
   };
 
+  // Проверяем валидность названия
+  const isNameValid = name.trim().length >= 3;
+
   const handleSave = () => {
+    // Дополнительная проверка перед сохранением
+    if (!isNameValid) {
+      alert('Название калькуляции должно содержать минимум 3 символа.');
+      return;
+    }
+
     const updatedCalculation: Calculation = {
       ...calculation,
       name,
@@ -122,15 +132,32 @@ export function CalculationEditForm({ calculation, onSave, onCancel }: Calculati
       <div className="space-y-4">
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-            Название калькуляции
+            Название калькуляции <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             id="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#3A55DF] focus:border-[#3A55DF]"
+            className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#3A55DF] transition-colors ${
+              name.trim().length > 0 && name.trim().length < 3
+                ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                : name.trim().length >= 3
+                ? 'border-green-300 focus:border-green-500 focus:ring-green-500'
+                : 'border-gray-300 focus:border-[#3A55DF]'
+            }`}
+            placeholder="Введите название калькуляции (минимум 3 символа)"
           />
+          {name.trim().length > 0 && name.trim().length < 3 && (
+            <p className="mt-1 text-sm text-red-600">
+              Название должно содержать минимум 3 символа
+            </p>
+          )}
+          {name.trim().length >= 3 && (
+            <p className="mt-1 text-sm text-green-600">
+              ✓ Название корректно
+            </p>
+          )}
         </div>
       </div>
 
@@ -152,6 +179,10 @@ export function CalculationEditForm({ calculation, onSave, onCancel }: Calculati
               disconnector: [],
               busbar: [],
               busbridge: [],
+              withdrawable_breaker: [],
+              molded_case_breaker: [],
+              rps: [],
+              rubilnik: [],
             },
           }
         }
@@ -173,7 +204,13 @@ export function CalculationEditForm({ calculation, onSave, onCancel }: Calculati
         initialValues={calculationValues}
       />
 
-      <CalculationEditActions onCancel={onCancel} onSave={handleSave} />
+      <CalculationEditActions 
+        onCancel={onCancel} 
+        onSave={handleSave} 
+        onFinishEditing={onFinishEditing}
+        isSaveDisabled={!isNameValid}
+        saveDisabledMessage="Название должно содержать минимум 3 символа"
+      />
     </div>
   );
 }

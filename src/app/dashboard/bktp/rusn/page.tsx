@@ -1,21 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTransformerStore } from '@/store/useTransformerStore';
 import { useRusnStore } from '@/store/useRusnStore';
-import Link from 'next/link';
-import RusnFormFields from './RusnFormFields';
+import RusnFormFields from './layout/RusnFormFields';
 import { RusnNotConfigured } from '@/components/bktp/rusn/RusnNotConfigured';
 import { RusnNextStepButton } from '@/components/bktp/rusn/RusnNextStepButton';
-import { RusnStatusCard } from '@/components/bktp/rusn/RusnStatusCard';
-import RusnHeader from './components/RusnHeader';
-import RusnModeSelector from './components/RusnModeSelector';
+import RusnHeader from './layout/RusnHeader';
+import RusnModeSelector from './layout/RusnModeSelector';
 
 type RusnMode = 'configured' | 'not-configured';
 
 export default function RusnConfigurator() {
   const { selectedTransformer } = useTransformerStore();
-  const { cellConfigs } = useRusnStore();
+  const { cellConfigs, clearAllCells } = useRusnStore();
   const voltage = selectedTransformer?.voltage || '10';
 
   // Определяем режим на основе наличия конфигурации
@@ -23,92 +21,85 @@ export default function RusnConfigurator() {
     cellConfigs.length > 0 ? 'configured' : 'not-configured'
   );
 
+  // Синхронизируем режим с состоянием store при изменении cellConfigs
+  // НО только если режим еще не был установлен пользователем
+  useEffect(() => {
+    const hasConfiguration = cellConfigs.length > 0;
+    // Переключаем режим только если:
+    // 1. Есть конфигурация и текущий режим "not-configured" (первая загрузка)
+    // 2. Нет конфигурации и пользователь явно выбрал "not-configured"
+    if (hasConfiguration && mode === 'not-configured') {
+      setMode('configured');
+    }
+    // НЕ переключаем на "not-configured" автоматически при очистке ячеек
+  }, [cellConfigs, mode]);
+  
+  // Текущая активная вкладка
+  const [currentTab, setCurrentTab] = useState<'main' | 'bus-bridge'>('main');
+
   const handleModeChange = (newMode: RusnMode) => {
     setMode(newMode);
     if (newMode === 'not-configured') {
       // Очищаем конфигурацию при выборе "не предусмотрено"
-      // Можно добавить подтверждение
+      clearAllCells();
     }
   };
 
   return (
-    <div className="h-[calc(100vh-110px)] overflow-y-auto bg-gray-50">
-      {/* Header */}
-      <RusnHeader voltage={voltage} cellCount={cellConfigs.length} />
+    <div className="h-[calc(100vh-64px)] bg-white overflow-y-auto">
+      <div className="p-6">
+        {/* Header */}
+        <RusnHeader voltage={voltage} cellCount={cellConfigs.length} />
 
-      {/* Mode Selector */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <RusnModeSelector mode={mode} onModeChange={handleModeChange} />
-      </div>
+        {/* Mode Selector */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-lg mb-6">
+          <RusnModeSelector mode={mode} onModeChange={handleModeChange} />
+        </div>
 
-      {/* Main Content */}
-      <div className="px-6 py-6">
-        {mode === 'configured' ? (
-          <div className="space-y-6">
-            {/* Status Card */}
-            <RusnStatusCard voltage={voltage} />
 
-            {/* Configuration Form */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Конфигурация РУСН-{voltage}кВ
-                </h2>
-              </div>
-              <div className="p-6">
-                <RusnFormFields />
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Not Configured Status */}
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    fillRule="evenodd"
-                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                <div>
-                  <h3 className="text-sm font-medium text-gray-900">
-                    РУСН-{voltage}кВ не предусмотрен
-                  </h3>
-                  <p className="text-sm text-gray-700">В данной конфигурации РУСН не требуется</p>
+        {/* Main Content */}
+        <div className="space-y-6">
+          {mode === 'configured' ? (
+            <div className="space-y-6">
+              {/* Configuration Form */}
+              <div className="bg-white border border-gray-200 rounded-2xl shadow-lg">
+                <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200">
+                  <div className="p-2 bg-gray-100 rounded-lg">
+                    <svg className="w-5 h-5 text-[#8eba1e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-lg font-bold text-gray-900">
+                    Конфигурация РУСН-{voltage}кВ
+                  </h2>
+                </div>
+                <div className="p-6">
+                  <RusnFormFields currentTab={currentTab} onTabChange={setCurrentTab} />
                 </div>
               </div>
             </div>
-
-            {/* Not Configured Component */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">РУСН-{voltage}кВ</h2>
-              </div>
-              <div className="p-6">
-                <RusnNotConfigured />
+          ) : (
+            <div className="space-y-6">
+              {/* Not Configured Component */}
+              <div className="bg-white border border-gray-200 rounded-2xl shadow-lg">
+                <div className="p-6">
+                  <RusnNotConfigured />
+                </div>
               </div>
             </div>
+          )}
+
+          {/* Navigation */}
+          <div className="mt-8 flex justify-start">
+            <RusnNextStepButton 
+              skip={mode === 'not-configured'} 
+              currentTab={currentTab}
+              onSwitchToBusbar={() => {
+                // Переключаемся на вкладку "Сборные шины"
+                setCurrentTab('bus-bridge');
+              }}
+            />
           </div>
-        )}
-
-        {/* Navigation */}
-        <div className="mt-8 flex justify-between items-center">
-          <Link href="/dashboard/bktp/bmz">
-            <button className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors text-sm font-medium flex items-center gap-2">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              Назад к БМЗ
-            </button>
-          </Link>
-
-          <RusnNextStepButton skip={mode === 'not-configured'} />
         </div>
       </div>
     </div>

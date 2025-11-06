@@ -4,6 +4,7 @@ import React from 'react';
 import { useBmzStore } from '@/store/useBmzStore';
 import { BmzSettings } from '@/api/bmz';
 import { formatNumber } from '@/utils/formatNumber';
+import { Settings, Check, X } from 'lucide-react';
 
 interface BmzOptionsProps {
   state: Record<string, boolean>;
@@ -30,12 +31,19 @@ const BmzOptions = ({
   if (!bmz.settings) return null;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-      <h3 className="text-lg font-medium text-gray-900 mb-4">Дополнительное оборудование</h3>
-      <div className="grid grid-cols-2 gap-4">
-        {bmz.settings.equipment.map((equipment) => {
-         
-
+    <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-lg relative z-10">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2 bg-gray-100 rounded-lg">
+          <Settings className="w-5 h-5 text-[#8eba1e]" />
+        </div>
+        <h3 className="text-xl font-bold text-gray-900">Дополнительное оборудование</h3>
+      </div>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-8 relative z-10">
+        {/* Первая колонка */}
+        <div className="space-y-4">
+          <h4 className="text-lg font-semibold text-gray-800 mb-4">Основное оборудование</h4>
+          {bmz.settings.equipment.slice(0, Math.ceil(bmz.settings.equipment.length / 2)).map((equipment) => {
           const stateKey = equipment.name.toLowerCase().replace(/\s+/g, '');
           let price = 0;
           let quantity = 0;
@@ -56,53 +64,149 @@ const BmzOptions = ({
           }
 
           const totalPrice = price * quantity;
+          const isSelected = state[stateKey] || false;
 
           return (
             <label
               key={equipment.name}
-              className={`flex flex-col p-4 border rounded-lg transition-colors ${
+              className={`flex items-center justify-between p-6 border-2 rounded-2xl transition-all duration-200 cursor-pointer relative z-20 bg-white ${
                 isDisabled
-                  ? 'opacity-50 cursor-not-allowed bg-gray-50'
-                  : state[stateKey]
-                  ? 'bg-blue-50 border-blue-200 hover:bg-blue-100'
-                  : 'hover:bg-gray-50'
+                  ? 'opacity-50 cursor-not-allowed bg-gray-50 border-gray-200'
+                  : isSelected
+                  ? 'bg-[#8eba1e]/10 border-[#8eba1e] hover:bg-[#8eba1e]/20 shadow-lg'
+                  : 'border-gray-200 hover:border-[#8eba1e] hover:bg-[#8eba1e]/5'
               }`}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    checked={state[stateKey] || false}
-                    onChange={(e) => setField(equipment.name, e.target.checked)}
-                    disabled={isDisabled || disabled}
-                    className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="font-medium text-gray-900">{equipment.name}</span>
+              <div className="flex items-center space-x-4">
+                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-200 ${
+                  isSelected 
+                    ? 'bg-[#8eba1e] border-[#8eba1e]' 
+                    : 'border-gray-300'
+                }`}>
+                  {isSelected && <Check className="w-4 h-4 text-white" />}
                 </div>
-                {state[stateKey] && (
-                  <div className="text-right">
-                    <div className="text-sm font-semibold text-blue-600">
-                      {formatNumber(totalPrice)} тг
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {equipment.priceType === 'fixed' ? (
-                        '1 компл.'
-                      ) : (
-                        <>
-                          {formatNumber(price)} тг/м² ×{' '}
-                          {equipment.priceType === 'perHalfSquareMeter'
-                            ? `${(roundedArea / 2).toFixed(2)}`
-                            : `${roundedArea}`}{' '}
-                          м²
-                        </>
-                      )}
-                    </div>
+                <div>
+                  <span className="font-semibold text-gray-900 text-lg">{equipment.name}</span>
+                  <div className="text-sm text-gray-600 mt-1">
+                    {equipment.priceType === 'fixed' ? (
+                      '1 компл.'
+                    ) : (
+                      <>
+                        {formatNumber(price)} тг/м² ×{' '}
+                        {equipment.priceType === 'perHalfSquareMeter'
+                          ? `${(roundedArea / 2).toFixed(2)}`
+                          : `${roundedArea}`}{' '}
+                        м²
+                      </>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
+              
+              <div className="text-right">
+                <div className="text-lg font-bold text-[#8eba1e]">
+                  {formatNumber(totalPrice)} тг
+                </div>
+                <div className="text-sm text-gray-500">
+                  {isSelected ? 'Выбрано' : 'Не выбрано'}
+                </div>
+              </div>
+              
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={(e) => setField(equipment.name, e.target.checked)}
+                disabled={isDisabled || disabled}
+                className="sr-only"
+              />
             </label>
           );
         })}
+        </div>
+        
+        {/* Вторая колонка */}
+        <div className="space-y-4">
+          <h4 className="text-lg font-semibold text-gray-800 mb-4">Дополнительное оборудование</h4>
+          {bmz.settings.equipment.slice(Math.ceil(bmz.settings.equipment.length / 2)).map((equipment) => {
+          const stateKey = equipment.name.toLowerCase().replace(/\s+/g, '');
+          let price = 0;
+          let quantity = 0;
+          let unit = '';
+
+          if (equipment.priceType === 'perSquareMeter') {
+            price = equipment.pricePerSquareMeter || 0;
+            quantity = roundedArea;
+            unit = 'м²';
+          } else if (equipment.priceType === 'perHalfSquareMeter') {
+            price = equipment.pricePerSquareMeter || 0;
+            quantity = roundedArea / 2;
+            unit = 'м²';
+          } else if (equipment.priceType === 'fixed') {
+            price = equipment.fixedPrice || 0;
+            quantity = 1;
+            unit = 'компл.';
+          }
+
+          const totalPrice = price * quantity;
+          const isSelected = state[stateKey] || false;
+
+          return (
+            <label
+              key={equipment.name}
+              className={`flex items-center justify-between p-6 border-2 rounded-2xl transition-all duration-200 cursor-pointer relative z-20 bg-white ${
+                isDisabled
+                  ? 'opacity-50 cursor-not-allowed bg-gray-50 border-gray-200'
+                  : isSelected
+                  ? 'bg-[#8eba1e]/10 border-[#8eba1e] hover:bg-[#8eba1e]/20 shadow-lg'
+                  : 'border-gray-200 hover:border-[#8eba1e] hover:bg-[#8eba1e]/5'
+              }`}
+            >
+              <div className="flex items-center space-x-4">
+                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-200 ${
+                  isSelected 
+                    ? 'bg-[#8eba1e] border-[#8eba1e]' 
+                    : 'border-gray-300'
+                }`}>
+                  {isSelected && <Check className="w-4 h-4 text-white" />}
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-900 text-lg">{equipment.name}</span>
+                  <div className="text-sm text-gray-600 mt-1">
+                    {equipment.priceType === 'fixed' ? (
+                      '1 компл.'
+                    ) : (
+                      <>
+                        {formatNumber(price)} тг/м² ×{' '}
+                        {equipment.priceType === 'perHalfSquareMeter'
+                          ? `${(roundedArea / 2).toFixed(2)}`
+                          : `${roundedArea}`}{' '}
+                        м²
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="text-right">
+                <div className="text-lg font-bold text-[#8eba1e]">
+                  {formatNumber(totalPrice)} тг
+                </div>
+                <div className="text-sm text-gray-500">
+                  {isSelected ? 'Выбрано' : 'Не выбрано'}
+                </div>
+              </div>
+              
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={(e) => setField(equipment.name, e.target.checked)}
+                disabled={isDisabled || disabled}
+                className="sr-only"
+              />
+            </label>
+          );
+        })}
+        </div>
       </div>
     </div>
   );

@@ -8,6 +8,16 @@ import LoaderOverlay from '@/shared/loader/PageLoader';
 import { ConfirmDialog } from '@/components/ui/confirm';
 import { ToastContainer } from '@/components/ui/toast';
 
+export const metadata: Metadata = {
+  title: 'AETZ Client',
+  description: 'AETZ Client Application',
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+  },
+};
+
 const montserrat = Montserrat({
   variable: '--font-montserrat',
   subsets: ['latin', 'cyrillic'], // обязательно для русского

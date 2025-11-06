@@ -1,15 +1,19 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   getAllMaterials,
   createMaterial,
   updateMaterial,
   deleteMaterial,
   getMaterialHistory,
+  getMaterialHistoryList,
   Material,
   CreateMaterialRequest,
   UpdateMaterialRequest,
   MaterialHistoryItem,
+  MaterialHistoryWithMaterial,
   GetMaterialsParams,
+  GetMaterialHistoryParams,
 } from '../api/material/index';
 import { searchMaterials } from '../api/material';
 import { getAllCategories, Category } from '@/api/categories';
@@ -17,14 +21,14 @@ import { showToast } from '@/shared/modals/ToastProvider';
 import { showConfirm } from '@/shared/modals/ConfirmModal';
 import { useDebounce } from '@/hooks/useDebounce';
 
-console.log('DEBUG updateMaterial:', updateMaterial);
 
 export function useMaterials() {
+  const searchParams = useSearchParams();
   const [materials, setMaterials] = useState<Material[]>([]);
   const [total, setTotal] = useState(0);
 
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [limit, setLimit] = useState(50);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<'name' | 'price' | 'code'>('name');
   const [order, setOrder] = useState<'ASC' | 'DESC'>('ASC');
@@ -44,28 +48,41 @@ export function useMaterials() {
     const fetchCategories = async () => {
       try {
         const token = localStorage.getItem('token') || '';
-        console.log('Fetching categories...');
         const cats = await getAllCategories(token);
-        console.log('Received categories:', cats);
         setAllCategories(cats);
+        
+        // Читаем параметр категории из URL после загрузки категорий
+        const categoryParam = searchParams.get('category');
+        if (categoryParam && categoryParam !== selectedCategory) {
+          // Проверяем, что категория существует в загруженных категориях
+          const categoryExists = cats.some(cat => cat.name === categoryParam);
+          if (categoryExists) {
+            setSelectedCategory(categoryParam);
+          }
+        }
       } catch (err) {
         console.error('Error fetching categories:', err);
         showToast('Ошибка при загрузке категорий', 'error');
       }
     };
     fetchCategories();
-  }, []);
+  }, [searchParams]);
 
-  const categories = ['Все', ...new Set(allCategories.map((c) => c.name))];
-  console.log('Available categories:', categories);
+  const categories = useMemo(() => 
+    ['Все', ...new Set(allCategories.map((c) => c.name))], 
+    [allCategories]
+  );
 
   // ✅ Загрузка материалов
   const fetchMaterials = useCallback(async () => {
+    // Не загружаем материалы, если категории еще не загружены
+    if (allCategories.length === 0) {
+      return;
+    }
+
     setLoading(true);
     try {
       const token = localStorage.getItem('token') || '';
-      console.log('Token:', token ? 'Present' : 'Missing');
-      console.log('Current page:', page);
 
       // Get category ID if a category is selected
       const selectedCategoryId =
@@ -73,15 +90,10 @@ export function useMaterials() {
           ? allCategories.find((cat) => cat.name === selectedCategory)?.id
           : undefined;
 
-      console.log('Selected category:', selectedCategory);
-      console.log('Selected category ID:', selectedCategoryId);
-      console.log('All categories:', allCategories);
 
       // If there's a search term, use searchMaterials instead of getAllMaterials
       if (debouncedSearch?.trim()) {
-        console.log('Using search with term:', debouncedSearch);
         const results = await searchMaterials(debouncedSearch.trim(), token);
-        console.log('Search results:', results);
 
         if (results && Array.isArray(results)) {
           // Filter by category if selected
@@ -89,15 +101,8 @@ export function useMaterials() {
           if (selectedCategoryId) {
             filteredResults = results.filter((item) => {
               const matches = item.category?.id === selectedCategoryId;
-              console.log('Item category check:', {
-                itemId: item.id,
-                itemCategoryId: item.category?.id,
-                selectedCategoryId,
-                matches,
-              });
               return matches;
             });
-            console.log('Filtered results by category:', filteredResults.length);
           }
 
           // Apply sorting
@@ -129,14 +134,6 @@ export function useMaterials() {
           const endIndex = startIndex + limit;
           const paginatedResults = filteredResults.slice(startIndex, endIndex);
 
-          console.log('Pagination details:', {
-            total: filteredResults.length,
-            startIndex,
-            endIndex,
-            pageSize: limit,
-            currentPage: page,
-            resultsCount: paginatedResults.length,
-          });
 
           setMaterials(paginatedResults);
           setTotal(filteredResults.length);
@@ -153,16 +150,7 @@ export function useMaterials() {
           order,
           categoryId: selectedCategoryId,
         };
-        console.log('Fetching materials with params:', params);
         const { data, total } = await getAllMaterials(token, params);
-        console.log('Received materials:', {
-          count: data.length,
-          total,
-          page,
-          limit,
-          firstItem: data[0],
-          lastItem: data[data.length - 1],
-        });
 
         setMaterials(data);
         setTotal(total);
@@ -177,28 +165,27 @@ export function useMaterials() {
     }
   }, [page, limit, debouncedSearch, selectedCategory, sort, order, allCategories]);
 
-  // Fetch materials when dependencies change
+  // Загружаем материалы после загрузки категорий
   useEffect(() => {
-    console.log('Fetching materials with dependencies:', {
-      page,
-      limit,
-      debouncedSearch,
-      sort,
-      order,
-      selectedCategory,
-    });
-    fetchMaterials();
-  }, [fetchMaterials]);
+    if (allCategories.length > 0) {
+      fetchMaterials();
+    }
+  }, [allCategories.length]);
+
+  // Fetch materials when other dependencies change
+  useEffect(() => {
+    if (allCategories.length > 0) {
+      fetchMaterials();
+    }
+  }, [page, limit, debouncedSearch, selectedCategory, sort, order, fetchMaterials]);
 
   // Custom page setter that triggers fetch
   const handlePageChange = useCallback((newPage: number) => {
-    console.log('Changing page to:', newPage);
     setPage(newPage);
   }, []);
 
   // Custom limit setter that triggers fetch
   const handleLimitChange = useCallback((newLimit: number) => {
-    console.log('Changing limit to:', newLimit);
     setLimit(newLimit);
     setPage(1); // Reset to first page when changing limit
   }, []);

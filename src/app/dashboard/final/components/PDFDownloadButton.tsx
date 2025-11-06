@@ -1,46 +1,53 @@
 'use client';
 
 import { Download } from 'lucide-react';
-import { PDFDownloadLink } from '@react-pdf/renderer';
-import { PDFDocument } from './PDFDocument';
+import dynamic from 'next/dynamic';
 import type { BmzData } from '@/utils/bmzCalculations';
 import type { Transformer } from '@/api/transformers';
 import type { RusnState } from '@/store/useRusnStore';
-import type { WorksState, WorkItem } from '@/store/useWorksStore';
+import type { WorkItem } from '@/store/useWorksStore';
+
+// Динамический импорт PDF функционала для избежания ошибок SSR
+const PDFWrapper = dynamic(
+  () => import('./PDFWrapper'),
+  { 
+    ssr: false,
+    loading: () => (
+      <button
+        disabled
+        className="flex items-center space-x-2 px-4 py-2 rounded-lg text-white font-medium transition-colors bg-gray-400 cursor-not-allowed"
+      >
+        <Download size={16} />
+        <span>Загрузка PDF...</span>
+      </button>
+    )
+  }
+);
 
 interface Props {
   filename: string;
   fullName: string;
+  user: any;
   bmzStore: BmzData;
   selectedTransformer: Transformer | null;
   rusnStore: RusnState;
-  selectedWorks: WorksState['selected'];
+  selectedWorks: any;
   worksList: WorkItem[];
+  runnStore: any;
 }
 
 export default function PDFDownloadButton(props: Props) {
   return (
-    <PDFDownloadLink
-      document={
-        <PDFDocument
-          filename={props.filename}
-          fullName={props.fullName}
-          bmzStore={props.bmzStore}
-          selectedTransformer={props.selectedTransformer}
-          rusnStore={props.rusnStore}
-          selectedWorks={props.selectedWorks}
-          worksList={props.worksList}
-        />
-      }
-      fileName={`${props.filename}-спецификация.pdf`}
-      className="flex items-center space-x-2 px-4 py-2 rounded-lg text-white font-medium transition-colors bg-blue-600 hover:bg-blue-700"
-    >
-      {({ loading }) => (
-        <>
-          <Download size={16} />
-          <span>{loading ? 'Создание PDF...' : 'Скачать PDF'}</span>
-        </>
-      )}
-    </PDFDownloadLink>
+    <PDFWrapper
+      filename={props.filename}
+      fullName={props.fullName}
+      user={props.user}
+      bmzStore={props.bmzStore}
+      selectedTransformer={props.selectedTransformer}
+      rusnStore={props.rusnStore}
+      selectedWorks={props.selectedWorks}
+      worksList={props.worksList}
+      runnStore={props.runnStore}
+    />
   );
 }

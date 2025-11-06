@@ -1,147 +1,503 @@
-import { useState, useEffect } from 'react';
-import { useRunnStore, BusMaterial, BusbarBridge } from '@/store/useRunnStore';
+import { useEffect } from 'react';
+import { useRunnStore } from '@/store/useRunnStore';
+import { useTransformerStore } from '@/store/useTransformerStore';
 import { switchgearApi, Switchgear } from '@/api/switchgear';
-import { useRusnCalculation } from '@/hooks/useRusnCalculation';
-import { calculateCost } from '@/utils/calculationUtils';
+import { Material } from '@/api/material';
+import { api } from '@/api/baseUrl';
 
 export const useRunnBusbarBridgeCalculation = () => {
   const runn = useRunnStore();
-  const busBridge = runn.global.busBridge || { enabled: false, material: null, bridges: [] };
-  const [switchgearConfigs, setSwitchgearConfigs] = useState<Switchgear[]>([]);
+  const { selectedTransformer } = useTransformerStore();
+  const { busBridges } = runn;
+  
+  
+  // Инициализируем busBridges если он undefined
+  const safeBusBridges = busBridges || [];
 
-  // Получаем выбранную группу из localStorage
-  const [selectedGroupSlug] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('selectedGroupSlug') || '';
+  // Функция для получения материала по ID
+  const getMaterialById = async (id: number, token: string): Promise<Material> => {
+    const response = await fetch(`${api}/materials/${id}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Ошибка при получении материала');
     }
-    return '';
-  });
 
-  // Получаем все калькуляции по выбранной группе
-  const { calculations, loading: calculationsLoading } = useRusnCalculation(selectedGroupSlug);
-
-  // Находим калькуляцию с типом "bus-bridge"
-  const busbarBridgeCalculation = calculations.cell.find(
-    (calc) => calc.data?.cellConfig?.type === 'bus-bridge'
-  );
-
-  // Извлекаем ток из имени выключателя
-  const getBreakerCurrent = (name: string) => {
-    const match = name.match(/(\d+)[АA]/);
-    return match ? parseInt(match[1]) : null;
+    return await response.json();
   };
 
-  // Находим ячейку шинного моста
-  const bridgeCell = runn.cellConfigs.find((cell) => cell.purpose === 'Шинный мост');
-  const selectedBreaker = bridgeCell?.breaker;
+  // Функция для загрузки калькуляции шинного моста
+  const fetchBusbarCalculation = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return null;
 
-  // Получаем цену за кг
-  const getPricePerKg = (material: BusMaterial) => {
-    if (material === 'АД' || material === 'АД2') {
-      return 2800;
+      const response = await fetch(`${api}/calculations/panel-sho-70/для-шинного-моста-рунн`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Ошибка при получении калькуляции');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching busbar bridge calculation:', error);
+      return null;
     }
-    if (material === 'МТ' || material === 'МТ2') {
-      return 5600;
-    }
-    return 0;
   };
 
-  // Определяем группу на основе выбранного материала
-  const getGroupForMaterial = (material: BusMaterial) => {
-    if (material === 'АД' || material === 'АД2') {
-      return 'АД';
+  // Функция для загрузки цен материалов
+  const fetchMaterialPrices = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return { aluminum: 2800, copper: 5600 };
+
+      const [aluminumMaterial, copperMaterial] = await Promise.all([
+        getMaterialById(3489, token),
+        getMaterialById(3490, token)
+      ]);
+
+      return {
+        aluminum: typeof aluminumMaterial.price === 'string'
+          ? parseFloat(aluminumMaterial.price)
+          : aluminumMaterial.price,
+        copper: typeof copperMaterial.price === 'string'
+          ? parseFloat(copperMaterial.price)
+          : copperMaterial.price
+      };
+    } catch (error) {
+      console.error('Error fetching material prices:', error);
+      return { aluminum: 2800, copper: 5600 };
     }
-    if (material === 'МТ' || material === 'МТ2') {
-      return 'МТ';
-    }
-    return null;
   };
 
-  // Получаем вес на метр для материала
-  const getWeightPerMeter = (material: BusMaterial, width: number) => {
-    // Плотность алюминия ~2.7 г/см³, меди ~8.9 г/см³
-    // Толщина шины обычно 10мм = 1см
-    const thickness = 1; // см
+  // Функция для получения веса на метр
+  const getBridgeWeightPerMeter = (bridgeName: string, switchgearConfigs: Switchgear[]) => {
     
-    if (material === 'АД' || material === 'АД2') {
-      return (width * thickness * 2.7) / 1000; // кг/м
+    if (bridgeName.includes('Шинный мост N')) {
+      // Для мостов типа N ищем конфигурацию "Панель ЩО-70N"
+      const nConfig = switchgearConfigs.find(config =>
+        config.type === 'Панель ЩО-70N' &&
+        config.group === (selectedTransformer?.busbars === 'Медь' ? 'МТ' : 'АД')
+      );
+      
+      if (nConfig) {
+        const nBridgeCell = nConfig.cells?.find(cell => cell.name === 'Шинный мост');
+        const weight = nBridgeCell?.quantity || 4;
+        return weight;
+      }
+      return 4;
+    } else {
+      // Для обычных мостов ищем конфигурацию "Панель ЩО-70" по мощности трансформатора
+      const transformerPower = selectedTransformer?.power;
+      const config = transformerPower
+        ? switchgearConfigs.find((config) => {
+            const possibleGroups = selectedTransformer?.busbars === 'Медь' ? ['МТ', 'МТ2'] : ['АД', 'АД2'];
+            return (
+              config.type === 'Панель ЩО-70' &&
+              config.breaker === transformerPower.toString() &&
+              possibleGroups.includes(config.group)
+            );
+          })
+        : null;
+
+      if (config) {
+        const bridgeCell = config.cells?.find(cell => cell.name === 'Шинный мост');
+        const weight = bridgeCell?.quantity || 8; // Fallback для мостов 0.4
+        return weight;
+      }
+      return 8; // Fallback для мостов 0.4
     }
-    if (material === 'МТ' || material === 'МТ2') {
-      return (width * thickness * 8.9) / 1000; // кг/м
-    }
-    return 0;
   };
 
-  // Загружаем конфигурации коммутационных аппаратов
+  // Функция для получения множителя из группы
+  const getGroupMultiplier = (matchingConfig: any) => {
+    const group = matchingConfig?.group || '';
+    const match = group.match(/(АД|МТ)(\d)/);
+    if (match) {
+      return parseInt(match[2]);
+    }
+    return 1;
+  };
+
+  // Функция для расчета стоимости пары мостов как одной калькуляции
+  const calculateBridgePairCost = async (primaryBridge: any, pairedBridge: any, materialPrices: any, busbarCalculation: any) => {
+    if (!busbarCalculation) return 0;
+
+    // Определяем материал
+    const materialType = selectedTransformer?.busbars === 'Медь' ? 'copper' : 'aluminum';
+    const pricePerKg = materialPrices[materialType];
+
+    // Получаем matchingConfig для определения группы
+    const switchgearConfigs = await switchgearApi.getAll();
+    const transformerPower = selectedTransformer?.power;
+    const matchingConfig = transformerPower
+      ? switchgearConfigs.find((config) => {
+          const possibleGroups = selectedTransformer?.busbars === 'Медь' ? ['МТ', 'МТ2'] : ['АД', 'АД2'];
+          return (
+            config.type === 'Панель ЩО-70' &&
+            config.breaker === transformerPower.toString() &&
+            possibleGroups.includes(config.group)
+          );
+        })
+      : null;
+
+    // Получаем zero busbar configuration для мостов N
+    const possibleZeroGroups = selectedTransformer?.busbars === 'Медь' 
+      ? ['МТ', 'МТ1', 'МТ2', 'МТ3', 'МТ4'] 
+      : ['АД', 'АД1', 'АД2', 'АД3', 'АД4'];
+    
+    const zeroBusbarConfig = switchgearConfigs.find((config: any) => 
+      config.type === 'Панель ЩО-70N' && 
+      config.breaker === transformerPower.toString() &&
+      possibleZeroGroups.includes(config.group)
+    );
+
+    // Функции для получения множителей
+    const getGroupMultiplier = (matchingConfig: any) => {
+      const group = matchingConfig?.group || '';
+      const match = group.match(/(АД|МТ)(\d)/);
+      if (match) return parseInt(match[2]);
+      return 1;
+    };
+
+    const getZeroGroupMultiplier = (zeroConfig: any) => {
+      const group = zeroConfig?.group || '';
+      const match = group.match(/(АД|МТ)(\d)/);
+      if (match) return parseInt(match[2]);
+      return 1;
+    };
+
+    const bridgeCell = matchingConfig?.cells?.find((cell: any) => cell.name === 'Шинный мост');
+    const bridgeWeightMultiplier = bridgeCell?.quantity || 1;
+
+    const zeroBridgeCell = zeroBusbarConfig?.cells?.find((cell: any) => cell.name === 'Шинный мост');
+    const zeroBridgeWeightMultiplier = zeroBridgeCell?.quantity || 1;
+
+    // Рассчитываем длины для обоих мостов
+    // Мост 0.4
+    const formulaResult = ((primaryBridge.length + 2) * 1.3) * 3;
+    const groupMultiplier = getGroupMultiplier(matchingConfig);
+    const primaryCalculatedLength = formulaResult * groupMultiplier * bridgeWeightMultiplier;
+
+    // Мост N
+    const baseResult = pairedBridge.length + 5;
+    const zeroGroupMultiplier = getZeroGroupMultiplier(zeroBusbarConfig);
+    const pairedCalculatedLength = baseResult * zeroGroupMultiplier * zeroBridgeWeightMultiplier;
+
+    // Материалы для обоих мостов
+    const primaryMaterialCost = primaryCalculatedLength * primaryBridge.quantity * pricePerKg;
+    const pairedMaterialCost = pairedCalculatedLength * pairedBridge.quantity * pricePerKg;
+    const totalBridgeMaterialCost = primaryMaterialCost + pairedMaterialCost;
+
+    // Дополнительные материалы из калькуляции (только один раз!)
+    const additionalMaterialsCost = busbarCalculation.data.categories.reduce(
+      (total, category) => {
+        return total + category.items.reduce(
+          (itemSum, item) => itemSum + (parseFloat(item.price) * item.quantity),
+          0
+        );
+      },
+      0
+    );
+
+    // Общая стоимость материалов (мосты + дополнительные материалы только один раз)
+    const totalMaterialsCost = totalBridgeMaterialCost + (additionalMaterialsCost * primaryBridge.quantity);
+
+    // Применяем калькуляцию
+    const calculationData = busbarCalculation.data.calculation;
+    const totalSalary = calculationData.manufacturingHours * calculationData.hourlyRate * primaryBridge.quantity;
+    const overheadCost = (totalMaterialsCost * calculationData.overheadPercentage) / 100;
+    const productionCost = totalMaterialsCost + totalSalary + overheadCost;
+    const adminCost = (totalMaterialsCost * calculationData.adminPercentage) / 100;
+    const fullCost = productionCost + adminCost;
+    const plannedProfit = (fullCost * calculationData.plannedProfitPercentage) / 100;
+    const wholesalePrice = fullCost + plannedProfit;
+    const ndsAmount = (wholesalePrice * calculationData.ndsPercentage) / 100;
+    const finalPrice = wholesalePrice + ndsAmount;
+
+    return finalPrice;
+  };
+
+  // Функция для получения matchingConfig для формирования названия
+  const getMatchingConfigForBridge = async () => {
+    const switchgearConfigs = await switchgearApi.getAll();
+    const transformerPower = selectedTransformer?.power;
+    if (!transformerPower) return null;
+    
+    const possibleGroups = selectedTransformer?.busbars === 'Медь' 
+      ? ['МТ', 'МТ2', 'МТ3'] 
+      : ['АД', 'АД2', 'АД3'];
+    
+    return switchgearConfigs.find((config) => {
+      return (
+        config.type === 'Панель ЩО-70' &&
+        config.breaker === transformerPower.toString() &&
+        possibleGroups.includes(config.group)
+      );
+    }) || null;
+  };
+
+  // Функция для расчета стоимости моста с калькуляцией
+  const calculateBridgeCost = async (bridge: any, materialPrices: any, busbarCalculation: any) => {
+    if (!busbarCalculation) return 0;
+
+    // Определяем материал
+    const materialType = selectedTransformer?.busbars === 'Медь' ? 'copper' : 'aluminum';
+    const pricePerKg = materialPrices[materialType];
+
+    // Получаем matchingConfig для определения группы
+    const switchgearConfigs = await switchgearApi.getAll();
+    const transformerPower = selectedTransformer?.power;
+    const matchingConfig = transformerPower
+      ? switchgearConfigs.find((config) => {
+          const possibleGroups = selectedTransformer?.busbars === 'Медь' ? ['МТ', 'МТ2'] : ['АД', 'АД2'];
+          return (
+            config.type === 'Панель ЩО-70' &&
+            config.breaker === transformerPower.toString() &&
+            possibleGroups.includes(config.group)
+          );
+        })
+      : null;
+
+    // Получаем zero busbar configuration для мостов N - ищем конфигурацию по всем вариантам группы
+    const possibleZeroGroups = selectedTransformer?.busbars === 'Медь' 
+      ? ['МТ', 'МТ1', 'МТ2', 'МТ3', 'МТ4'] 
+      : ['АД', 'АД1', 'АД2', 'АД3', 'АД4'];
+    
+    const zeroBusbarConfig = switchgearConfigs.find((config: any) => 
+      config.type === 'Панель ЩО-70N' && 
+      config.breaker === transformerPower.toString() &&
+      possibleZeroGroups.includes(config.group)
+    );
+
+    // Функция для получения множителя из группы zero config
+    const getZeroGroupMultiplier = (zeroConfig: any) => {
+      const group = zeroConfig?.group || '';
+      const match = group.match(/(АД|МТ)(\d)/);
+      if (match) {
+        return parseInt(match[2]);
+      }
+      // Если группа без числа (например "АД"), возвращаем 1
+      return 1;
+    };
+
+    // Получаем weight multiplier из конфигурации для обычных мостов
+    const bridgeCell = matchingConfig?.cells?.find((cell: any) => cell.name === 'Шинный мост');
+    const bridgeWeightMultiplier = bridgeCell?.quantity || 1;
+
+    // Получаем weight multiplier для нулевых мостов из zeroBusbarConfig
+    const zeroBridgeCell = zeroBusbarConfig?.cells?.find((cell: any) => cell.name === 'Шинный мост');
+    const zeroBridgeWeightMultiplier = zeroBridgeCell?.quantity || 1;
+
+    // Рассчитываем длину с учетом множителя группы и weight multiplier
+    let calculatedLength;
+    
+    if (bridge.name.includes('Шинный мост N')) {
+      // Для мостов N (нулевых шин): (длина + 5) × множитель группы из zeroBusbarConfig × quantity
+      const baseResult = bridge.length + 5;
+      const groupMultiplier = getZeroGroupMultiplier(zeroBusbarConfig);
+      calculatedLength = baseResult * groupMultiplier * zeroBridgeWeightMultiplier;
+    } else {
+      // Для обычных мостов применяем формулу ((длина + 2) × 1.3) × 3
+      const formulaResult = ((bridge.length + 2) * 1.3) * 3;
+      // Затем умножаем на множитель из группы
+      const groupMultiplier = getGroupMultiplier(matchingConfig);
+      // И на weight multiplier из API
+      calculatedLength = formulaResult * groupMultiplier * bridgeWeightMultiplier;
+    }
+
+    // Стоимость материалов моста (calculatedLength уже в кг)
+    const bridgeMaterialCost = calculatedLength * bridge.quantity * pricePerKg;
+
+    // Дополнительные материалы из калькуляции
+    const additionalMaterialsCost = busbarCalculation.data.categories.reduce(
+      (total, category) => {
+        return total + category.items.reduce(
+          (itemSum, item) => itemSum + (parseFloat(item.price) * item.quantity),
+          0
+        );
+      },
+      0
+    );
+
+    // Общая стоимость материалов
+    const totalMaterialsCost = bridgeMaterialCost + (additionalMaterialsCost * bridge.quantity);
+
+    // Применяем калькуляцию
+    const calculationData = busbarCalculation.data.calculation;
+    const totalSalary = calculationData.manufacturingHours * calculationData.hourlyRate * bridge.quantity;
+    const overheadCost = (totalMaterialsCost * calculationData.overheadPercentage) / 100;
+    const productionCost = totalMaterialsCost + totalSalary + overheadCost;
+    const adminCost = (totalMaterialsCost * calculationData.adminPercentage) / 100;
+    const fullCost = productionCost + adminCost;
+    const plannedProfit = (fullCost * calculationData.plannedProfitPercentage) / 100;
+    const wholesalePrice = fullCost + plannedProfit;
+    const ndsAmount = (wholesalePrice * calculationData.ndsPercentage) / 100;
+    const finalPrice = wholesalePrice + ndsAmount;
+
+    return finalPrice;
+  };
+
+  // Основной эффект для расчета сводки
   useEffect(() => {
-    const fetchSwitchgearConfigs = async () => {
+    const calculateSummaries = async () => {
+      if (!safeBusBridges || safeBusBridges.length === 0) {
+        // Очищаем только сводки шинных мостов, не трогая нулевые шины
+        // Используем функциональное обновление, чтобы получить актуальное состояние
+        runn.setBusBridgeSummaries((currentSummaries) => {
+          return (currentSummaries || []).filter(summary => 
+            !summary.name.includes('Шинный мост')
+            // Сохраняем все записи, которые не являются шинными мостами (включая нулевые шины)
+          );
+        });
+        return;
+      }
+
       try {
-        const configs = await switchgearApi.getAll();
-        setSwitchgearConfigs(configs);
+        // Загружаем необходимые данные
+        const [materialPrices, busbarCalculation] = await Promise.all([
+          fetchMaterialPrices(),
+          fetchBusbarCalculation()
+        ]);
+
+        if (!busbarCalculation) {
+          // Очищаем только сводки шинных мостов
+          // Используем функциональное обновление, чтобы получить актуальное состояние
+          runn.setBusBridgeSummaries((currentSummaries) => {
+            return (currentSummaries || []).filter(summary => 
+              !summary.name.includes('Шинный мост')
+            );
+          });
+          return;
+        }
+
+        // Получаем matchingConfig для формирования названия
+        const matchingConfigForBridge = await getMatchingConfigForBridge();
+        
+        // Рассчитываем сводки для каждого моста
+        const bridgeSummaries = [];
+        const processedIds = new Set();
+        
+        for (const bridge of safeBusBridges) {
+          // Пропускаем, если уже обработали
+          if (processedIds.has(bridge.id)) continue;
+          
+          const totalPrice = await calculateBridgeCost(bridge, materialPrices, busbarCalculation);
+          
+          if (totalPrice > 0) {
+            // Проверяем, есть ли парный мост
+            if (bridge.pairedId) {
+              const pairedBridge = safeBusBridges.find(b => b.id === bridge.pairedId);
+              if (pairedBridge) {
+                // Используем расчет пары как единого блока
+                const combinedPrice = await calculateBridgePairCost(bridge, pairedBridge, materialPrices, busbarCalculation);
+                
+                // Формируем название в формате: "Шинный мост 0,4кВ (шина МТ (80x8мм) 1690A)"
+                let bridgeName = 'Шинный мост 0,4кВ';
+                if (matchingConfigForBridge) {
+                  const busbarSize = matchingConfigForBridge.busbar ? `${matchingConfigForBridge.busbar}мм` : '';
+                  const amperage = matchingConfigForBridge.amperage ? `${matchingConfigForBridge.amperage}A` : '';
+                  const group = matchingConfigForBridge.group || '';
+                  
+                  const innerParts = [
+                    `шина ${group}`,
+                    busbarSize ? `(${busbarSize})` : '',
+                    amperage
+                  ].filter(Boolean);
+                  
+                  if (innerParts.length > 0) {
+                    bridgeName = `Шинный мост 0,4кВ (${innerParts.join(' ')})`;
+                  }
+                }
+                
+                bridgeSummaries.push({
+                  name: bridgeName,
+                  quantity: bridge.quantity, // Количество одинаковое для пары
+                  pricePerUnit: combinedPrice,
+                  totalPrice: combinedPrice,
+                });
+                
+                // Отмечаем парный мост как обработанный
+                processedIds.add(pairedBridge.id);
+                processedIds.add(bridge.id);
+              }
+            } else {
+              // Обычный мост без пары
+              // Для мостов 0.4 формируем название по конфигурации
+              let bridgeName = bridge.name;
+              if (matchingConfigForBridge && (bridge.name.includes('0.4') || bridge.name.includes('Шинный мост'))) {
+                const busbarSize = matchingConfigForBridge.busbar ? `${matchingConfigForBridge.busbar}мм` : '';
+                const amperage = matchingConfigForBridge.amperage ? `${matchingConfigForBridge.amperage}A` : '';
+                const group = matchingConfigForBridge.group || '';
+                
+                const innerParts = [
+                  `шина ${group}`,
+                  busbarSize ? `(${busbarSize})` : '',
+                  amperage
+                ].filter(Boolean);
+                
+                if (innerParts.length > 0) {
+                  bridgeName = `Шинный мост 0,4кВ (${innerParts.join(' ')})`;
+                }
+              }
+              
+              bridgeSummaries.push({
+                name: bridgeName,
+                quantity: bridge.quantity,
+                pricePerUnit: totalPrice,
+                totalPrice: totalPrice,
+              });
+              processedIds.add(bridge.id);
+            }
+          }
+        }
+
+        // Сохраняем только сводки шинных мостов, сохраняя нулевые шины (новый формат "Шина N")
+        // Используем функциональное обновление, чтобы получить актуальное состояние
+        runn.setBusBridgeSummaries((currentSummaries) => {
+          const nonBridgeSummaries = (currentSummaries || []).filter(summary => 
+            !summary.name.includes('Шинный мост')
+            // Сохраняем все записи, которые не являются шинными мостами (включая нулевые шины)
+          );
+          return [...nonBridgeSummaries, ...bridgeSummaries];
+        });
+
+        // Сохраняем первый мост как основной (для обратной совместимости)
+        if (bridgeSummaries.length > 0) {
+          runn.setBusBridgeSummary(bridgeSummaries[0]);
+        } else {
+          runn.setBusBridgeSummary(null);
+        }
+
       } catch (error) {
-        console.error('Error fetching switchgear configs:', error);
+        console.error('Error calculating busbar bridge summaries:', error);
+        // Очищаем только сводки шинных мостов
+        // Используем функциональное обновление, чтобы получить актуальное состояние
+        runn.setBusBridgeSummaries((currentSummaries) => {
+          return (currentSummaries || []).filter(summary => 
+            !summary.name.includes('Шинный мост')
+          );
+        });
+        runn.setBusBridgeSummary(null);
       }
     };
 
-    fetchSwitchgearConfigs();
-  }, []);
-
-  // Находим подходящую конфигурацию
-  const matchingConfig = selectedBreaker
-    ? switchgearConfigs.find((config) => {
-        const current = getBreakerCurrent(selectedBreaker);
-        const materialGroup = busBridge.material ? getGroupForMaterial(busBridge.material) : null;
-        
-        return (
-          config.amperage === current &&
-          config.group === materialGroup
-        );
-      })
-    : null;
-
-  // Рассчитываем общий вес и стоимость шинных мостов
-  const calculateBridgeWeight = (bridge: BusbarBridge) => {
-    if (!busBridge.material) return 0;
-    const weightPerMeter = getWeightPerMeter(busBridge.material, bridge.width);
-    return bridge.length * bridge.quantity * weightPerMeter;
-  };
-
-  const totalBridgeWeight = busBridge.bridges.reduce(
-    (sum, bridge) => sum + calculateBridgeWeight(bridge),
-    0
-  );
-
-  const totalBridgePrice = busBridge.material 
-    ? totalBridgeWeight * getPricePerKg(busBridge.material)
-    : 0;
-
-  // Рассчитываем данные для калькуляции шинного моста
-  const busbarBridgeCalculationResult = busbarBridgeCalculation
-    ? calculateCost(totalBridgePrice, {
-        hourlyRate: busbarBridgeCalculation.data.calculation?.hourlyRate || 2000,
-        manufacturingHours: busbarBridgeCalculation.data.calculation?.manufacturingHours || 1,
-        overheadPercentage: busbarBridgeCalculation.data.calculation?.overheadPercentage || 10,
-        adminPercentage: busbarBridgeCalculation.data.calculation?.adminPercentage || 15,
-        plannedProfitPercentage: busbarBridgeCalculation.data.calculation?.plannedProfitPercentage || 10,
-        ndsPercentage: busbarBridgeCalculation.data.calculation?.ndsPercentage || 12,
-      })
-    : null;
+    calculateSummaries();
+  }, [safeBusBridges, selectedTransformer?.busbars]);
 
   return {
-    selectedBreaker,
-    matchingConfig,
-    bridges: busBridge.bridges,
-    setBridges: runn.setBusBridges,
-    busBridgeMaterial: busBridge.material,
-    totalBridgeWeight,
-    totalBridgePrice,
-    busbarBridgeCalculation,
-    busbarBridgeCalculationResult,
-    getBreakerCurrent,
-    getPricePerKg,
-    getWeightPerMeter: (material: BusMaterial, width: number) => getWeightPerMeter(material, width),
-    calculateBridgeWeight,
-    calculationsLoading,
-    bridgeCell,
+    busBridgeSummaries: runn.busBridgeSummaries,
+    busBridgeSummary: runn.busBridgeSummary,
   };
 };

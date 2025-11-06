@@ -43,13 +43,33 @@ export default function SidebarLink({
       href={href}
       onClick={handleClick}
       className={clsx(
-        'flex items-center gap-2 rounded px-2 py-2 transition',
-        'hover:bg-gray-100',
-        isActive && 'bg-blue-100 text-blue-700 font-medium'
+        'flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-200 group',
+        'hover:bg-gray-100 hover:shadow-md hover:scale-[1.02]',
+        isActive && !collapsed && 'bg-[#8eba1e] text-white shadow-lg',
+        isActive && collapsed && 'bg-gray-100 shadow-md'
       )}
     >
-      <Icon className="w-5 h-5 text-[#3A55DF]" />
-      {!collapsed && <span>{label}</span>}
+      {collapsed && isActive ? (
+        <Icon className="w-5 h-5 text-[#8eba1e]" />
+      ) : (
+        <div className={clsx(
+          'p-2 rounded-lg transition-all duration-200',
+          !collapsed && isActive ? 'bg-white/20' : 'bg-gray-100 group-hover:bg-[#8eba1e]'
+        )}>
+          <Icon className={clsx(
+            'w-5 h-5 transition-colors duration-200',
+            !collapsed && isActive ? 'text-white' : 'text-[#8eba1e] group-hover:text-white'
+          )} />
+        </div>
+      )}
+      {!collapsed && (
+        <span className={clsx(
+          'font-medium transition-colors duration-200',
+          isActive ? 'text-white' : 'text-gray-700 group-hover:text-[#8eba1e]'
+        )}>
+          {label}
+        </span>
+      )}
     </Link>
   );
 }

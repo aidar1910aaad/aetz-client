@@ -5,6 +5,8 @@ import { useRouter, useParams } from 'next/navigation';
 import { CalculationEditForm } from '../[calcSlug]/components/CalculationEditForm';
 import { createCalculation } from '@/api/calculations';
 import { useCalculations } from '@/hooks/useCalculations';
+import RoleGuard from '@/components/common/RoleGuard';
+import { UserRole } from '@/types/user';
 
 export default function CreateCalculationPage() {
   const router = useRouter();
@@ -31,8 +33,34 @@ export default function CreateCalculationPage() {
         throw new Error('Группа не найдена');
       }
 
+      // Проверяем, что название калькуляции не пустое
+      if (!calculation.name || calculation.name.trim() === '') {
+        throw new Error('Название калькуляции обязательно для заполнения. Пожалуйста, введите название.');
+      }
+
+      // Проверяем минимальную длину названия
+      if (calculation.name.trim().length < 3) {
+        throw new Error('Название калькуляции должно содержать минимум 3 символа.');
+      }
+
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No token found');
+
+      // Проверяем, что все материалы имеют валидные ID (только если есть материалы)
+      if (calculation.data.categories.some(cat => cat.items.length > 0)) {
+        const materialsWithoutId = calculation.data.categories.flatMap(cat => 
+          cat.items.filter(item => !item.id || item.id <= 0)
+        );
+        
+        if (materialsWithoutId.length > 0) {
+          const materialNames = materialsWithoutId.map(item => item.name || 'Без названия').join(', ');
+          throw new Error(`Следующие материалы не выбраны: ${materialNames}. Пожалуйста, выберите материалы из списка.`);
+        }
+      }
+
+      // Убираем проверку на обязательное наличие материалов
+      // Теперь можно создавать калькуляцию без материалов
+      // Если материалы есть - они будут добавлены, если нет - калькуляция создастся пустой
 
       // Создаем slug из названия
       const slug = calculation.name
@@ -46,16 +74,18 @@ export default function CreateCalculationPage() {
         slug: slug,
         groupId: selectedGroup.id,
         data: {
-          categories: calculation.data.categories.map((cat: any) => ({
-            name: cat.name,
-            items: cat.items.map((item: any) => ({
-              id: item.id || null,
-              name: item.name,
-              unit: item.unit,
-              price: Number(item.price),
-              quantity: Number(item.quantity),
+          categories: calculation.data.categories
+            .filter(cat => cat.items.length > 0) // Фильтруем только категории с материалами
+            .map((cat: any) => ({
+              name: cat.name,
+              items: cat.items.map((item: any) => ({
+                id: item.id, // ID уже проверен выше, используем как есть
+                name: item.name,
+                unit: item.unit,
+                price: Number(item.price),
+                quantity: Number(item.quantity),
+              })),
             })),
-          })),
           calculation: {
             manufacturingHours: Number(calculation.data.calculation.manufacturingHours),
             hourlyRate: Number(calculation.data.calculation.hourlyRate),
@@ -76,6 +106,8 @@ export default function CreateCalculationPage() {
         },
       };
 
+      console.log('🔍 Debug - Creating calculation payload:', JSON.stringify(payload, null, 2));
+
       await createCalculation(payload, token);
       setToast({ message: 'Калькуляция успешно создана', type: 'success' });
       router.push(`/dashboard/calc/${groupSlug}`);
@@ -90,7 +122,9 @@ export default function CreateCalculationPage() {
   };
 
   const initialCalculation = {
+    id: 0, // Временный ID для новой калькуляции
     name: '',
+    slug: '', // Будет сгенерирован при сохранении
     data: {
       categories: [],
       calculation: {
@@ -102,14 +136,19 @@ export default function CreateCalculationPage() {
         ndsPercentage: 12,
       },
       cellConfig: {
-        type: '10kv',
+        type: '10kv' as const, // Явно указываем тип CellType
         materials: {},
       },
     },
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <RoleGuard
+      allowedRoles={[UserRole.ADMIN, UserRole.PTO]}
+      redirectTo="/dashboard"
+      pagePath={`/dashboard/calc/${groupSlug}/new`}
+    >
+      <div className="h-[calc(100vh-64px)] overflow-y-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-6">Создание новой калькуляции</h1>
@@ -132,5 +171,6 @@ export default function CreateCalculationPage() {
         </div>
       )}
     </div>
+    </RoleGuard>
   );
 }

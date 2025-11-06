@@ -47,19 +47,7 @@ export default function RusnSection({ voltage = '10' }: RusnSectionProps) {
   const [cellTotals, setCellTotals] = React.useState<Record<string, number>>({});
   const { materials } = useRusnMaterials();
 
-  // Отладочная информация
-  console.log('RusnSection Debug:', {
-    cellConfigs: cellConfigs?.length || 0,
-    cellSummaries: cellSummaries?.length || 0,
-    busbarSummary: !!busbarSummary,
-    busBridgeSummary: !!busBridgeSummary,
-    busBridgeSummaries: busBridgeSummaries?.length || 0,
-    cellConfigsData: cellConfigs,
-    cellSummariesData: cellSummaries,
-    busbarSummaryData: busbarSummary,
-    busBridgeSummaryData: busBridgeSummary,
-    busBridgeSummariesData: busBridgeSummaries,
-  });
+
 
   // Если нет данных, показываем пустую таблицу
   if (
@@ -72,7 +60,7 @@ export default function RusnSection({ voltage = '10' }: RusnSectionProps) {
     return (
       <section>
         <h2 className="text-xl font-semibold text-gray-800 mb-2">РУСН-{voltage}кВ</h2>
-        <table className="w-full table-auto border text-sm">
+        <table className="w-full table-fixed border text-sm">
           <thead className={`${COLORS.header} text-white`}>
             <tr>
               <th className="p-2">№</th>
@@ -86,7 +74,7 @@ export default function RusnSection({ voltage = '10' }: RusnSectionProps) {
           <tbody className="text-center">
             <tr>
               <td className="p-2">1</td>
-              <td className="text-left p-2">РУСН-{voltage}кВ не предусмотрено</td>
+              <td className="text-left p-2 break-words">РУСН-{voltage}кВ не предусмотрено</td>
               <td className="p-2">шт</td>
               <td className="p-2">—</td>
               <td className="p-2">—</td>
@@ -135,7 +123,6 @@ export default function RusnSection({ voltage = '10' }: RusnSectionProps) {
 
   // Добавляем шинные мосты, если есть данные
   if (busBridgeSummaries && busBridgeSummaries.length > 0) {
-    console.log('RusnSection - Добавляем шинные мосты:', busBridgeSummaries);
     busBridgeSummaries.forEach((busBridgeSummary) => {
       tableData.push({
         id: rowNumber++,
@@ -146,8 +133,6 @@ export default function RusnSection({ voltage = '10' }: RusnSectionProps) {
         totalPrice: busBridgeSummary.totalPrice,
       });
     });
-  } else {
-    console.log('RusnSection - Шинные мосты не найдены:', { busBridgeSummaries });
   }
 
   // Добавляем сборные шины, если есть данные
@@ -184,18 +169,19 @@ export default function RusnSection({ voltage = '10' }: RusnSectionProps) {
       <table className="w-full table-auto border text-sm">
         <thead className={`${COLORS.header} text-white`}>
           <tr>
-            {TABLE_HEADERS.map((header, index) => (
-              <th key={index} className={`p-2 ${index === 1 ? 'text-left' : ''}`}>
-                {header}
-              </th>
-            ))}
+            <th className="p-2 w-12">№</th>
+            <th className="p-2 text-left w-2/5 break-words">Наименование</th>
+            <th className="p-2 w-20">Ед. изм.</th>
+            <th className="p-2 w-20">Кол-во</th>
+            <th className="p-2 w-32">Цена</th>
+            <th className="p-2 w-32">Сумма</th>
           </tr>
         </thead>
         <tbody className="text-center">
           {tableData.map((item) => (
             <tr key={item.id}>
               <td className="p-2">{item.id}</td>
-              <td className="text-left p-2 whitespace-pre-line">{item.name}</td>
+              <td className="text-left p-2 whitespace-pre-line break-words">{item.name}</td>
               <td className="p-2">{item.unit}</td>
               <td className="p-2">{item.quantity}</td>
               <td className="p-2">{item.totalPrice > 0 ? formatPrice(item.pricePerUnit) : '—'}</td>

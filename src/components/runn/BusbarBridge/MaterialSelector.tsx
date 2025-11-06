@@ -1,5 +1,6 @@
 import React from 'react';
 import { BusMaterial } from '@/store/useRunnStore';
+import { useTransformerStore } from '@/store/useTransformerStore';
 
 interface MaterialSelectorProps {
   selectedMaterial: BusMaterial | null;
@@ -10,40 +11,26 @@ export const MaterialSelector: React.FC<MaterialSelectorProps> = ({
   selectedMaterial,
   onMaterialChange,
 }) => {
-  const materials: { value: BusMaterial; label: string }[] = [
-    { value: 'АД', label: 'АД (Алюминий)' },
-    { value: 'АД2', label: 'АД2 (Алюминий улучшенный)' },
-    { value: 'МТ', label: 'МТ (Медь)' },
-    { value: 'МТ2', label: 'МТ2 (Медь улучшенная)' },
-  ];
+  const { selectedTransformer } = useTransformerStore();
+
+  const getMaterialLabel = (busbarsType: string) => {
+    if (busbarsType === 'Алюминий') {
+      return 'Алюминий (АД, АД2, АД3)';
+    }
+    if (busbarsType === 'Медь') {
+      return 'Медь (МТ, МТ2, МТ3)';
+    }
+    return 'Не выбран';
+  };
 
   return (
     <div className="space-y-3">
       <h4 className="font-medium text-gray-900">Материал шинного моста</h4>
-      <div className="grid grid-cols-2 gap-3">
-        {materials.map((material) => (
-          <label
-            key={material.value}
-            className={`
-              flex items-center p-3 border rounded cursor-pointer transition-colors
-              ${
-                selectedMaterial === material.value
-                  ? 'border-blue-500 bg-blue-50 text-blue-900'
-                  : 'border-gray-300 hover:border-gray-400'
-              }
-            `}
-          >
-            <input
-              type="radio"
-              name="busBridgeMaterial"
-              value={material.value}
-              checked={selectedMaterial === material.value}
-              onChange={() => onMaterialChange(material.value)}
-              className="mr-2"
-            />
-            <span className="text-sm font-medium">{material.label}</span>
-          </label>
-        ))}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
+        <div className="text-sm text-gray-600">
+          <p><span className="font-medium">Тип материала:</span> {getMaterialLabel(selectedTransformer?.busbars || '')}</p>
+          <p className="text-xs text-gray-500 mt-1">Выбирается автоматически на основе выбора в трансформаторе</p>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BusMaterial } from '@/types/rusn';
-import MaterialsTable from '@/app/dashboard/bktp/rusn/components/MaterialsTable';
+import MaterialsTable from '@/app/dashboard/bktp/rusn/calculations/MaterialsTable';
 import { BusbarBridgesTable } from './BusbarBridgesTable';
 
 interface BusbarBridge {

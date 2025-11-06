@@ -93,9 +93,7 @@ export const updateSettings = async (
 
 export const getSettings = async (token: string): Promise<Settings> => {
   try {
-    console.log('=== API getSettings: Отправка запроса ===');
-    console.log('Token:', token ? 'Present' : 'Missing');
-    console.log('URL:', `${api}/settings`);
+    
 
     const response = await fetch(`${api}/settings`, {
       headers: {
@@ -103,18 +101,14 @@ export const getSettings = async (token: string): Promise<Settings> => {
       },
     });
 
-    console.log('Response status:', response.status);
-    console.log('Response ok:', response.ok);
+
 
     if (!response.ok) {
       throw new Error(`Ошибка при получении настроек: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('Get settings response:', data);
-    console.log('Структура ответа:', Object.keys(data));
-    console.log('Настройки РУСН в ответе:', data.settings?.rusn);
-    console.log('Количество настроек РУСН:', data.settings?.rusn?.length || 0);
+
 
     return data;
   } catch (error) {
@@ -183,6 +177,11 @@ export const saveSettings = async (
         message: error.message,
         stack: error.stack,
       });
+      
+      // Специальная обработка для ошибки "Failed to fetch"
+      if (error.message === 'Failed to fetch') {
+        throw new Error('Ошибка сети: не удается подключиться к серверу. Проверьте подключение к интернету.');
+      }
     }
     throw error;
   }

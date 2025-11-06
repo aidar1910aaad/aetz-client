@@ -95,7 +95,7 @@ const categories = [
     key: 'transport',
     icon: <FaTruck className="w-6 h-6 text-purple-500" />,
     items: [
-      { name: 'Доставка оборудования', price: 25000, unit: 'раб.' },
+      { name: 'Доставка оборудования', price: 25000, unit: 'раб' },
       { name: 'Командировочные расходы', price: 3932, unit: 'МРП' },
       { name: 'Проживание на день', price: 30000, unit: 'день' },
     ],
@@ -115,12 +115,11 @@ export default function WorkSelector() {
   const [search, setSearch] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Принудительно обновляем store при каждом рендере
-  useEffect(() => {
-    const worksData = categories.flatMap((cat) => cat.items) as WorkItem[];
-    setWorksList(worksData);
-    console.log('Work data updated:', worksData);
-  }, []);
+  // Убираем принудительное обновление store, чтобы не перезаписывать данные из WorkPage
+  // useEffect(() => {
+  //   const worksData = categories.flatMap((cat) => cat.items) as WorkItem[];
+  //   setWorksList(worksData);
+  // }, []);
 
   // Функция для принудительного обновления
   const handleRefresh = () => {
@@ -153,7 +152,7 @@ export default function WorkSelector() {
       ...selected,
       [name]: {
         ...selected[name],
-        count: count < 1 ? 1 : count,
+        count: count < 0 ? 0 : count,
       },
     });
   };
@@ -265,8 +264,8 @@ export default function WorkSelector() {
                               </button>
                               <input
                                 type="number"
-                                min={1}
-                                value={selected[item.name]?.count || 1}
+                                min={0}
+                                value={selected[item.name]?.count || 0}
                                 onChange={(e) => handleCount(item.name, Number(e.target.value))}
                                 onClick={(e) => e.stopPropagation()}
                                 className="w-14 text-center border border-gray-300 px-2 py-1 rounded-lg text-base focus:ring-2 focus:ring-blue-300"

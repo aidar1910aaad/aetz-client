@@ -11,6 +11,7 @@ import {
 } from '@/utils/bmzCalculations';
 import type { Transformer } from '@/api/transformers';
 import type { RusnState } from '@/store/useRusnStore';
+// import { useRunnStore } from '@/store/useRunnStore';
 import type { WorksState, WorkItem } from '@/store/useWorksStore';
 
 // Регистрируем шрифт с поддержкой кириллицы
@@ -61,9 +62,6 @@ const styles = StyleSheet.create({
   },
   table: {
     width: '100%',
-    borderStyle: 'solid',
-    borderWidth: 0.5,
-    borderColor: '#D1D5DB',
     marginBottom: 8,
   },
   tableRow: {
@@ -71,24 +69,20 @@ const styles = StyleSheet.create({
     minHeight: 20,
   },
   tableHeader: {
-    backgroundColor: '#3A55DF',
+    backgroundColor: '#90bd20',
     fontWeight: 'bold',
   },
   tableCellHeader: {
     padding: 3,
-    borderWidth: 0.5,
-    borderColor: '#D1D5DB',
     fontSize: 7,
     flex: 1,
-    backgroundColor: '#3A55DF',
+    backgroundColor: '#90bd20',
     color: '#fff',
     fontWeight: 'bold',
     fontFamily: 'Roboto-Bold',
   },
   tableCell: {
     padding: 3,
-    borderWidth: 0.5,
-    borderColor: '#D1D5DB',
     fontSize: 7,
     flex: 1,
     fontFamily: 'Roboto',
@@ -96,8 +90,6 @@ const styles = StyleSheet.create({
   },
   tableCellNumber: {
     padding: 3,
-    borderWidth: 0.5,
-    borderColor: '#D1D5DB',
     fontSize: 7,
     width: 25,
     textAlign: 'center',
@@ -106,8 +98,6 @@ const styles = StyleSheet.create({
   },
   tableCellName: {
     padding: 3,
-    borderWidth: 0.5,
-    borderColor: '#D1D5DB',
     fontSize: 7,
     flex: 3,
     fontFamily: 'Roboto',
@@ -115,8 +105,6 @@ const styles = StyleSheet.create({
   },
   tableCellUnit: {
     padding: 3,
-    borderWidth: 0.5,
-    borderColor: '#D1D5DB',
     fontSize: 7,
     width: 35,
     textAlign: 'center',
@@ -125,8 +113,6 @@ const styles = StyleSheet.create({
   },
   tableCellQuantity: {
     padding: 3,
-    borderWidth: 0.5,
-    borderColor: '#D1D5DB',
     fontSize: 7,
     width: 35,
     textAlign: 'center',
@@ -135,8 +121,6 @@ const styles = StyleSheet.create({
   },
   tableCellPrice: {
     padding: 3,
-    borderWidth: 0.5,
-    borderColor: '#D1D5DB',
     fontSize: 7,
     width: 80,
     textAlign: 'right',
@@ -145,8 +129,6 @@ const styles = StyleSheet.create({
   },
   tableCellTotal: {
     padding: 3,
-    borderWidth: 0.5,
-    borderColor: '#D1D5DB',
     fontSize: 7,
     width: 80,
     textAlign: 'right',
@@ -154,7 +136,7 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   totalRow: {
-    backgroundColor: '#3A55DF',
+    backgroundColor: '#90bd20',
     fontWeight: 'bold',
   },
   totalCell: {
@@ -168,11 +150,13 @@ const styles = StyleSheet.create({
 interface PDFDocumentProps {
   filename: string;
   fullName: string;
+  user: any;
   bmzStore: BmzData;
   selectedTransformer: Transformer | null;
   rusnStore: RusnState;
   selectedWorks: WorksState['selected'];
   worksList: WorkItem[];
+  runnStore: any;
 }
 
 // Функция для форматирования чисел
@@ -183,14 +167,51 @@ const formatNumber = (num: number) => {
 export const PDFDocument = ({
   filename,
   fullName,
+  user,
   bmzStore,
   selectedTransformer,
   rusnStore,
   selectedWorks,
   worksList,
+  runnStore,
 }: PDFDocumentProps) => {
+  // Проверяем наличие необходимых данных
+  if (!bmzStore || !rusnStore || !selectedWorks || !worksList || !runnStore) {
+    return (
+      <Document>
+        <Page size="A4" style={styles.page}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Ошибка создания PDF</Text>
+            <Text style={styles.subtitle}>Недостаточно данных для создания документа</Text>
+          </View>
+        </Page>
+      </Document>
+    );
+  }
+
+  // Дополнительная проверка структуры данных
+  const hasValidBmzStore = bmzStore && typeof bmzStore === 'object' && 
+    typeof bmzStore.width === 'number' && typeof bmzStore.length === 'number';
+  const hasValidRusnStore = rusnStore && typeof rusnStore === 'object' && 
+    Array.isArray(rusnStore.cellConfigs);
+  const hasValidWorksList = Array.isArray(worksList);
+  const hasValidRunnStore = runnStore && typeof runnStore === 'object';
+
+  if (!hasValidBmzStore || !hasValidRusnStore || !hasValidWorksList || !hasValidRunnStore) {
+    return (
+      <Document>
+        <Page size="A4" style={styles.page}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Ошибка создания PDF</Text>
+            <Text style={styles.subtitle}>Некорректная структура данных</Text>
+          </View>
+        </Page>
+      </Document>
+    );
+  }
+
   // Глобальный расчет БМЗ
-  const bmzArea = calculateArea(bmzStore.width, bmzStore.length);
+  const bmzArea = calculateArea(bmzStore.width || 0, bmzStore.length || 0);
   const roundedArea = Math.round(bmzArea * 10) / 10;
   const unitPrice = calculateBasePrice(bmzStore.settings, bmzStore.thickness, bmzArea);
   const buildingTotal = unitPrice * roundedArea;
@@ -202,16 +223,16 @@ export const PDFDocument = ({
 
   // Итог по РУСН
   const rusnTotal =
-    rusnStore.cellConfigs.reduce((sum: number, cell: any) => sum + (cell.totalPrice || 0), 0) +
+    (rusnStore.cellConfigs || []).reduce((sum: number, cell: any) => sum + (cell.totalPrice || 0), 0) +
     (rusnStore.busBridgeSummary?.totalPrice || 0) +
     (rusnStore.busbarSummary?.totalPrice || 0);
 
   // Итог по работам
-  const worksTotal = worksList
+  const worksTotal = (worksList || [])
     .filter((work) => selectedWorks[work.name]?.checked)
     .reduce((sum, work) => {
       const count = selectedWorks[work.name]?.count || 1;
-      return sum + work.price * count;
+      return sum + (work.price || 0) * count;
     }, 0);
 
   // Общая сумма
@@ -224,7 +245,11 @@ export const PDFDocument = ({
         <View style={styles.header}>
           <Text style={styles.title}>Итоговая спецификация {filename}</Text>
           <Text style={styles.subtitle}>Исполнитель: ТОО &#34;АЭТЗ&#34;</Text>
-          <Text style={styles.subtitle}>Создал: {fullName}</Text>
+          <Text style={styles.subtitle}>
+            Исполнитель {user?.lastName || ''} {user?.firstName || ''}
+            {user?.phone && ` | ${user.phone}`}
+            {user?.email && ` | ${user.email}`}
+          </Text>
           <Text style={styles.subtitle}>Дата: {new Date().toLocaleDateString('ru-RU')}</Text>
         </View>
 
@@ -352,7 +377,7 @@ export const PDFDocument = ({
                   </View>
                 ))
               : // Fallback к обычному отображению ячеек
-                rusnStore.cellConfigs.map((cell: any, index: number) => {
+                (rusnStore.cellConfigs || []).map((cell: any, index: number) => {
                   // Формируем полное название ячейки
                   let cellName = `Ячейка ${cell.purpose}`;
 
@@ -449,7 +474,7 @@ export const PDFDocument = ({
               <Text style={[styles.tableCellPrice, styles.totalCell]}></Text>
               <Text style={[styles.tableCellTotal, styles.totalCell]}>
                 {formatNumber(
-                  rusnStore.cellConfigs.reduce(
+                  (rusnStore.cellConfigs || []).reduce(
                     (sum: number, cell: any) => sum + (cell.totalPrice || 0),
                     0
                   ) +
@@ -462,8 +487,100 @@ export const PDFDocument = ({
           </View>
         </View>
 
+        {/* Секция РУ-0.4кВ - Общая сводка РУНН */}
+        {(() => {
+          const runnCellSummaries = runnStore?.cellSummaries || [];
+          const runnBusbarSummary = runnStore?.busbarSummary;
+          const runnBusBridgeSummary = runnStore?.busBridgeSummary;
+          
+          return (runnCellSummaries.length > 0 || runnBusbarSummary || runnBusBridgeSummary) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>РУ-0.4кВ</Text>
+            <View style={styles.table}>
+              <View style={[styles.tableRow, styles.tableHeader]}>
+                <Text style={[styles.tableCellNumber, styles.totalCell]}>№</Text>
+                <Text style={[styles.tableCellName, styles.totalCell]}>Наименование</Text>
+                <Text style={[styles.tableCellUnit, styles.totalCell]}>Ед. изм.</Text>
+                <Text style={[styles.tableCellQuantity, styles.totalCell]}>Кол-во</Text>
+                <Text style={[styles.tableCellPrice, styles.totalCell]}>Цена за ед., в тенге, без НДС</Text>
+                <Text style={[styles.tableCellTotal, styles.totalCell]}>Сумма, в тенге, без НДС</Text>
+              </View>
+              
+              {/* Ячейки из общей сводки */}
+              {runnCellSummaries.map((summary: any, index: number) => (
+                <View key={`cell-${summary.cellId}`} style={styles.tableRow}>
+                  <Text style={styles.tableCellNumber}>{index + 1}</Text>
+                  <Text style={styles.tableCellName}>{summary.name}</Text>
+                  <Text style={styles.tableCellUnit}>шт.</Text>
+                  <Text style={styles.tableCellQuantity}>{summary.quantity}</Text>
+                  <Text style={styles.tableCellPrice}>
+                    {summary.pricePerUnit > 0 ? formatNumber(summary.pricePerUnit) : '—'}
+                  </Text>
+                  <Text style={styles.tableCellTotal}>
+                    {summary.totalPrice > 0 ? formatNumber(summary.totalPrice) : '—'}
+                  </Text>
+                </View>
+              ))}
+
+              {/* Шина */}
+              {runnBusbarSummary && (
+                <View style={styles.tableRow}>
+                  <Text style={styles.tableCellNumber}>
+                    {runnCellSummaries.length + 1}
+                  </Text>
+                  <Text style={styles.tableCellName}>{runnBusbarSummary.name}</Text>
+                  <Text style={styles.tableCellUnit}>шт.</Text>
+                  <Text style={styles.tableCellQuantity}>{runnBusbarSummary.quantity}</Text>
+                  <Text style={styles.tableCellPrice}>
+                    {runnBusbarSummary.pricePerUnit > 0 ? formatNumber(runnBusbarSummary.pricePerUnit) : '—'}
+                  </Text>
+                  <Text style={styles.tableCellTotal}>
+                    {runnBusbarSummary.totalPrice > 0 ? formatNumber(runnBusbarSummary.totalPrice) : '—'}
+                  </Text>
+                </View>
+              )}
+
+              {/* Мостовая шина */}
+              {runnBusBridgeSummary && (
+                <View style={styles.tableRow}>
+                  <Text style={styles.tableCellNumber}>
+                    {runnCellSummaries.length + (runnBusbarSummary ? 1 : 0) + 1}
+                  </Text>
+                  <Text style={styles.tableCellName}>{runnBusBridgeSummary.name}</Text>
+                  <Text style={styles.tableCellUnit}>шт.</Text>
+                  <Text style={styles.tableCellQuantity}>{runnBusBridgeSummary.quantity}</Text>
+                  <Text style={styles.tableCellPrice}>
+                    {runnBusBridgeSummary.pricePerUnit > 0 ? formatNumber(runnBusBridgeSummary.pricePerUnit) : '—'}
+                  </Text>
+                  <Text style={styles.tableCellTotal}>
+                    {runnBusBridgeSummary.totalPrice > 0 ? formatNumber(runnBusBridgeSummary.totalPrice) : '—'}
+                  </Text>
+                </View>
+              )}
+
+              {/* Итого РУ-0.4кВ */}
+              <View style={[styles.tableRow, styles.totalRow]}>
+                <Text style={[styles.tableCellNumber, styles.totalCell]}>—</Text>
+                <Text style={[styles.tableCellName, styles.totalCell]}>Итого:</Text>
+                <Text style={[styles.tableCellUnit, styles.totalCell]}>—</Text>
+                <Text style={[styles.tableCellQuantity, styles.totalCell]}>—</Text>
+                <Text style={[styles.tableCellPrice, styles.totalCell]}>—</Text>
+                <Text style={[styles.tableCellTotal, styles.totalCell]}>
+                  {formatNumber(
+                    (runnCellSummaries.reduce((sum: number, s: any) => sum + (s.totalPrice || 0), 0)) +
+                    (runnBusbarSummary?.totalPrice || 0) +
+                    (runnBusBridgeSummary?.totalPrice || 0)
+                  )}{' '}
+                  тг
+                </Text>
+              </View>
+            </View>
+          </View>
+        );
+        })()}
+
         {/* Секция работ */}
-        {worksList.filter((work) => selectedWorks[work.name]?.checked).length > 0 && (
+        {(worksList || []).filter((work) => selectedWorks[work.name]?.checked).length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Работы и транспортные расходы</Text>
             <View style={styles.table}>
@@ -476,18 +593,18 @@ export const PDFDocument = ({
                 <Text style={[styles.tableCellTotal, styles.totalCell]}>Сумма</Text>
               </View>
 
-              {worksList
+              {(worksList || [])
                 .filter((work) => selectedWorks[work.name]?.checked)
                 .map((work, index) => {
-                  const count = selectedWorks[work.name]?.count || 1;
-                  const totalPrice = work.price * count;
+                  const count = 1; // Всегда 1
+                  const totalPrice = work.price || 0; // Сумма равна цене
                   return (
                     <View key={work.name} style={styles.tableRow}>
                       <Text style={styles.tableCellNumber}>{index + 1}</Text>
                       <Text style={styles.tableCellName}>{work.name}</Text>
-                      <Text style={styles.tableCellUnit}>{work.unit || 'раб.'}</Text>
+                      <Text style={styles.tableCellUnit}>{work.unit || 'раб'}</Text>
                       <Text style={styles.tableCellQuantity}>{count}</Text>
-                      <Text style={styles.tableCellPrice}>{formatNumber(work.price)} тг</Text>
+                      <Text style={styles.tableCellPrice}>{formatNumber(work.price || 0)} тг</Text>
                       <Text style={styles.tableCellTotal}>{formatNumber(totalPrice)} тг</Text>
                     </View>
                   );

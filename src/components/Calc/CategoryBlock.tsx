@@ -103,7 +103,6 @@ export default function CategoryBlock({
   }, [showDropdown]);
 
   useEffect(() => {
-    console.log('Поиск по:', debouncedSearch);
     const fetch = async () => {
       if (!debouncedSearch.trim()) return setResults([]);
       try {

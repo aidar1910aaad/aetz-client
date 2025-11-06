@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import MaterialsTable from '@/app/dashboard/bktp/rusn/components/MaterialsTable';
+import MaterialsTable from '@/app/dashboard/bktp/rusn/calculations/MaterialsTable';
 
 interface AdditionalMaterialsProps {
   busbarBridgeCalculation: any;

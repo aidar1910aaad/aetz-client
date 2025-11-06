@@ -3,7 +3,7 @@
 import React from 'react';
 import { useRusnStore } from '@/store/useRusnStore';
 
-type TabType = 'global' | 'cells' | 'bus-bridge';
+type TabType = 'main' | 'bus-bridge';
 
 interface RusnConfigTabsProps {
   activeTab: TabType;
@@ -15,8 +15,8 @@ export const RusnConfigTabs: React.FC<RusnConfigTabsProps> = ({ activeTab, onTab
 
   const tabs = [
     {
-      id: 'global' as TabType,
-      label: 'Общие настройки',
+      id: 'main' as TabType,
+      label: 'Конфигурация',
       icon: (
         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
           <path
@@ -26,21 +26,7 @@ export const RusnConfigTabs: React.FC<RusnConfigTabsProps> = ({ activeTab, onTab
           />
         </svg>
       ),
-      hasData: !!(global.breaker || global.rza || global.meterType),
-    },
-    {
-      id: 'cells' as TabType,
-      label: 'Ячейки',
-      icon: (
-        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-          <path
-            fillRule="evenodd"
-            d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
-            clipRule="evenodd"
-          />
-        </svg>
-      ),
-      hasData: cellConfigs.length > 0,
+      hasData: !!(global.breaker || global.rza || global.meterType) || cellConfigs.length > 0,
       badge: cellConfigs.length,
     },
     {

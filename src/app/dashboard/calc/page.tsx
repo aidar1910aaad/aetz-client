@@ -2,9 +2,11 @@
 
 import { useRouter } from 'next/navigation';
 import { useCalculations } from '@/hooks/useCalculations';
-import { FolderPlus, Folder, Zap, Edit, Trash } from 'lucide-react';
+import { FolderPlus, Folder, Zap, Edit, Trash, Calculator, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { showToast } from '@/shared/modals/ToastProvider';
+import RoleGuard from '@/components/common/RoleGuard';
+import { UserRole } from '@/types/user';
 
 export default function CalculationsPage() {
   const router = useRouter();
@@ -129,140 +131,179 @@ export default function CalculationsPage() {
   };
 
   return (
-    <div className="h-[calc(100vh-110px)] overflow-y-auto px-8 py-8 bg-gradient-to-br from-gray-50 to-white">
-      <div className="flex items-center justify-between mb-8">
-        <h2 className="text-3xl font-bold text-gray-800">Группы калькуляций</h2>
-
-        <button
-          onClick={() => setModalOpen(true)}
-          className="flex items-center gap-2 bg-[#3A55DF] text-white px-4 py-2 rounded-lg hover:bg-[#2e46c5] transition-colors text-sm font-medium shadow-sm"
-        >
-          <FolderPlus className="w-5 h-5" />
-          Добавить группу
-        </button>
-      </div>
-
-      {/* Фильтры по напряжению */}
-      <div className="mb-6">
-        <div className="flex items-center gap-4">
-          <span className="text-sm font-medium text-gray-700">Фильтр по напряжению:</span>
-          <div className="flex items-center gap-2">
+    <RoleGuard
+      allowedRoles={[UserRole.ADMIN, UserRole.PTO]}
+      redirectTo="/dashboard"
+      pagePath="/dashboard/calc"
+    >
+      <div className="h-[calc(100vh-64px)] bg-white overflow-y-auto">
+      <div className="p-6">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="p-3 bg-gray-100 rounded-xl">
+              <Calculator className="w-6 h-6 text-[#8eba1e]" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Группы калькуляций</h1>
+              <p className="text-gray-600">Управление группами расчетов</p>
+            </div>
+          </div>
+          
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-4">
+              <div className="bg-gray-50 px-4 py-2 rounded-lg">
+                <span className="text-sm text-gray-600">Всего групп: </span>
+                <span className="font-semibold text-[#8eba1e]">{groups.length}</span>
+              </div>
+              {voltageFilter !== null && (
+                <div className="bg-gray-50 px-4 py-2 rounded-lg">
+                  <span className="text-sm text-gray-600">Показано: </span>
+                  <span className="font-semibold text-[#8eba1e]">{filteredGroups.length}</span>
+                </div>
+              )}
+            </div>
             <button
-              onClick={() => setVoltageFilter(null)}
-              className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                voltageFilter === null
-                  ? 'bg-[#3A55DF] text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+              onClick={() => setModalOpen(true)}
+              className="flex items-center gap-2 bg-[#8eba1e] hover:bg-[#7aa31a] text-white px-6 py-3 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
             >
-              Все
-            </button>
-            <button
-              onClick={() => setVoltageFilter(400)}
-              className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                voltageFilter === 400
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              0.4 кВ
-            </button>
-            <button
-              onClick={() => setVoltageFilter(10)}
-              className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                voltageFilter === 10
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              10 кВ
-            </button>
-            <button
-              onClick={() => setVoltageFilter(20)}
-              className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                voltageFilter === 20
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              20 кВ
+              <Plus size={18} />
+              Добавить группу
             </button>
           </div>
         </div>
-        {voltageFilter !== null && (
-          <p className="text-sm text-gray-500 mt-2">
-            Показано {filteredGroups.length} из {groups.length} групп
-          </p>
-        )}
-      </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3A55DF]"></div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredGroups.map((group) => (
-            <div
-              key={group.id}
-              className="group cursor-pointer bg-white border border-gray-200 hover:border-[#3A55DF] shadow-sm hover:shadow-md rounded-xl p-6 transition-all duration-200"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div
-                  className="flex items-center gap-3 flex-1"
-                  onClick={() => handleOpenGroup(group.slug)}
-                >
-                  <Folder className="w-6 h-6 text-[#3A55DF] flex-shrink-0" />
-                  <h3 className="text-lg font-semibold text-gray-800 group-hover:text-[#3A55DF] transition-colors">
-                    {group.name}
-                  </h3>
-                </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEdit(group);
-                    }}
-                    className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                    title="Редактировать"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(group);
-                    }}
-                    className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                    title="Удалить"
-                  >
-                    <Trash className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-2" onClick={() => handleOpenGroup(group.slug)}>
-                <div className="flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-gray-400" />
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${getVoltageColor(
-                      group.voltageType
-                    )}`}
-                  >
-                    {getVoltageLabel(group.voltageType)}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-500">Slug: {group.slug}</p>
-                {group.createdAt && (
-                  <p className="text-xs text-gray-400">
-                    Создано: {new Date(group.createdAt).toLocaleDateString('ru-RU')}
-                  </p>
-                )}
-              </div>
+        {/* Фильтры по напряжению */}
+        <div className="mb-8">
+          <div className="flex items-center gap-4 mb-4">
+            <span className="text-sm font-medium text-gray-700">Фильтр по напряжению:</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setVoltageFilter(null)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  voltageFilter === null
+                    ? 'bg-[#8eba1e] text-white shadow-md'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:border-[#8eba1e]/30'
+                }`}
+              >
+                Все
+              </button>
+              <button
+                onClick={() => setVoltageFilter(400)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  voltageFilter === 400
+                    ? 'bg-green-600 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:border-[#8eba1e]/30'
+                }`}
+              >
+                0.4 кВ
+              </button>
+              <button
+                onClick={() => setVoltageFilter(10)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  voltageFilter === 10
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:border-[#8eba1e]/30'
+                }`}
+              >
+                10 кВ
+              </button>
+              <button
+                onClick={() => setVoltageFilter(20)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  voltageFilter === 20
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:border-[#8eba1e]/30'
+                }`}
+              >
+                20 кВ
+              </button>
             </div>
-          ))}
+          </div>
+          {voltageFilter !== null && (
+            <div className="bg-gray-50 px-4 py-2 rounded-lg inline-block">
+              <span className="text-sm text-gray-600">
+                Показано <span className="font-semibold text-[#8eba1e]">{filteredGroups.length}</span> из <span className="font-semibold text-[#8eba1e]">{groups.length}</span> групп
+              </span>
+            </div>
+          )}
         </div>
-      )}
+
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#8eba1e] mx-auto mb-4"></div>
+              <p className="text-gray-600">Загрузка групп...</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredGroups.map((group) => (
+              <div
+                key={group.id}
+                className="group cursor-pointer bg-white border border-gray-200 hover:border-[#8eba1e]/30 shadow-lg hover:shadow-xl rounded-2xl p-6 transition-all duration-300 hover:scale-[1.02]"
+              >
+                {/* Декоративный акцент сверху */}
+                <div className="absolute top-0 left-0 right-0 h-1 bg-[#8eba1e] opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-t-2xl"></div>
+                
+                <div className="flex items-start justify-between mb-4">
+                  <div
+                    className="flex items-center gap-3 flex-1"
+                    onClick={() => handleOpenGroup(group.slug)}
+                  >
+                    <div className="p-2 bg-gray-100 group-hover:bg-[#8eba1e] rounded-lg transition-all duration-300">
+                      <Folder className="w-6 h-6 text-[#8eba1e] group-hover:text-white flex-shrink-0" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-800 group-hover:text-[#8eba1e] transition-colors">
+                      {group.name}
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(group);
+                      }}
+                      className="p-2 text-gray-400 hover:text-[#8eba1e] hover:bg-gray-100 rounded-lg transition-all duration-200"
+                      title="Редактировать"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(group);
+                      }}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-lg transition-all duration-200"
+                      title="Удалить"
+                    >
+                      <Trash className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-3" onClick={() => handleOpenGroup(group.slug)}>
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-[#8eba1e]" />
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${getVoltageColor(
+                        group.voltageType
+                      )}`}
+                    >
+                      {getVoltageLabel(group.voltageType)}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500">Slug: {group.slug}</p>
+                  {group.createdAt && (
+                    <p className="text-xs text-gray-400">
+                      Создано: {new Date(group.createdAt).toLocaleDateString('ru-RU')}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
       {/* Модалка создания */}
       {modalOpen && (
@@ -279,7 +320,7 @@ export default function CalculationsPage() {
                   placeholder="Введите название"
                   value={newGroupName}
                   onChange={(e) => setNewGroupName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#3A55DF] focus:border-[#3A55DF]"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e] transition-all duration-200"
                 />
               </div>
               <div>
@@ -287,7 +328,7 @@ export default function CalculationsPage() {
                 <select
                   value={newGroupVoltage}
                   onChange={(e) => setNewGroupVoltage(Number(e.target.value))}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#3A55DF] focus:border-[#3A55DF]"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e] transition-all duration-200"
                 >
                   <option value={400}>0.4 кВ</option>
                   <option value={10}>10 кВ</option>
@@ -308,7 +349,7 @@ export default function CalculationsPage() {
               </button>
               <button
                 onClick={handleCreate}
-                className="px-4 py-2 rounded-lg bg-[#3A55DF] text-white hover:bg-[#2e46c5] transition-colors"
+                className="px-4 py-2 rounded-lg bg-[#8eba1e] text-white hover:bg-[#7aa31a] transition-all duration-200 shadow-md hover:shadow-lg"
               >
                 Создать
               </button>
@@ -332,7 +373,7 @@ export default function CalculationsPage() {
                   placeholder="Введите название"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#3A55DF] focus:border-[#3A55DF]"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e] transition-all duration-200"
                 />
               </div>
               <div>
@@ -340,7 +381,7 @@ export default function CalculationsPage() {
                 <select
                   value={editVoltage}
                   onChange={(e) => setEditVoltage(Number(e.target.value))}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#3A55DF] focus:border-[#3A55DF]"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e] transition-all duration-200"
                 >
                   <option value={400}>0.4 кВ</option>
                   <option value={10}>10 кВ</option>
@@ -360,7 +401,7 @@ export default function CalculationsPage() {
               </button>
               <button
                 onClick={handleUpdate}
-                className="px-4 py-2 rounded-lg bg-[#3A55DF] text-white hover:bg-[#2e46c5] transition-colors"
+                className="px-4 py-2 rounded-lg bg-[#8eba1e] text-white hover:bg-[#7aa31a] transition-all duration-200 shadow-md hover:shadow-lg"
               >
                 Сохранить
               </button>
@@ -369,5 +410,7 @@ export default function CalculationsPage() {
         </div>
       )}
     </div>
+    </div>
+    </RoleGuard>
   );
 }

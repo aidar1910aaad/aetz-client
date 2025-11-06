@@ -69,5 +69,4 @@ export const runnCellsData = [
     vvod: 5000,
     sv: 4000,
   },
-  // Можно добавить другие связки ниже
 ];

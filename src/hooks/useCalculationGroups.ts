@@ -13,9 +13,7 @@ export function useCalculationGroups() {
         setError(null);
 
         const token = localStorage.getItem('token') || '';
-        console.log('Fetching calculation groups...');
         const response = await getAllCalculationGroups(token);
-        console.log('Calculation groups response:', response);
 
         if (!response || !Array.isArray(response)) {
           throw new Error('Invalid calculation groups response format');

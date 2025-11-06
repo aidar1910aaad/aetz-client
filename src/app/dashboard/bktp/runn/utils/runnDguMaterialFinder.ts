@@ -45,8 +45,7 @@ export function findBestMaterialByNominalCurrent(
     return null;
   }
 
-  console.log(`=== ПОИСК МАТЕРИАЛА ДЛЯ РУНН ДГУ (номинальный ток: ${nominalCurrent.toFixed(2)} А) ===`);
-  console.log('Количество материалов для поиска:', materials.length);
+
 
   // Собираем материалы с извлеченными токами
   const materialsWithCurrents = materials
@@ -61,14 +60,8 @@ export function findBestMaterialByNominalCurrent(
     }));
 
   if (materialsWithCurrents.length === 0) {
-    console.log('❌ Не найдено материалов с указанием тока в названии');
     return null;
   }
-
-  console.log('Материалы с токами:');
-  materialsWithCurrents.forEach(item => {
-    console.log(`  "${item.material.name}" -> ${item.current} А`);
-  });
 
   // Ищем материал с током, который больше или равен номинальному току
   // Сортируем по возрастанию тока, чтобы найти минимально подходящий
@@ -78,18 +71,12 @@ export function findBestMaterialByNominalCurrent(
 
   if (suitableMaterials.length > 0) {
     const selected = suitableMaterials[0];
-    console.log(`✅ Выбран материал: "${selected.material.name}" (${selected.current} А)`);
-    console.log(`   Превышение: ${(selected.current - nominalCurrent).toFixed(2)} А`);
     return selected.material;
   }
 
   // Если нет материала с током >= номинального, выбираем максимальный доступный
   const maxCurrentMaterial = materialsWithCurrents
     .sort((a, b) => b.current - a.current)[0];
-
-  console.log(`⚠️ Нет материала с током >= ${nominalCurrent.toFixed(2)} А`);
-  console.log(`   Выбран максимальный доступный: "${maxCurrentMaterial.material.name}" (${maxCurrentMaterial.current} А)`);
-  console.log(`   Недостаток: ${(nominalCurrent - maxCurrentMaterial.current).toFixed(2)} А`);
 
   return maxCurrentMaterial.material;
 }

@@ -7,7 +7,7 @@ import { showToast } from '@/shared/modals/ToastProvider';
 
 const steps = [
   { label: 'Заявка', href: '/dashboard/bktp' },
-  { label: 'БМЗ', href: '/dashboard/bktp/bmz' },
+  { label: 'Здание подстанции', href: '/dashboard/bktp/bmz' },
   { label: 'Трансформатор', href: '/dashboard/bktp/transformers' },
   { label: 'РУСН', href: '/dashboard/bktp/rusn' },
   { label: 'РУНН', href: '/dashboard/bktp/runn' },
@@ -48,8 +48,8 @@ export default function Breadcrumbs() {
                   href={step.href}
                   className={`px-2 py-1 rounded-md transition-all duration-200 ${
                     isActive
-                      ? 'bg-[#3A55DF]/10 text-[#3A55DF] font-medium'
-                      : 'hover:bg-gray-100 hover:text-[#3A55DF]'
+                      ? 'bg-[#8eba1e]/10 text-[#8eba1e] font-medium'
+                      : 'hover:bg-gray-100 hover:text-[#8eba1e]'
                   }`}
                 >
                   {step.label}

@@ -1,6 +1,5 @@
 import { api } from '../baseUrl';
 
-console.log('LOADED MATERIAL API MODULE');
 
 export interface Material {
   code: string;
@@ -46,6 +45,39 @@ export interface MaterialHistoryItem {
   changedAt: string;
 }
 
+export interface MaterialHistoryWithMaterial extends MaterialHistoryItem {
+  material: {
+    id: number;
+    name: string;
+    code: string;
+    unit: string;
+    price: number;
+    category: {
+      id: number;
+      name: string;
+    };
+  };
+}
+
+export interface GetMaterialHistoryParams {
+  materialName?: string;
+  materialCode?: string;
+  categoryId?: number;
+  fieldChanged?: string;
+  changedBy?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface MaterialHistoryResponse {
+  data: MaterialHistoryWithMaterial[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 // ✅ Создание материала
 export async function createMaterial(
   data: CreateMaterialRequest,
@@ -76,7 +108,6 @@ export const getAllMaterials = async (
   params: GetMaterialsParams
 ): Promise<{ data: Material[]; total: number }> => {
   try {
-    console.log('[getAllMaterials] token:', !!token, 'params:', params);
     const query = new URLSearchParams();
 
     // Required parameters
@@ -98,11 +129,6 @@ export const getAllMaterials = async (
     }
 
     const url = `${api}/materials?${query.toString()}`;
-    console.log('API Request URL:', url);
-    console.log('API Request Headers:', {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    });
 
     const response = await fetch(url, {
       headers: {
@@ -111,31 +137,18 @@ export const getAllMaterials = async (
       },
     });
 
-    console.log('API Response Status:', response.status);
-    console.log('API Response Headers:', Object.fromEntries(response.headers.entries()));
-
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
-      console.error('API Error Response:', errorData);
       throw new Error(errorData?.message || 'Failed to fetch materials');
     }
 
     const data = await response.json();
-    console.log('API Response Data:', {
-      total: data.total,
-      count: data.data?.length,
-      page: params.page,
-      limit: params.limit,
-      firstItem: data.data?.[0],
-      lastItem: data.data?.[data.data.length - 1],
-    });
 
     return {
       data: data.data || [],
       total: data.total || 0,
     };
   } catch (error) {
-    console.error('[getAllMaterials] API Error:', error);
     throw error;
   }
 };
@@ -217,7 +230,6 @@ export async function getMaterialHistory(
   id: number,
   token: string
 ): Promise<MaterialHistoryItem[]> {
-  console.log('[getMaterialHistory] id:', id, 'token:', !!token);
   const response = await fetch(`${api}/materials/${id}/history`, {
     method: 'GET',
     headers: {
@@ -239,13 +251,12 @@ export const getMaterialsByCategoryId = async (
   token: string
 ): Promise<Material[]> => {
   try {
-    console.log('Fetching materials for category:', categoryId);
+    // Проверяем валидность ID
+    if (isNaN(categoryId) || categoryId <= 0 || categoryId > 2147483647) {
+      throw new Error(`Неправильный ID категории: ${categoryId}. ID должен быть числом от 1 до 2147483647.`);
+    }
+
     const url = `${api}/categories/${categoryId}/materials`;
-    console.log('API URL:', url);
-    console.log('Request headers:', {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    });
 
     const response = await fetch(url, {
       method: 'GET',
@@ -255,29 +266,57 @@ export const getMaterialsByCategoryId = async (
       },
     });
 
-    console.log('Response status:', response.status);
-    console.log('Response headers:', response.headers);
-    console.log('Response ok:', response.ok);
-
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('Error response:', errorData);
+      console.error(`[getMaterialsByCategoryId] Ошибка сервера:`, {
+        status: response.status,
+        statusText: response.statusText,
+        errorData
+      });
       throw new Error(errorData.message || 'Failed to fetch materials');
     }
 
     const data = await response.json();
-    console.log('Materials data:', data);
-    console.log('Materials data type:', typeof data);
-    console.log('Is array:', Array.isArray(data));
 
     if (!Array.isArray(data)) {
-      console.error('Invalid response format:', data);
+      console.error(`[getMaterialsByCategoryId] Неправильный формат ответа:`, data);
       throw new Error('Invalid response format');
     }
 
     return data;
   } catch (error) {
-    console.error('Error in getMaterialsByCategoryId:', error);
     throw error;
   }
 };
+
+// ✅ Получить историю изменений материалов
+export async function getMaterialHistoryList(
+  token: string
+): Promise<MaterialHistoryResponse> {
+  try {
+    const url = `${api}/materials/history`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || 'Ошибка при получении истории материалов');
+    }
+
+    const data = await response.json();
+    
+    return {
+      data: data,
+      total: data.length,
+      limit: 10,
+      offset: 0
+    };
+  } catch (error) {
+    throw error;
+  }
+}

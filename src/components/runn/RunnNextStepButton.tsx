@@ -1,26 +1,45 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface RunnNextStepButtonProps {
   skip: boolean;
+  onSwitchToBusbar?: () => void;
+  currentTab?: 'main' | 'bus-bridge';
 }
 
-export const RunnNextStepButton: React.FC<RunnNextStepButtonProps> = ({ skip }) => {
+export const RunnNextStepButton: React.FC<RunnNextStepButtonProps> = ({ skip, onSwitchToBusbar, currentTab }) => {
+  const router = useRouter();
+
+  const handleClick = () => {
+    if (skip) {
+      // Если пропускаем, переходим на следующую страницу
+      router.push('/dashboard/bktp/additional-equipment');
+    } else {
+      // Если добавляем в спецификацию
+      if (currentTab === 'bus-bridge') {
+        // Если мы в разделе "Сборные шины", переходим на следующую страницу
+        router.push('/dashboard/bktp/additional-equipment');
+      } else {
+        // Если мы в разделе "Конфигурация", переключаемся на вкладку "Сборные шины"
+        if (onSwitchToBusbar) {
+          onSwitchToBusbar();
+        }
+      }
+    }
+  };
+
   return (
-    <Link href="/dashboard/bktp/work">
-      <button className="bg-[#3A55DF] text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2">
-        {skip ? 'Пропустить РУНН' : 'К монтажным работам'}
-        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-          <path
-            fillRule="evenodd"
-            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-            clipRule="evenodd"
-          />
-        </svg>
-      </button>
-    </Link>
+    <button 
+      onClick={handleClick}
+      className="flex items-center gap-2 px-8 py-4 rounded-xl text-lg font-semibold transition-all duration-200 bg-[#8eba1e] hover:bg-[#7aa31a] text-white shadow-lg hover:shadow-xl transform hover:scale-105"
+    >
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      {skip ? 'Далее' : 'Добавить в спецификацию'}
+    </button>
   );
 };
 

@@ -1,60 +1,136 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
+import { FileText, Plus, RefreshCw, Calendar, User, DollarSign } from 'lucide-react';
+import { getAllApplications } from '@/api/requests';
+
+interface Request {
+  id: number;
+  bidNumber: string;
+  type: string;
+  date: string;
+  client: string;
+  taskNumber: string;
+  totalAmount: number;
+  user: {
+    id: number;
+    username: string;
+    firstName?: string;
+    lastName?: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
 
 const statuses = ['Все', 'В обработке', 'Завершено'];
 
-const requests = [
-  { id: 1, date: '2024-04-01', status: 'В обработке', amount: '1 200 000 ₸', author: 'Алия С.' },
-  { id: 2, date: '2024-04-05', status: 'Завершено', amount: '850 000 ₸', author: 'Бауыржан Т.' },
-  { id: 3, date: '2024-04-10', status: 'В обработке', amount: '3 400 000 ₸', author: 'Елена М.' },
-  { id: 4, date: '2024-04-12', status: 'Завершено', amount: '1 750 000 ₸', author: 'Дуйсембай А.' },
-  { id: 5, date: '2024-04-14', status: 'В обработке', amount: '620 000 ₸', author: 'Алия С.' },
-  { id: 6, date: '2024-04-01', status: 'В обработке', amount: '1 200 000 ₸', author: 'Алия С.' },
-  { id: 7, date: '2024-04-05', status: 'Завершено', amount: '850 000 ₸', author: 'Бауыржан Т.' },
-  { id: 8, date: '2024-04-10', status: 'В обработке', amount: '3 400 000 ₸', author: 'Елена М.' },
-  { id: 9, date: '2024-04-12', status: 'Завершено', amount: '1 750 000 ₸', author: 'Дуйсембай А.' },
-  { id: 10, date: '2024-04-14', status: 'В обработке', amount: '620 000 ₸', author: 'Алия С.' },
-  { id: 11, date: '2024-04-01', status: 'В обработке', amount: '1 200 000 ₸', author: 'Алия С.' },
-  { id: 12, date: '2024-04-05', status: 'Завершено', amount: '850 000 ₸', author: 'Бауыржан Т.' },
-  { id: 13, date: '2024-04-10', status: 'В обработке', amount: '3 400 000 ₸', author: 'Елена М.' },
-  {
-    id: 14,
-    date: '2024-04-12',
-    status: 'Завершено',
-    amount: '1 750 000 ₸',
-    author: 'Дуйсембай А.',
-  },
-  { id: 15, date: '2024-04-14', status: 'В обработке', amount: '620 000 ₸', author: 'Алия С.' },
-];
-
 export default function RequestsPage() {
+  const router = useRouter();
   const [selectedStatus, setSelectedStatus] = useState('Все');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [requests, setRequests] = useState<Request[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  // Функция загрузки заявок
+  const fetchRequests = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Токен авторизации не найден');
+        return;
+      }
+
+      const data = await getAllApplications(token);
+      console.log('📋 Загруженные заявки:', data);
+      setRequests(data);
+    } catch (err: any) {
+      console.error('❌ Ошибка при загрузке заявок:', err);
+      setError(err.message || 'Ошибка при загрузке заявок');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Загружаем заявки с сервера при монтировании компонента
+  useEffect(() => {
+    fetchRequests();
+  }, []);
+
+  // Фильтрация заявок
   const filtered = requests.filter((r) => {
-    const matchesStatus = selectedStatus === 'Все' || r.status === selectedStatus;
+    const matchesStatus = selectedStatus === 'Все' || r.type === selectedStatus;
     const inDateRange = (!fromDate || r.date >= fromDate) && (!toDate || r.date <= toDate);
     return matchesStatus && inDateRange;
   });
 
-  return (
-    <div className="h-[calc(100vh-124px)] flex flex-col p-6">
-      {/* Заголовок + фильтры */}
-      <div className="mb-4">
-        <h1 className="text-2xl font-semibold mb-4">Заявки</h1>
+  // Форматирование даты
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('ru-RU');
+  };
 
-        <div className="flex flex-wrap justify-between items-center gap-4">
-          <div className="flex flex-wrap gap-2 items-center">
+  // Форматирование суммы
+  const formatAmount = (amount: number) => {
+    return amount.toLocaleString('ru-RU') + ' ₸';
+  };
+
+  // Получение имени автора
+  const getAuthorName = (user: Request['user']) => {
+    if (user.firstName && user.lastName) {
+      return `${user.lastName} ${user.firstName}`;
+    }
+    return user.username;
+  };
+
+  // Обработка клика по заявке
+  const handleRequestClick = (requestId: number) => {
+    router.push(`/dashboard/requests/${requestId}`);
+  };
+
+  return (
+    <div className="h-[calc(100vh-64px)] bg-white overflow-y-auto">
+      <div className="p-6">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="p-3 bg-gray-100 rounded-xl">
+              <FileText className="w-6 h-6 text-[#8eba1e]" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Заявки</h1>
+              <p className="text-gray-600">Управление заявками и их статусами</p>
+            </div>
+          </div>
+          
+          {!loading && !error && (
+            <div className="flex items-center gap-6 mb-6">
+              <div className="bg-gray-50 px-4 py-2 rounded-lg">
+                <span className="text-sm text-gray-600">Всего заявок: </span>
+                <span className="font-semibold text-[#8eba1e]">{requests.length}</span>
+              </div>
+              <div className="bg-gray-50 px-4 py-2 rounded-lg">
+                <span className="text-sm text-gray-600">Показано: </span>
+                <span className="font-semibold text-[#8eba1e]">{filtered.length}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Filters Section */}
+        <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
+          <div className="flex flex-wrap gap-4 items-center">
             {/* Select статус */}
-            <div className="relative w-52">
+            <div className="relative">
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="appearance-none w-full cursor-pointer rounded-full border border-[#C8D1E0] bg-white px-4 py-2 pr-10 text-sm text-gray-800 shadow-sm 
-                  focus:outline-none focus:ring-2 focus:ring-[#3A55DF] transition"
+                className="appearance-none w-52 cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-2 pr-10 text-sm text-gray-800 shadow-sm 
+                  focus:outline-none focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e] transition-all duration-200"
               >
                 {statuses.map((status) => (
                   <option key={status} value={status}>
@@ -68,69 +144,127 @@ export default function RequestsPage() {
             </div>
 
             {/* Даты */}
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-[#3A55DF]"
-            />
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-[#3A55DF]"
-            />
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-[#8eba1e]" />
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e] transition-all duration-200"
+                placeholder="От даты"
+              />
+              <span className="text-gray-500">—</span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e] transition-all duration-200"
+                placeholder="До даты"
+              />
+            </div>
           </div>
 
-          {/* Кнопка */}
-          <button className="bg-[#3A55DF] text-white px-4 py-2 rounded-full hover:bg-blue-700 transition">
-            Создать новую заявку
-          </button>
+          {/* Кнопки */}
+          <div className="flex gap-3">
+            <button 
+              onClick={fetchRequests}
+              disabled={loading}
+              className="flex items-center gap-2 bg-gray-100 hover:bg-[#8eba1e] text-gray-700 hover:text-white px-4 py-2 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              {loading ? 'Обновление...' : 'Обновить'}
+            </button>
+            <button className="flex items-center gap-2 bg-[#8eba1e] hover:bg-[#7aa31a] text-white px-6 py-3 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105">
+              <Plus size={18} />
+              Создать заявку
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Прокручиваемый блок с таблицей и пагинацией */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="rounded-xl border border-gray-200">
-          <table className="min-w-full table-auto text-sm">
-            <thead className="bg-gray-100 text-gray-600 text-left">
-              <tr>
-                <th className="px-6 py-3">Дата</th>
-                <th className="px-6 py-3">Статус</th>
-                <th className="px-6 py-3">Сумма</th>
-                <th className="px-6 py-3">Автор</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((req, idx) => (
-                <tr key={`${req.id}-${idx}`} className="border-t">
-                  <td className="px-6 py-4">{req.date}</td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={clsx(
-                        'px-3 py-1 rounded-full text-xs',
-                        req.status === 'Завершено'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                      )}
-                    >
-                      {req.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">{req.amount}</td>
-                  <td className="px-6 py-4">{req.author}</td>
+        {/* Table Section */}
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#8eba1e] mx-auto mb-4"></div>
+              <p className="text-gray-600">Загрузка заявок...</p>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="text-red-500 text-6xl mb-4">⚠️</div>
+              <p className="text-red-600 text-lg mb-2">Ошибка загрузки</p>
+              <p className="text-gray-600">{error}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-gray-200 shadow-sm">
+            <div className="px-6 py-3 bg-[#8eba1e]/10 text-[#8eba1e] text-sm border-b border-gray-200">
+              💡 Нажмите на строку заявки для просмотра деталей
+            </div>
+            <table className="min-w-full table-auto text-sm">
+              <thead className="bg-gray-50 text-gray-600 text-left border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-4 font-semibold">Номер заявки</th>
+                  <th className="px-6 py-4 font-semibold">Дата</th>
+                  <th className="px-6 py-4 font-semibold">Клиент</th>
+                  <th className="px-6 py-4 font-semibold">Тип</th>
+                  <th className="px-6 py-4 font-semibold">Сумма</th>
+                  <th className="px-6 py-4 font-semibold">Автор</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                      <div className="flex flex-col items-center">
+                        <FileText className="w-12 h-12 text-gray-400 mb-4" />
+                        <p className="text-lg font-medium">Заявки не найдены</p>
+                        <p className="text-sm">Попробуйте изменить фильтры поиска</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((req, idx) => (
+                    <tr 
+                      key={`${req.id}-${idx}`} 
+                      className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-all duration-200 hover:shadow-sm"
+                      onClick={() => handleRequestClick(req.id)}
+                    >
+                      <td className="px-6 py-4 font-mono text-sm text-[#8eba1e] hover:text-[#7aa31a] font-medium">
+                        {req.bidNumber}
+                      </td>
+                      <td className="px-6 py-4 text-gray-700">{formatDate(req.date)}</td>
+                      <td className="px-6 py-4 font-medium text-gray-900">{req.client}</td>
+                      <td className="px-6 py-4">
+                        <span className="px-3 py-1 rounded-full text-xs bg-[#8eba1e]/10 text-[#8eba1e] font-medium">
+                          {req.type}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 font-semibold text-green-600">
+                        {formatAmount(req.totalAmount)}
+                      </td>
+                      <td className="px-6 py-4 text-gray-700">{getAuthorName(req.user)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {/* Пагинация */}
-        <div className="mt-4 flex justify-center gap-2">
-          <button className="px-3 py-1 rounded border border-gray-300 hover:bg-gray-100">1</button>
-          <button className="px-3 py-1 rounded border border-gray-300 hover:bg-gray-100">2</button>
-          <button className="px-3 py-1 rounded border border-gray-300 hover:bg-gray-100">3</button>
-          <button className="px-3 py-1 rounded border border-gray-300 hover:bg-gray-100">
+        <div className="mt-6 flex justify-center gap-2">
+          <button className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 hover:border-[#8eba1e] transition-all duration-200">
+            1
+          </button>
+          <button className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 hover:border-[#8eba1e] transition-all duration-200">
+            2
+          </button>
+          <button className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 hover:border-[#8eba1e] transition-all duration-200">
+            3
+          </button>
+          <button className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 hover:border-[#8eba1e] transition-all duration-200">
             Вперёд
           </button>
         </div>

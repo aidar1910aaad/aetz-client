@@ -1,13 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useRunnStore, BusMaterial } from '@/store/useRunnStore';
+import { useTransformerStore } from '@/store/useTransformerStore';
 import { switchgearApi, Switchgear } from '@/api/switchgear';
 import { useRusnCalculation } from '@/hooks/useRusnCalculation';
 import { calculateCost } from '@/utils/calculationUtils';
+import { Material } from '@/api/material';
+import { api } from '@/api/baseUrl';
 
 export const useRunnBusbarCalculation = () => {
   const runn = useRunnStore();
+  const { selectedTransformer } = useTransformerStore();
   const busbar = runn.global.busbar || { enabled: false, material: null };
   const [switchgearConfigs, setSwitchgearConfigs] = useState<Switchgear[]>([]);
+  const [materialPrices, setMaterialPrices] = useState<{
+    aluminum: number;
+    copper: number;
+  }>({ aluminum: 2800, copper: 5600 }); // Значения по умолчанию
+  const [busbarCalculationFromApi, setBusbarCalculationFromApi] = useState<any>(null);
 
   // Получаем выбранную группу из localStorage
   const [selectedGroupSlug] = useState<string>(() => {
@@ -31,17 +40,59 @@ export const useRunnBusbarCalculation = () => {
     return match ? parseInt(match[1]) : null;
   };
 
-  // Находим вводной выключатель
-  const inputCell = runn.cellConfigs.find((cell) => cell.purpose === 'Ввод');
-  const selectedBreaker = inputCell?.breaker;
+  // Получаем мощность трансформатора
+  const transformerPower = selectedTransformer?.power;
+
+  // Функция для получения материала по ID
+  const getMaterialById = async (id: number, token: string): Promise<Material> => {
+    const response = await fetch(`${api}/materials/${id}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Ошибка при получении материала');
+    }
+
+    return await response.json();
+  };
+
+  // Функция для загрузки калькуляции сборных шин
+  const fetchBusbarCalculation = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      // Используем существующий API endpoint для получения калькуляции
+      const response = await fetch(`${api}/calculations/panel-sho-70/для-сборных-шин-рунн`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Ошибка при получении калькуляции');
+      }
+
+      const calculation = await response.json();
+      setBusbarCalculationFromApi(calculation);
+    } catch (error) {
+      console.error('Error fetching busbar calculation:', error);
+    }
+  };
 
   // Получаем цену за кг
   const getPricePerKg = (material: BusMaterial) => {
     if (material === 'АД' || material === 'АД2') {
-      return 2800;
+      return materialPrices.aluminum;
     }
     if (material === 'МТ' || material === 'МТ2') {
-      return 5600;
+      return materialPrices.copper;
     }
     return 0;
   };
@@ -57,6 +108,35 @@ export const useRunnBusbarCalculation = () => {
     return null;
   };
 
+  // Получаем все возможные группы для материала
+  const getPossibleGroupsForMaterial = (material: BusMaterial) => {
+    if (material === 'АД') {
+      return ['АД'];
+    }
+    if (material === 'АД2') {
+      return ['АД2', 'АД'];
+    }
+    if (material === 'МТ') {
+      return ['МТ'];
+    }
+    if (material === 'МТ2') {
+      return ['МТ2', 'МТ'];
+    }
+    return [];
+  };
+
+  // Получаем возможные группы на основе выбранного типа материала из трансформатора
+  const getPossibleGroupsFromTransformer = (busbarsType: string) => {
+    if (busbarsType === 'Алюминий') {
+      return ['АД', 'АД2', 'АД3'];
+    }
+    if (busbarsType === 'Медь') {
+      return ['МТ', 'МТ2', 'МТ3'];
+    }
+    return [];
+  };
+
+
   // Загружаем конфигурации коммутационных аппаратов
   useEffect(() => {
     const fetchSwitchgearConfigs = async () => {
@@ -71,75 +151,205 @@ export const useRunnBusbarCalculation = () => {
     fetchSwitchgearConfigs();
   }, []);
 
-  // Находим подходящую конфигурацию
-  const matchingConfig = selectedBreaker
+  // Загружаем цены материалов из API
+  useEffect(() => {
+    const fetchMaterialPrices = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        // Загружаем алюминий (ID: 3489) и медь (ID: 3490)
+        const [aluminumMaterial, copperMaterial] = await Promise.all([
+          getMaterialById(3489, token),
+          getMaterialById(3490, token)
+        ]);
+
+        setMaterialPrices({
+          aluminum: typeof aluminumMaterial.price === 'string'
+            ? parseFloat(aluminumMaterial.price)
+            : aluminumMaterial.price,
+          copper: typeof copperMaterial.price === 'string'
+            ? parseFloat(copperMaterial.price)
+            : copperMaterial.price
+        });
+      } catch (error) {
+        console.error('Error fetching material prices:', error);
+        // Оставляем значения по умолчанию при ошибке
+      }
+    };
+
+    fetchMaterialPrices();
+  }, []);
+
+  // Загружаем калькуляцию сборных шин
+  useEffect(() => {
+    fetchBusbarCalculation();
+  }, []);
+
+  // Находим подходящую конфигурацию для "Панель ЩО-70" по мощности трансформатора
+  const matchingConfig = transformerPower
     ? switchgearConfigs.find((config) => {
-        const current = getBreakerCurrent(selectedBreaker);
-        const materialGroup = busbar.material ? getGroupForMaterial(busbar.material) : null;
+        // Используем тип материала из трансформатора, если он выбран
+        const possibleGroups = selectedTransformer?.busbars 
+          ? getPossibleGroupsFromTransformer(selectedTransformer.busbars)
+          : busbar.material 
+            ? getPossibleGroupsForMaterial(busbar.material) 
+            : [];
         
+        // Ищем конфигурацию типа "Панель ЩО-70" с подходящими параметрами
+        // Используем мощность трансформатора для поиска по полю breaker
         return (
-          config.amperage === current &&
-          config.group === materialGroup
+          config.type === 'Панель ЩО-70' &&
+          config.breaker === transformerPower.toString() &&
+          possibleGroups.includes(config.group)
         );
       })
     : null;
 
-  // Рассчитываем общий вес и стоимость
+  // Рассчитываем общий вес и стоимость с детализацией
+  const cellDetails: Array<{name: string, quantity: number, weightPerCell: number, totalWeight: number}> = [];
+  
   const totalWeight = matchingConfig && matchingConfig.cells
     ? matchingConfig.cells
         .filter((configCell) => configCell.name !== 'Шинный мост')
         .reduce((sum, configCell) => {
-          let cellCount = 0;
+          let selectedCellCount = 0;
 
           switch (configCell.name) {
             case 'Ввод':
-              cellCount = runn.cellConfigs
+              selectedCellCount = runn.cellConfigs
                 .filter((c) => c.purpose === 'Ввод')
                 .reduce((total, cell) => total + (cell.quantity || 1), 0);
               break;
             case 'СВ':
-              cellCount = runn.cellConfigs
+              selectedCellCount = runn.cellConfigs
                 .filter((c) => c.purpose === 'Секционный выключатель')
                 .reduce((total, cell) => total + (cell.quantity || 1), 0);
               break;
+            case 'ОТХ':
+              selectedCellCount = runn.cellConfigs
+                .filter((c) => c.purpose === 'Отходящая')
+                .reduce((total, cell) => total + (cell.quantity || 1), 0);
+              break;
+            case 'УСТ':
+              // УСТ не считаем отдельно, так как это отходящие ячейки
+              selectedCellCount = 0;
+              break;
             default:
-              cellCount = runn.cellConfigs
+              selectedCellCount = runn.cellConfigs
                 .filter((c) => c.purpose === configCell.name)
                 .reduce((total, cell) => total + (cell.quantity || 1), 0);
               break;
           }
 
+          // configCell.quantity - это вес в кг на одну ячейку данного типа
           const weightPerCell = configCell.quantity || 0;
-          return sum + (weightPerCell * cellCount);
+          const cellTotalWeight = weightPerCell * selectedCellCount;
+          
+          // Добавляем детализацию только для ячеек с количеством > 0
+          if (selectedCellCount > 0) {
+            cellDetails.push({
+              name: configCell.name,
+              quantity: selectedCellCount,
+              weightPerCell: weightPerCell,
+              totalWeight: cellTotalWeight
+            });
+          }
+          
+          // Расчет: вес на ячейку × количество выбранных ячеек
+          return sum + cellTotalWeight;
         }, 0)
     : 0;
 
-  const totalPrice = busbar.material 
-    ? totalWeight * getPricePerKg(busbar.material)
+
+  // Определяем материал на основе конфигурации
+  const getMaterialFromConfig = () => {
+    if (matchingConfig?.group === 'МТ' || matchingConfig?.group === 'МТ2') {
+      return 'МТ';
+    }
+    if (matchingConfig?.group === 'АД' || matchingConfig?.group === 'АД2') {
+      return 'АД';
+    }
+    return busbar.material;
+  };
+
+  const materialFromConfig = getMaterialFromConfig();
+  const materialCost = materialFromConfig 
+    ? totalWeight * getPricePerKg(materialFromConfig)
     : 0;
 
-  // Рассчитываем данные для калькуляции сборных шин
-  const busbarCalculationResult = busbarCalculation
-    ? calculateCost(totalPrice, {
-        hourlyRate: busbarCalculation.data.calculation?.hourlyRate || 2000,
-        manufacturingHours: busbarCalculation.data.calculation?.manufacturingHours || 4,
-        overheadPercentage: busbarCalculation.data.calculation?.overheadPercentage || 10,
-        adminPercentage: busbarCalculation.data.calculation?.adminPercentage || 15,
-        plannedProfitPercentage: busbarCalculation.data.calculation?.plannedProfitPercentage || 10,
-        ndsPercentage: busbarCalculation.data.calculation?.ndsPercentage || 12,
-      })
+  // Отладочная информация для материала
+
+  // Рассчитываем данные для калькуляции сборных шин (как в useRusnCalculation)
+  const busbarCalculationResult = busbarCalculationFromApi
+    ? (() => {
+        const calculationData = busbarCalculationFromApi.data.calculation;
+        if (!calculationData) return { totalWithNds: materialCost };
+
+        // Рассчитываем стоимость дополнительных материалов из калькуляции
+        const additionalMaterialsCost = busbarCalculationFromApi.data.categories.reduce(
+          (total, category) => {
+            return total + category.items.reduce(
+              (itemSum, item) => itemSum + (parseFloat(item.price) * item.quantity),
+              0
+            );
+          },
+          0
+        );
+
+        // Общая стоимость материалов = стоимость сборных шин + дополнительные материалы
+        const totalMaterialsCost = materialCost + additionalMaterialsCost;
+
+        // Используем ту же логику, что и в useRusnCalculation
+        const totalSalary = calculationData.manufacturingHours * calculationData.hourlyRate;
+        const overheadCost = (totalMaterialsCost * calculationData.overheadPercentage) / 100;
+        const productionCost = totalMaterialsCost + totalSalary + overheadCost;
+        const adminCost = (totalMaterialsCost * calculationData.adminPercentage) / 100;
+        const fullCost = productionCost + adminCost;
+        const plannedProfit = (fullCost * calculationData.plannedProfitPercentage) / 100;
+        const wholesalePrice = fullCost + plannedProfit;
+        const ndsAmount = (wholesalePrice * calculationData.ndsPercentage) / 100;
+        const finalPrice = wholesalePrice + ndsAmount;
+
+        // Детальная отладочная информация
+
+        return {
+          materialsTotal: materialCost,
+          additionalMaterialsCost,
+          totalMaterialsCost,
+          salary: totalSalary,
+          overheadCost,
+          productionCost,
+          adminCost,
+          fullCost,
+          plannedProfit,
+          wholesalePrice,
+          ndsAmount,
+          totalWithNds: finalPrice
+        };
+      })()
     : null;
 
+  // Итоговая стоимость с учетом работ
+  const totalPrice = busbarCalculationResult 
+    ? (busbarCalculationResult.totalWithNds || materialCost || 0)
+    : (materialCost || 0);
+
+  // Отладочная информация
+
   return {
-    selectedBreaker,
+    selectedBreaker: selectedTransformer?.model || null,
     matchingConfig,
     totalWeight,
     totalPrice,
-    busbarCalculation,
+    materialCost,
+    cellDetails,
+    busbarCalculationFromApi,
     busbarCalculationResult,
-    busMaterial: busbar.material,
+    busMaterial: materialFromConfig,
     getBreakerCurrent,
     getPricePerKg,
     calculationsLoading,
+    transformerPower,
   };
 };

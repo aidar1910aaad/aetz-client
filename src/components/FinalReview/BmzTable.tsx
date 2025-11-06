@@ -13,7 +13,7 @@ interface BmzTableProps {
 
 const TABLE_HEADERS = ['Наименование', 'Ед. изм.', 'Кол-во', 'Цена', 'Сумма'];
 const COLORS = {
-  header: 'bg-[#3A55DF]',
+  header: 'bg-[#90bd20]',
   total: 'bg-[#f3f4f6]',
 };
 
@@ -21,21 +21,23 @@ export default function BmzTable({ bmzData, roundedArea, unitPrice, totalPrice }
   const activeEquipment = getActiveEquipment(bmzData);
 
   return (
-    <div className="bg-white border border-gray-200">
-      <table className="w-full table-auto border text-sm">
+        <div className="bg-white">
+          <table className="w-full table-fixed text-sm">
         <thead className={`${COLORS.header} text-white`}>
           <tr>
-            {TABLE_HEADERS.map((header, index) => (
-              <th key={index} className={`p-2 ${index === 0 ? 'text-left' : ''}`}>
-                {header}
-              </th>
-            ))}
+            <th className="p-2 w-12">№</th>
+            <th className="p-2 text-left w-2/5 break-words">Наименование</th>
+            <th className="p-2 w-20">Ед. изм.</th>
+            <th className="p-2 w-20">Кол-во</th>
+            <th className="p-2 w-32">Цена</th>
+            <th className="p-2 w-32">Сумма</th>
           </tr>
         </thead>
         <tbody className="text-center">
           {bmzData.buildingType === 'bmz' && (
             <tr>
-              <td className="p-2 text-left">
+              <td className="p-2">1</td>
+              <td className="p-2 text-left break-words">
                 Здание БМЗ ({bmzData.length}×{bmzData.width}×{bmzData.height} мм, толщина{' '}
                 {bmzData.thickness} мм, {bmzData.blockCount} блоков)
               </td>
@@ -47,7 +49,8 @@ export default function BmzTable({ bmzData, roundedArea, unitPrice, totalPrice }
           )}
           {bmzData.buildingType === 'tp' && (
             <tr>
-              <td className="p-2 text-left">
+              <td className="p-2">1</td>
+              <td className="p-2 text-left break-words">
                 Здание ТП ({bmzData.length}×{bmzData.width}×{bmzData.height} мм)
               </td>
               <td className="p-2">м²</td>
@@ -57,9 +60,10 @@ export default function BmzTable({ bmzData, roundedArea, unitPrice, totalPrice }
             </tr>
           )}
 
-          {activeEquipment.map((equipment) => (
+          {activeEquipment.map((equipment, index) => (
             <tr key={equipment.name}>
-              <td className="p-2 text-left">{equipment.name}</td>
+              <td className="p-2">{index + 2}</td>
+              <td className="p-2 text-left break-words">{equipment.name}</td>
               <td className="p-2">{equipment.unit}</td>
               <td className="p-2">{equipment.quantity.toFixed(2)}</td>
               <td className="p-2">{equipment.price.toLocaleString()} тг</td>
@@ -68,7 +72,7 @@ export default function BmzTable({ bmzData, roundedArea, unitPrice, totalPrice }
           ))}
 
           <tr className={`${COLORS.total} font-semibold`}>
-            <td colSpan={4} className="text-right pr-4">
+            <td colSpan={5} className="text-right pr-4">
               ВСЕГО:
             </td>
             <td className="text-right pr-4">{totalPrice.toLocaleString()} тг</td>

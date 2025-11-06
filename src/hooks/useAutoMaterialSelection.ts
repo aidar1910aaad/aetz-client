@@ -18,10 +18,11 @@ export function useAutoMaterialSelection({
   categoryName,
 }: UseAutoMaterialSelectionProps) {
   const { selectedTransformer } = useTransformerStore();
-  const { cellConfigs, updateCell, addCell } = useRunnStore();
+  const { cellConfigs, updateCell, addCell, global } = useRunnStore();
   const [autoSelectedMaterial, setAutoSelectedMaterial] = useState<Material | null>(null);
   const [autoSelectedSvMaterial, setAutoSelectedSvMaterial] = useState<Material | null>(null);
   const [isAutoSelectionEnabled, setIsAutoSelectionEnabled] = useState(false);
+
 
   // Используем ref для отслеживания предыдущих значений
   const prevValuesRef = useRef({
@@ -29,23 +30,31 @@ export function useAutoMaterialSelection({
     categoryMaterialsLength: 0,
     categoryName: '',
     cellConfigsLength: 0,
+    withdrawableBreaker: '',
+    categoryMaterialsHash: '',
   });
 
   useEffect(() => {
     // Проверяем, есть ли выбранный трансформатор и материалы категории
     if (!selectedTransformer || !categoryMaterials || categoryMaterials.length === 0) {
-      setAutoSelectedMaterial(null);
-      setAutoSelectedSvMaterial(null);
-      setIsAutoSelectionEnabled(false);
+      // Не сбрасываем autoSelectedMaterial, если он уже установлен
+      if (!autoSelectedMaterial) {
+        setAutoSelectedMaterial(null);
+        setAutoSelectedSvMaterial(null);
+        setIsAutoSelectionEnabled(false);
+      }
       return;
     }
 
     const transformerPower = selectedTransformer.power;
+    const categoryMaterialsHash = JSON.stringify(categoryMaterials.map(m => ({ id: m.id, name: m.name })));
     const currentValues = {
       transformerPower,
       categoryMaterialsLength: categoryMaterials.length,
       categoryName,
       cellConfigsLength: cellConfigs.length,
+      withdrawableBreaker: global.withdrawableBreaker || '',
+      categoryMaterialsHash,
     };
 
     // Проверяем, изменились ли значения
@@ -53,21 +62,23 @@ export function useAutoMaterialSelection({
       prevValuesRef.current.transformerPower !== transformerPower ||
       prevValuesRef.current.categoryMaterialsLength !== categoryMaterials.length ||
       prevValuesRef.current.categoryName !== categoryName ||
-      prevValuesRef.current.cellConfigsLength !== cellConfigs.length;
+      prevValuesRef.current.cellConfigsLength !== cellConfigs.length ||
+      prevValuesRef.current.withdrawableBreaker !== (global.withdrawableBreaker || '') ||
+      prevValuesRef.current.categoryMaterialsHash !== categoryMaterialsHash;
 
     if (!valuesChanged) {
       return; // Пропускаем, если ничего не изменилось
     }
 
-    console.log('=== АВТОМАТИЧЕСКИЙ ВЫБОР МАТЕРИАЛА ===');
-    console.log('Мощность трансформатора:', transformerPower, 'кВА');
+
+    // Обновляем ref с текущими значениями
+    prevValuesRef.current = currentValues;
 
     // Получаем рекомендуемый ток для ввода
     const recommendedCurrent = getVvodCurrentByTransformerPower(transformerPower);
     const recommendedSvCurrent = getSvCurrentByTransformerPower(transformerPower);
 
     if (!recommendedCurrent) {
-      console.log('Рекомендуемый ток не найден для мощности:', transformerPower);
       setAutoSelectedMaterial(null);
       setAutoSelectedSvMaterial(null);
       setIsAutoSelectionEnabled(false);
@@ -75,8 +86,27 @@ export function useAutoMaterialSelection({
       return;
     }
 
-    console.log('Рекомендуемый ток для ввода:', recommendedCurrent, 'A');
-    console.log('Рекомендуемый ток для секционного выключателя:', recommendedSvCurrent, 'A');
+    // Проверяем, что материалы соответствуют выбранному типу
+    // Ищем материалы с тем же брендом, что указан в categoryName
+    const expectedBrand = categoryName.includes('Hyundai') ? 'Hyundai' : 
+                         categoryName.includes('Metasol') ? 'Metasol' : 
+                         categoryName.includes('CHINT') ? 'CHINT' : null;
+    
+    if (expectedBrand) {
+      const hasCorrectBrand = categoryMaterials.some(material => 
+        material.name.includes(expectedBrand)
+      );
+      
+      if (!hasCorrectBrand) {
+        // Не сбрасываем autoSelectedMaterial, если он уже установлен и соответствует категории
+        if (!autoSelectedMaterial || !autoSelectedMaterial.name.includes(expectedBrand)) {
+          setAutoSelectedMaterial(null);
+          setAutoSelectedSvMaterial(null);
+        }
+        return; // Ждем правильные материалы
+      }
+    }
+
 
     // Ищем подходящий материал для ввода
     const foundMaterial = findMaterialByCurrent(categoryMaterials, recommendedCurrent);
@@ -89,7 +119,6 @@ export function useAutoMaterialSelection({
     // Добавляем небольшую задержку для создания ячеек
     setTimeout(() => {
       if (foundMaterial) {
-        console.log('✅ Найден автоматически материал для ввода:', foundMaterial.name);
         setAutoSelectedMaterial(foundMaterial);
 
         // Находим или создаем ячейку "Ввод"
@@ -97,7 +126,6 @@ export function useAutoMaterialSelection({
 
         if (!vvodCell) {
           // Создаем ячейку "Ввод" если её нет
-          console.log('Создаем ячейку Ввод автоматически');
           const newCellId = crypto.randomUUID();
           addCell({
             id: newCellId,
@@ -109,27 +137,17 @@ export function useAutoMaterialSelection({
         } else {
           // Обновляем существующую ячейку только если материал отличается
           if (vvodCell.breaker !== foundMaterial.name) {
-            console.log('Обновляем существующую ячейку Ввод с материалом:', foundMaterial.name);
             updateCell(vvodCell.id, 'breaker', foundMaterial.name);
           }
         }
 
         setIsAutoSelectionEnabled(true);
       } else {
-        console.log(
-          '❌ Подходящий материал для ввода не найден для тока:',
-          recommendedCurrent,
-          'A'
-        );
         setAutoSelectedMaterial(null);
       }
 
       // Обрабатываем материал для секционного выключателя
       if (foundSvMaterial) {
-        console.log(
-          '✅ Найден автоматически материал для секционного выключателя:',
-          foundSvMaterial.name
-        );
         setAutoSelectedSvMaterial(foundSvMaterial);
 
         // Находим или создаем ячейку "Секционный выключатель"
@@ -137,7 +155,6 @@ export function useAutoMaterialSelection({
 
         if (!svCell) {
           // Создаем ячейку "Секционный выключатель" если её нет
-          console.log('Создаем ячейку Секционный выключатель автоматически');
           const newCellId = crypto.randomUUID();
           addCell({
             id: newCellId,
@@ -154,19 +171,10 @@ export function useAutoMaterialSelection({
         } else {
           // Обновляем существующую ячейку только если материал отличается
           if (svCell.breaker !== foundSvMaterial.name) {
-            console.log(
-              'Обновляем существующую ячейку Секционный выключатель с материалом:',
-              foundSvMaterial.name
-            );
             updateCell(svCell.id, 'breaker', foundSvMaterial.name);
           }
         }
       } else {
-        console.log(
-          '❌ Подходящий материал для секционного выключателя не найден для тока:',
-          recommendedSvCurrent,
-          'A'
-        );
         setAutoSelectedSvMaterial(null);
       }
 
@@ -177,17 +185,12 @@ export function useAutoMaterialSelection({
         // Проверяем и обновляем ячейку "Ввод"
         const vvodCell = updatedCellConfigs.find((cell) => cell.purpose === 'Ввод');
         if (vvodCell && foundMaterial && vvodCell.breaker !== foundMaterial.name) {
-          console.log('Принудительно обновляем ячейку Ввод с материалом:', foundMaterial.name);
           updateCell(vvodCell.id, 'breaker', foundMaterial.name);
         }
 
         // Проверяем и обновляем ячейку "Секционный выключатель"
         const svCell = updatedCellConfigs.find((cell) => cell.purpose === 'Секционный выключатель');
         if (svCell && foundSvMaterial && svCell.breaker !== foundSvMaterial.name) {
-          console.log(
-            'Принудительно обновляем ячейку Секционный выключатель с материалом:',
-            foundSvMaterial.name
-          );
           updateCell(svCell.id, 'breaker', foundSvMaterial.name);
         }
       }, 200); // Дополнительная задержка для обновления
@@ -195,7 +198,7 @@ export function useAutoMaterialSelection({
 
     // Обновляем предыдущие значения
     prevValuesRef.current = currentValues;
-  }, [selectedTransformer, categoryMaterials, categoryName, cellConfigs, updateCell, addCell]);
+  }, [selectedTransformer, categoryMaterials, categoryName, cellConfigs, updateCell, addCell, global.withdrawableBreaker]);
 
   return {
     autoSelectedMaterial,

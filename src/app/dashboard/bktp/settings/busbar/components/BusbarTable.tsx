@@ -116,29 +116,29 @@ export const BusbarTable: React.FC<BusbarTableProps> = ({
     <div className="space-y-4">
       {filterType ? (
         <>
-          <div className="overflow-x-auto">
-            <table className="table-fixed bg-white border border-gray-300 text-xs shadow-sm">
+          <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-lg">
+            <table className="table-fixed bg-white text-xs">
               <thead>
-                <tr className="bg-gray-50">
-                  <th className="w-[90px] px-1 py-1 border border-gray-200 text-gray-700">Тип</th>
-                  <th className="w-[50px] px-1 py-1 border border-gray-200 text-gray-700">
+                <tr className="bg-gradient-to-r from-[#8eba1e] to-[#7aa31a] text-white">
+                  <th className="w-[90px] px-2 py-3 border-r border-white/20 font-semibold">Тип</th>
+                  <th className="w-[50px] px-2 py-3 border-r border-white/20 font-semibold">
                     Ячейка
                   </th>
                   {filteredColumnHeaders.map((header) => (
                     <th
                       key={header.id}
-                      className="w-[60px] px-1 py-1 border border-gray-200 text-gray-700"
+                      className="w-[60px] px-2 py-3 border-r border-white/20 last:border-r-0"
                     >
                       <div className="flex flex-col text-[10px] leading-tight">
-                        <span className="font-medium">{header.breaker}</span>
-                        <span>{header.amperage}</span>
-                        <span>{header.group}</span>
-                        <span>{header.busbar}</span>
+                        <span className="font-bold">{header.breaker}</span>
+                        <span className="opacity-90">{header.amperage}</span>
+                        <span className="opacity-90">{header.group}</span>
+                        <span className="opacity-90">{header.busbar}</span>
                       </div>
                       {onDeleteColumn && (
                         <button
                           onClick={() => onDeleteColumn(header.id)}
-                          className="mt-1 text-red-500 hover:text-red-700 text-xs underline"
+                          className="mt-2 text-white/80 hover:text-white text-xs underline hover:no-underline transition-all"
                           title="Удалить конфигурацию"
                         >
                           Удалить
@@ -156,21 +156,21 @@ export const BusbarTable: React.FC<BusbarTableProps> = ({
                       {cellTypes.map((cellName, index) => {
                         const rowData = typedRows.find((row) => row.cellName === cellName);
                         return (
-                          <tr key={cellName} className="hover:bg-gray-50">
+                          <tr key={cellName} className="hover:bg-[#8eba1e]/5 transition-colors">
                             {index === 0 && (
                               <td
                                 rowSpan={cellTypes.length}
-                                className="px-1 py-1 border border-gray-200 font-medium text-left text-[10px] text-gray-700"
+                                className="px-2 py-3 border-r border-gray-200 font-semibold text-left text-[10px] text-gray-800 bg-gray-50"
                               >
                                 {typeLabel}
                               </td>
                             )}
-                            <td className="px-1 py-1 border border-gray-200 text-[10px] text-gray-700">
+                            <td className="px-2 py-3 border-r border-gray-200 text-[10px] text-gray-700 font-medium">
                               {cellName}
                             </td>
                             {filteredColumnHeaders.map((header) => {
                               return (
-                                <td key={header.id} className="px-1 py-1 border border-gray-200">
+                                <td key={header.id} className="px-2 py-3 border-r border-gray-200 last:border-r-0">
                                   <input
                                     type="number"
                                     value={rowData?.values[header.id] || ''}
@@ -182,7 +182,7 @@ export const BusbarTable: React.FC<BusbarTableProps> = ({
                                         e.target.value ? Number(e.target.value) : null
                                       )
                                     }
-                                    className="w-full p-0.5 border border-gray-200 rounded text-center text-[10px] focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                    className="w-full p-1 border border-gray-300 rounded text-center text-[10px] focus:outline-none focus:ring-2 focus:ring-[#8eba1e]/30 focus:border-[#8eba1e] transition-all hover:border-[#8eba1e]/50"
                                   />
                                 </td>
                               );

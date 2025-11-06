@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getSettings, saveSettings } from '@/api/settings/index';
 import { getAllCategories, Category } from '@/api/categories';
+import { getMaterialsByCategoryId } from '@/api/material/index';
 import { showToast } from '@/shared/modals/ToastProvider';
 
 interface CategorySetting {
@@ -9,11 +10,28 @@ interface CategorySetting {
   visible: boolean;
 }
 
+interface Material {
+  code: string;
+  id: number;
+  name: string;
+  unit: string;
+  price: number | string;
+  category: {
+    id: number;
+    name: string;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 interface RunnSettings {
   avtomatVyk: CategorySetting[];
   avtomatLity: CategorySetting[];
   counter: CategorySetting[];
   rpsLeft: CategorySetting[];
+  fusesPn: CategorySetting[];
+  currentTransformer: CategorySetting[];
+  moldedCaseSwitch: CategorySetting[];
 }
 
 interface AllCategories {
@@ -21,6 +39,19 @@ interface AllCategories {
   avtomatLity: string[];
   counter: string[];
   rpsLeft: string[];
+  fusesPn: string[];
+  currentTransformer: string[];
+  moldedCaseSwitch: string[];
+}
+
+interface RunnMaterials {
+  avtomatVyk: Material[];
+  avtomatLity: Material[];
+  counter: Material[];
+  rpsLeft: Material[];
+  fusesPn: Material[];
+  currentTransformer: Material[];
+  moldedCaseSwitch: Material[];
 }
 
 export function useRunnSettings() {
@@ -29,12 +60,27 @@ export function useRunnSettings() {
     avtomatLity: [],
     counter: [],
     rpsLeft: [],
+    fusesPn: [],
+    currentTransformer: [],
+    moldedCaseSwitch: [],
   });
   const [selectedCategories, setSelectedCategories] = useState<RunnSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasChanges, setHasChanges] = useState(false);
   const [originalSettings, setOriginalSettings] = useState<RunnSettings | null>(null);
   const [apiCategories, setApiCategories] = useState<Category[]>([]);
+  const [materials, setMaterials] = useState<RunnMaterials>({
+    avtomatVyk: [],
+    avtomatLity: [],
+    counter: [],
+    rpsLeft: [],
+    fusesPn: [],
+    currentTransformer: [],
+    moldedCaseSwitch: [],
+  });
+
+  // Ref для отслеживания предыдущего состояния видимости категорий
+  const prevVisibilityRef = useRef<string>('');
 
   // Загрузка всех доступных категорий из API
   useEffect(() => {
@@ -46,9 +92,7 @@ export function useRunnSettings() {
           return;
         }
 
-        console.log('=== БКТП РУНН: Загрузка категорий из API ===');
         const categories = await getAllCategories(token);
-        console.log('Полученные категории:', categories);
         setApiCategories(categories);
 
         // Все категории доступны для выбора в каждой секции
@@ -58,9 +102,12 @@ export function useRunnSettings() {
           avtomatLity: allCategoryNames,
           counter: allCategoryNames,
           rpsLeft: allCategoryNames,
+          fusesPn: allCategoryNames,
+          currentTransformer: allCategoryNames,
+          moldedCaseSwitch: allCategoryNames,
         };
 
-        console.log('Все категории доступны для выбора:', categorized);
+
         setAllCategories(categorized);
       } catch (error) {
         console.error('Ошибка загрузки категорий:', error);
@@ -71,6 +118,9 @@ export function useRunnSettings() {
           avtomatLity: [],
           counter: [],
           rpsLeft: [],
+          fusesPn: [],
+          currentTransformer: [],
+          moldedCaseSwitch: [],
         };
         setAllCategories(emptyCategories);
       }
@@ -78,6 +128,92 @@ export function useRunnSettings() {
 
     fetchAllCategories();
   }, []);
+
+  // Функция загрузки материалов для категорий
+  const loadMaterialsForCategories = async (settings: RunnSettings, token: string) => {
+    const newMaterials: RunnMaterials = {
+      avtomatVyk: [],
+      avtomatLity: [],
+      counter: [],
+      rpsLeft: [],
+      fusesPn: [],
+      currentTransformer: [],
+      moldedCaseSwitch: [],
+    };
+
+    // Загружаем материалы для каждого типа категорий
+    const materialPromises = Object.entries(settings).map(async ([type, categories]) => {
+      const visibleCategories = categories.filter(cat => cat.visible);
+      
+      // Фильтруем категории с неправильными ID
+      const validCategories = visibleCategories.filter(cat => {
+        const id = parseInt(cat.id);
+        const isValid = !isNaN(id) && id > 0 && id <= 2147483647;
+        if (!isValid) {
+          console.error(`Найдена категория с неправильным ID ${cat.id} (${cat.name}), удаляем из списка`);
+        }
+        return isValid;
+      });
+      
+      const categoryIds = validCategories.map(cat => parseInt(cat.id));
+      
+      
+      for (const categoryId of categoryIds) {
+        // Проверяем валидность ID перед запросом
+        if (isNaN(categoryId) || categoryId <= 0 || categoryId > 2147483647) {
+          console.error(`Неправильный ID категории: ${categoryId} (тип: ${type}). Пропускаем загрузку.`);
+          console.error(`Категория с проблемным ID:`, categories.find(cat => parseInt(cat.id) === categoryId));
+          continue;
+        }
+
+        try {
+          const categoryMaterials = await getMaterialsByCategoryId(categoryId, token);
+          newMaterials[type as keyof RunnMaterials].push(...categoryMaterials);
+          
+        } catch (error) {
+          console.error(`Ошибка загрузки материалов для категории ${categoryId} (тип: ${type}):`, error);
+          console.error(`Детали ошибки:`, {
+            categoryId,
+            type,
+            errorMessage: error instanceof Error ? error.message : 'Unknown error',
+            errorStack: error instanceof Error ? error.stack : undefined
+          });
+        }
+      }
+    });
+
+    await Promise.all(materialPromises);
+    
+    // Отладочная информация для avtomatVyk
+    if (newMaterials.avtomatVyk.length > 0) {
+      
+      // Проверяем наличие материалов с током 2500A и 2000A
+      const current2500 = newMaterials.avtomatVyk.filter(m => 
+        m.name && (
+          m.name.includes('2500А') || // кириллическая А
+          m.name.includes('2500 А') || // кириллическая А с пробелом
+          m.name.includes('2500A') || // латинская A
+          m.name.includes('2500 A') || // латинская A с пробелом
+          m.name.includes('2500ампер') ||
+          m.name.includes('2500 amp')
+        )
+      );
+      
+      const current2000 = newMaterials.avtomatVyk.filter(m => 
+        m.name && (
+          m.name.includes('2000А') || // кириллическая А
+          m.name.includes('2000 А') || // кириллическая А с пробелом
+          m.name.includes('2000A') || // латинская A
+          m.name.includes('2000 A') || // латинская A с пробелом
+          m.name.includes('2000ампер') ||
+          m.name.includes('2000 amp')
+        )
+      );
+      
+    }
+    
+    setMaterials(newMaterials);
+  };
 
   // Загрузка текущих настроек
   useEffect(() => {
@@ -87,49 +223,45 @@ export function useRunnSettings() {
 
         // Получаем токен из localStorage
         const token = localStorage.getItem('token');
-        console.log('=== БКТП РУНН: Отправка GET запроса к API ===');
-        console.log('Token:', token ? 'Present' : 'Missing');
 
         if (!token) {
           console.error('Токен не найден в localStorage');
           throw new Error('Токен не найден');
         }
-
+        
         // Выполняем GET запрос к API
         const apiResponse = await getSettings(token);
-        console.log('=== БКТП РУНН: Ответ от API ===');
-        console.log('Полный ответ API:', apiResponse);
-        console.log('Структура ответа:', Object.keys(apiResponse));
-        console.log('Настройки РУНН в ответе:', apiResponse.settings?.runn);
-        console.log('Количество настроек РУНН:', apiResponse.settings?.runn?.length || 0);
-        console.log('Тип настроек РУНН:', typeof apiResponse.settings?.runn);
 
         // Обрабатываем настройки РУНН (если они есть)
         if (apiResponse.settings?.runn && apiResponse.settings.runn.length > 0) {
-          console.log('Настройки РУНН существуют, обрабатываем их...');
           await processRunnSettings(apiResponse.settings.runn, apiCategories);
         } else {
-          console.log('Настройки РУНН пустые, показываем пустые секции...');
-
           // Показываем пустые секции (пользователь сам добавит категории)
           const emptySettings: RunnSettings = {
             avtomatVyk: [],
             avtomatLity: [],
             counter: [],
+            rpsLeft: [],
+            fusesPn: [],
+            currentTransformer: [],
+            moldedCaseSwitch: [],
           };
 
-          console.log('Пустые настройки РУНН:', emptySettings);
           setSelectedCategories(emptySettings);
           setOriginalSettings(JSON.parse(JSON.stringify(emptySettings)));
         }
       } catch (error) {
-        console.error('Ошибка загрузки настроек БКТП РУНН:', error);
+        console.error('Ошибка загрузки настроек РУНН:', error);
 
         // В случае ошибки показываем пустые настройки
         const emptySettings: RunnSettings = {
           avtomatVyk: [],
           avtomatLity: [],
           counter: [],
+          rpsLeft: [],
+          fusesPn: [],
+          currentTransformer: [],
+          moldedCaseSwitch: [],
         };
 
         setSelectedCategories(emptySettings);
@@ -143,12 +275,16 @@ export function useRunnSettings() {
       apiRunnSettings: { categoryId: number; type: string; isVisible: boolean }[],
       categories: Category[]
     ) => {
+
       // Преобразуем API формат в наш формат
       const transformedSettings: RunnSettings = {
         avtomatVyk: [],
         avtomatLity: [],
         counter: [],
         rpsLeft: [],
+        fusesPn: [],
+        currentTransformer: [],
+        moldedCaseSwitch: [],
       };
 
       // Группируем настройки по типам и находим названия категорий
@@ -176,16 +312,32 @@ export function useRunnSettings() {
             case 'rpsLeft':
               transformedSettings.rpsLeft.push(categorySetting);
               break;
+            case 'fusesPn':
+              transformedSettings.fusesPn.push(categorySetting);
+              break;
+            case 'currentTransformer':
+              transformedSettings.currentTransformer.push(categorySetting);
+              break;
+            case 'moldedCaseSwitch':
+              transformedSettings.moldedCaseSwitch.push(categorySetting);
+              break;
             default:
               console.warn('Неизвестный тип настройки:', setting.type);
           }
         }
       );
 
-      console.log('Преобразованные настройки РУНН:', transformedSettings);
+
       setSelectedCategories(transformedSettings);
       setOriginalSettings(JSON.parse(JSON.stringify(transformedSettings)));
+      
+      // Загружаем материалы для всех категорий
+      const token = localStorage.getItem('token');
+      if (token) {
+        await loadMaterialsForCategories(transformedSettings, token);
+      }
     };
+
 
     fetchSettings();
   }, [apiCategories, allCategories]);
@@ -197,6 +349,31 @@ export function useRunnSettings() {
       setHasChanges(hasChanges);
     }
   }, [selectedCategories, originalSettings]);
+
+  // Перезагрузка материалов при изменении видимости категорий
+  useEffect(() => {
+    if (selectedCategories) {
+      const token = localStorage.getItem('token');
+      if (token) {
+        // Создаем строку с информацией о видимости категорий для сравнения
+        const currentVisibility = Object.entries(selectedCategories)
+          .map(([type, categories]) => 
+            `${type}:${categories.map(cat => `${cat.id}:${cat.visible}`).join(',')}`
+          )
+          .join('|');
+        
+        // Проверяем, изменилась ли видимость категорий
+        if (prevVisibilityRef.current !== currentVisibility) {
+          
+          // Обновляем ref
+          prevVisibilityRef.current = currentVisibility;
+          
+          // Перезагружаем материалы
+          loadMaterialsForCategories(selectedCategories, token);
+        }
+      }
+    }
+  }, [selectedCategories]);
 
   const handleAddCategory = (type: keyof RunnSettings, categoryId: string | number) => {
     if (!selectedCategories) return;
@@ -215,9 +392,17 @@ export function useRunnSettings() {
       categoryName = apiCategory.name;
       categoryIdStr = apiCategory.id.toString();
     } else {
-      // Это строка из моковых данных
+      // Это строка из моковых данных - ищем категорию по названию
       categoryName = categoryId as string;
-      categoryIdStr = Date.now().toString();
+      const apiCategory = apiCategories.find((cat) => cat.name === categoryName);
+      
+      if (apiCategory) {
+        // Используем ID из API
+        categoryIdStr = apiCategory.id.toString();
+      } else {
+        console.error(`Категория "${categoryName}" не найдена в API. Пропускаем добавление.`);
+        return;
+      }
     }
 
     // Проверяем, не добавлена ли уже эта категория в другой раздел
@@ -235,10 +420,22 @@ export function useRunnSettings() {
       visible: true,
     };
 
-    setSelectedCategories((prev) => ({
-      ...prev!,
-      [type]: [...prev![type], newCategory],
-    }));
+    setSelectedCategories((prev) => {
+      const newCategories = {
+        ...prev!,
+        [type]: [...prev![type], newCategory],
+      };
+      
+      // Принудительно перезагружаем материалы после добавления категории
+      setTimeout(() => {
+        const token = localStorage.getItem('token');
+        if (token) {
+          loadMaterialsForCategories(newCategories, token);
+        }
+      }, 100);
+      
+      return newCategories;
+    });
     setHasChanges(true);
   };
 
@@ -248,10 +445,22 @@ export function useRunnSettings() {
     const categoryToRemove = selectedCategories[type].find((cat) => cat.id === categoryId);
     if (!categoryToRemove) return;
 
-    setSelectedCategories((prev) => ({
-      ...prev!,
-      [type]: prev![type].filter((cat) => cat.id !== categoryId),
-    }));
+    setSelectedCategories((prev) => {
+      const newCategories = {
+        ...prev!,
+        [type]: prev![type].filter((cat) => cat.id !== categoryId),
+      };
+      
+      // Принудительно перезагружаем материалы после удаления категории
+      setTimeout(() => {
+        const token = localStorage.getItem('token');
+        if (token) {
+          loadMaterialsForCategories(newCategories, token);
+        }
+      }, 100);
+      
+      return newCategories;
+    });
     setHasChanges(true);
   };
 
@@ -262,13 +471,26 @@ export function useRunnSettings() {
     if (!categoryToToggle) return;
 
     const newVisible = !categoryToToggle.visible;
+    
 
-    setSelectedCategories((prev) => ({
-      ...prev!,
-      [type]: prev![type].map((cat) =>
-        cat.id === categoryId ? { ...cat, visible: newVisible } : cat
-      ),
-    }));
+    setSelectedCategories((prev) => {
+      const newCategories = {
+        ...prev!,
+        [type]: prev![type].map((cat) =>
+          cat.id === categoryId ? { ...cat, visible: newVisible } : cat
+        ),
+      };
+      
+      // Принудительно перезагружаем материалы после изменения
+      setTimeout(() => {
+        const token = localStorage.getItem('token');
+        if (token) {
+          loadMaterialsForCategories(newCategories, token);
+        }
+      }, 100); // Небольшая задержка для гарантии обновления состояния
+      
+      return newCategories;
+    });
     setHasChanges(true);
   };
 
@@ -280,9 +502,7 @@ export function useRunnSettings() {
     }
 
     try {
-      console.log('=== БКТП РУНН: Сохранение настроек ===');
-      console.log('Настройки для сохранения:', selectedCategories);
-      console.log('API категории:', apiCategories);
+      
 
       const token = localStorage.getItem('token');
       if (!token) {
@@ -292,48 +512,46 @@ export function useRunnSettings() {
       }
 
       // Получаем текущие настройки из API
-      console.log('Получаем текущие настройки из API...');
       const currentSettings = await getSettings(token);
-      console.log('Текущие настройки из API:', currentSettings);
+
 
       // Преобразуем наши настройки в формат API
       const runnSettings = [];
 
       // Собираем все категории из всех типов
       Object.entries(selectedCategories).forEach(([type, categories]) => {
-        console.log(`Обрабатываем тип ${type}:`, categories);
-        categories.forEach((category) => {
-          console.log(`Обрабатываем категорию:`, category);
+                  categories.forEach((category) => {
 
           // Сначала пытаемся найти категорию по названию в API
           const apiCategory = apiCategories.find((cat) => cat.name === category.name);
-          console.log(`Найдена в API:`, apiCategory);
+          
 
           // Если не найдена в API, используем ID из category (для моковых данных)
           if (!apiCategory) {
-            // Для моковых данных используем ID как есть
+            // Проверяем, что ID является числом, а не UUID
             const categoryId = parseInt(category.id);
-            console.log(`Используем ID из моковых данных:`, categoryId);
-            if (!isNaN(categoryId)) {
+
+            if (!isNaN(categoryId) && categoryId > 0 && categoryId <= 2147483647) {
               runnSettings.push({
                 categoryId: categoryId,
-                type: type as 'avtomatVyk' | 'avtomatLity' | 'counter',
+                type: type as 'avtomatVyk' | 'avtomatLity' | 'counter' | 'rpsLeft' | 'fusesPn' | 'currentTransformer' | 'moldedCaseSwitch',
                 isVisible: category.visible,
               });
+            } else {
+              console.warn(`Неправильный ID категории: ${category.id} (${category.name}). ID должен быть числом от 1 до 2147483647.`);
             }
           } else {
             // Для API данных используем найденный ID
-            console.log(`Используем ID из API:`, apiCategory.id);
+
             runnSettings.push({
               categoryId: apiCategory.id,
-              type: type as 'avtomatVyk' | 'avtomatLity' | 'counter',
+              type: type as 'avtomatVyk' | 'avtomatLity' | 'counter' | 'rpsLeft' | 'fusesPn' | 'currentTransformer' | 'moldedCaseSwitch',
               isVisible: category.visible,
             });
           }
         });
       });
 
-      console.log('Преобразованные настройки для API:', runnSettings);
 
       if (runnSettings.length === 0) {
         console.warn('Нет настроек для сохранения');
@@ -350,12 +568,19 @@ export function useRunnSettings() {
         },
       };
 
-      console.log('Обновленные настройки для сохранения:', updatedSettings);
+      const settingsJson = JSON.stringify(updatedSettings);
+      const settingsSize = settingsJson.length;
+      
+
+      // Проверяем размер данных
+      if (settingsSize > 1000000) { // 1MB лимит
+        console.error('Размер настроек слишком большой:', settingsSize, 'байт');
+        showToast('Размер настроек слишком большой для сохранения', 'error');
+        return;
+      }
 
       // Сохраняем в API
-      console.log('Отправляем запрос на сохранение...');
       const result = await saveSettings(updatedSettings, token);
-      console.log('Результат сохранения:', result);
 
       // Обновляем оригинальные настройки
       setOriginalSettings(JSON.parse(JSON.stringify(selectedCategories)));
@@ -377,14 +602,26 @@ export function useRunnSettings() {
     }
   };
 
+  // Функция для принудительной перезагрузки материалов
+  const reloadMaterials = () => {
+    if (selectedCategories) {
+      const token = localStorage.getItem('token');
+      if (token) {
+        loadMaterialsForCategories(selectedCategories, token);
+      }
+    }
+  };
+
   return {
     allCategories,
     selectedCategories,
+    materials,
     loading,
     hasChanges,
     handleAddCategory,
     handleRemoveCategory,
     handleToggleVisibility,
     handleSave,
+    reloadMaterials,
   };
-}
+};

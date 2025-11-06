@@ -16,7 +16,7 @@ export const Summary: React.FC<SummaryProps> = ({
   totalPrice,
 }) => {
   const grandTotal = busbarCalculationResult 
-    ? busbarCalculationResult.totalWithNds + totalPrice 
+    ? (busbarCalculationResult.totalWithNds || 0) + totalPrice 
     : totalPrice;
 
   return (
@@ -50,7 +50,7 @@ export const Summary: React.FC<SummaryProps> = ({
             <div className="flex justify-between">
               <span className="text-gray-600">Стоимость работ:</span>
               <span className="font-medium">
-                {busbarCalculationResult.totalWithNds.toLocaleString()} тг
+                {busbarCalculationResult?.totalWithNds?.toLocaleString() || '0'} тг
               </span>
             </div>
           )}

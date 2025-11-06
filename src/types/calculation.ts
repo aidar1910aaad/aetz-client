@@ -35,7 +35,8 @@ export type MaterialType =
   | 'busbar' // Сборные шины
   | 'busbridge' // Шинный мост
   | 'withdrawable_breaker' // Автомат выкатной
-  | 'molded_case_breaker'; // Автомат литой корпус
+  | 'molded_case_breaker' // Автомат литой корпус
+  | 'rps'; // РПС
 
 export interface CellMaterial {
   id: number;
@@ -62,6 +63,7 @@ export interface CellConfiguration {
     busbridge?: CellMaterial[];
     withdrawable_breaker?: CellMaterial[];
     molded_case_breaker?: CellMaterial[];
+    rps?: CellMaterial[];
   };
   categoryId?: number;
 }

@@ -102,3 +102,28 @@ export async function getMaterialsByCategoryId(
     return [];
   }
 }
+
+export async function getMaterialById(id: number, token: string): Promise<Material> {
+  const response = await fetch(`${api}/materials/${id}`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || 'Ошибка при получении материала по ID');
+  }
+
+  const data = await response.json();
+  
+  return {
+    id: data.id,
+    name: data.name,
+    price: typeof data.price === 'string' ? parseFloat(data.price) : data.price,
+    unit: data.unit || 'шт',
+    code: data.code || '',
+    category: data.category?.id || data.category || 0,
+  };
+}

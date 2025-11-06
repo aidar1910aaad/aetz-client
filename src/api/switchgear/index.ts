@@ -12,6 +12,7 @@ export interface Switchgear {
   amperage: number;
   group: string;
   busbar: string;
+  power?: number; // Добавляем поле мощности
   cells: SwitchgearCell[];
   createdAt: string;
   updatedAt: string;
@@ -23,6 +24,7 @@ export interface CreateSwitchgearDto {
   amperage: number;
   group: string;
   busbar: string;
+  power?: number; // Добавляем поле мощности
   cells: SwitchgearCell[];
 }
 

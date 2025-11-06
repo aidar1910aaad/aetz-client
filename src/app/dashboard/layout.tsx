@@ -17,13 +17,7 @@ const analyzeToken = (token: string) => {
     const hoursUntilExpiry = (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60);
     const totalHours = (expiresAt.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
 
-    console.log('🔍 Анализ JWT токена:');
-    console.log('📅 Время создания:', createdAt.toLocaleString());
-    console.log('⏰ Время истечения:', expiresAt.toLocaleString());
-    console.log('🕐 Текущее время:', now.toLocaleString());
-    console.log('⏳ Часов до истечения:', hoursUntilExpiry.toFixed(2));
-    console.log('📊 Общее время жизни токена (часов):', totalHours.toFixed(2));
-    console.log('📋 Полный payload:', payload);
+
 
     return {
       createdAt,
@@ -60,14 +54,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       }
 
       // Проверяем истечение токена используя реальное время из JWT
-      const isExpired = Date.now() > tokenAnalysis.expiresAt.getTime();
+      const now = new Date();
+      const isExpired = now.getTime() > tokenAnalysis.expiresAt.getTime();
 
       if (isExpired) {
         console.log('❌ Токен истек, перенаправляем на главную страницу');
         localStorage.removeItem('token');
         router.push('/');
       } else {
-        console.log('✅ Токен действителен');
+    
       }
     } catch {
       localStorage.removeItem('token');
@@ -81,7 +76,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto ">{children}</main>
       </div>
     </div>
   );

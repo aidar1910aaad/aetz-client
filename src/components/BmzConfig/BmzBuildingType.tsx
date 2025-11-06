@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { Building2, Zap, X } from 'lucide-react';
 
 interface BmzBuildingTypeProps {
   onChange: (type: 'bmz' | 'tp' | 'none') => void;
@@ -9,40 +10,52 @@ interface BmzBuildingTypeProps {
 
 const BmzBuildingType: React.FC<BmzBuildingTypeProps> = ({ onChange, selectedType }) => {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-      <h3 className="text-lg font-medium text-gray-900 mb-4">Тип здания</h3>
+    <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-lg">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2 bg-gray-100 rounded-lg">
+          <Building2 className="w-5 h-5 text-[#8eba1e]" />
+        </div>
+        <h3 className="text-xl font-bold text-gray-900">Тип здания</h3>
+      </div>
+      
       <div className="grid grid-cols-3 gap-4">
         <button
           onClick={() => onChange('bmz')}
-          className={`flex items-center justify-center p-4 border rounded-lg transition-colors ${
+          className={`flex flex-col items-center justify-center p-6 border-2 rounded-2xl transition-all duration-200 ${
             selectedType === 'bmz'
-              ? 'bg-blue-50 border-blue-200 text-blue-700'
-              : 'hover:bg-gray-50 text-gray-900'
-          } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
+              ? 'bg-[#8eba1e] border-[#8eba1e] text-white shadow-lg'
+              : 'border-gray-200 text-gray-700 hover:border-[#8eba1e] hover:bg-[#8eba1e]/5'
+          } focus:outline-none focus:ring-2 focus:ring-[#8eba1e] focus:ring-offset-2`}
         >
-          <span className="text-lg font-medium">БМЗ</span>
+          <Building2 className="w-8 h-8 mb-2" />
+          <span className="text-lg font-semibold">БМЗ</span>
+          <span className="text-sm opacity-80">Блочная комплектная</span>
         </button>
 
         <button
           onClick={() => onChange('tp')}
-          className={`flex items-center justify-center p-4 border rounded-lg transition-colors ${
+          className={`flex flex-col items-center justify-center p-6 border-2 rounded-2xl transition-all duration-200 ${
             selectedType === 'tp'
-              ? 'bg-blue-50 border-blue-200 text-blue-700'
-              : 'hover:bg-gray-50 text-gray-900'
-          } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
+              ? 'bg-[#8eba1e] border-[#8eba1e] text-white shadow-lg'
+              : 'border-gray-200 text-gray-700 hover:border-[#8eba1e] hover:bg-[#8eba1e]/5'
+          } focus:outline-none focus:ring-2 focus:ring-[#8eba1e] focus:ring-offset-2`}
         >
-          <span className="text-lg font-medium">ТП</span>
+          <Zap className="w-8 h-8 mb-2" />
+          <span className="text-lg font-semibold">ТП</span>
+          <span className="text-sm opacity-80">Трансформаторная подстанция</span>
         </button>
 
         <button
           onClick={() => onChange('none')}
-          className={`flex items-center justify-center p-4 border rounded-lg transition-colors ${
+          className={`flex flex-col items-center justify-center p-6 border-2 rounded-2xl transition-all duration-200 ${
             selectedType === 'none'
-              ? 'bg-blue-50 border-blue-200 text-blue-700'
-              : 'hover:bg-gray-50 text-gray-900'
-          } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
+              ? 'bg-[#8eba1e] border-[#8eba1e] text-white shadow-lg'
+              : 'border-gray-200 text-gray-700 hover:border-[#8eba1e] hover:bg-[#8eba1e]/5'
+          } focus:outline-none focus:ring-2 focus:ring-[#8eba1e] focus:ring-offset-2`}
         >
-          <span className="text-lg font-medium">Нет</span>
+          <X className="w-8 h-8 mb-2" />
+          <span className="text-lg font-semibold">Нет</span>
+          <span className="text-sm opacity-80">Здание не предусмотрено</span>
         </button>
       </div>
     </div>

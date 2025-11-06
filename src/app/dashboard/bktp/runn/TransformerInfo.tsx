@@ -37,6 +37,12 @@ export default function TransformerInfo() {
           <span className="font-medium text-gray-700">Количество:</span>{' '}
           {selectedTransformer.quantity}
         </div>
+        {selectedTransformer.busbars && (
+          <div>
+            <span className="font-medium text-gray-700">Сборные шины для РУНН:</span>{' '}
+            {selectedTransformer.busbars}
+          </div>
+        )}
       </div>
     </div>
   );

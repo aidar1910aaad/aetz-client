@@ -1,10 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { UserRole } from '@/types/user';
 
 interface User {
   id: number;
   username: string;
-  role: string;
+  role: UserRole | string;
   firstName?: string;
   lastName?: string;
   email?: string;

@@ -14,6 +14,7 @@ interface TpBuildingState {
   hasVentilationShaft: boolean;
   hasCableShelves: boolean;
   setField: (field: keyof TpBuildingState, value: any) => void;
+  initializeDefaultEquipment: () => void;
   reset: () => void;
 }
 
@@ -35,5 +36,10 @@ const initialState = {
 export const useTpBuildingStore = create<TpBuildingState>((set) => ({
   ...initialState,
   setField: (field, value) => set({ [field]: value }),
+  initializeDefaultEquipment: () => set({
+    hasLighting: true,
+    hasHeating: true,
+    hasSecurity: true,
+  }),
   reset: () => set(initialState),
 }));

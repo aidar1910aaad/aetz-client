@@ -1,6 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import RoleGuard from '@/components/common/RoleGuard';
+import { UserRole } from '@/types/user';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -27,6 +29,11 @@ export default function SettingsPage() {
       path: '/dashboard/settings/runn'
     },
     {
+      title: 'Сборные шины РУНН',
+      description: 'Настройка сборных шин РУНН',
+      path: '/dashboard/settings/runn-busbar'
+    },
+    {
       title: 'Дополнительное оборудование',
       description: 'Настройки дополнительного оборудования',
       path: '/dashboard/settings/additional'
@@ -39,7 +46,12 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div className="p-6">
+    <RoleGuard
+      allowedRoles={[UserRole.ADMIN, UserRole.PTO]}
+      redirectTo="/dashboard"
+      pagePath="/dashboard/settings"
+    >
+      <div className="p-6">
       <div className="flex items-center gap-4 mb-6">
         <button
           onClick={() => router.back()}
@@ -78,5 +90,6 @@ export default function SettingsPage() {
         </div>
       </div>
     </div>
+    </RoleGuard>
   );
 } 

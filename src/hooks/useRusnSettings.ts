@@ -99,30 +99,12 @@ export function useRusnSettingsOld() {
         getSettings(token),
       ]);
 
-      console.log('=== useRusnSettings: Получение данных ===');
-      console.log('Fetched categories:', categories);
-      console.log('Fetched settings:', settings);
-      console.log('Тип настроек:', typeof settings);
-      console.log('Структура настроек:', settings ? Object.keys(settings) : 'null');
 
       setAllCategories(categories);
 
       if (settings) {
         const rusnSettings = settings.settings.rusn || [];
-        console.log('RUSN settings:', rusnSettings);
-        console.log('Количество настроек РУСН:', rusnSettings.length);
-        console.log('Тип настроек РУСН:', typeof rusnSettings);
 
-        // Показываем детальную информацию о каждой настройке
-        rusnSettings.forEach((setting, index) => {
-          console.log(`Настройка ${index + 1}:`, {
-            type: setting.type,
-            categoryId: setting.categoryId,
-            isVisible: setting.isVisible,
-            categoryName:
-              categories.find((cat) => cat.id === setting.categoryId)?.name || 'Не найдена',
-          });
-        });
 
         const categorizedSettings = {
           switch: [],
@@ -293,12 +275,8 @@ export function useRusnSettingsOld() {
         },
       };
 
-      console.log('Saving settings:', settings);
-      console.log('Token:', token);
-      console.log('API URL:', `${api}/settings`);
 
       const updatedSettings = await saveSettings(settings, token);
-      console.log('Settings updated:', updatedSettings);
 
       setHasChanges(false);
       showToast('Настройки успешно сохранены', 'success');

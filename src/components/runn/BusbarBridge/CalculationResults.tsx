@@ -60,7 +60,7 @@ export const CalculationResults: React.FC<CalculationResultsProps> = ({
             <div key={index} className="bg-white p-3 rounded border text-xs">
               <div className="grid grid-cols-4 gap-2">
                 <div>
-                  <span className="text-gray-600">Мост #{index + 1}:</span>
+                  <span className="text-gray-600">{bridge.name || `Шинный мост 0.4 #${index + 1}`}:</span>
                   <div>{bridge.length}м × {bridge.width}мм × {bridge.quantity}шт</div>
                 </div>
                 <div>

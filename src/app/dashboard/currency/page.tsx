@@ -1,17 +1,24 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { DollarSign, Save, Settings } from 'lucide-react';
 import { showToast } from '@/shared/modals/ToastProvider';
 import { showConfirm } from '@/shared/modals/ConfirmModal';
 import { CurrencySettings } from '@/types/api/currency';
 import { currencyApi } from '@/api/currency';
+import { useRoleCheck } from '@/hooks/useRoleCheck';
+import { UserRole } from '@/types/user';
 
 export default function CurrencyPage() {
+  const { isManagerUser, isAdminUser, isPTOUser } = useRoleCheck();
   const [settings, setSettings] = useState<CurrencySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isChanged, setIsChanged] = useState(false);
   const [tempSettings, setTempSettings] = useState<CurrencySettings | null>(null);
+  
+  // Менеджер может только просматривать, не может редактировать
+  const canEdit = isAdminUser || isPTOUser;
 
   useEffect(() => {
     fetchSettings();
@@ -31,7 +38,7 @@ export default function CurrencyPage() {
   };
 
   const handleChange = (field: keyof CurrencySettings, value: string) => {
-    if (!tempSettings) return;
+    if (!tempSettings || !canEdit) return;
 
     const newSettings = {
       ...tempSettings,
@@ -76,13 +83,13 @@ export default function CurrencyPage() {
 
   if (loading) {
     return (
-      <div className="h-[calc(100vh-110px)] overflow-y-auto px-6 py-6 bg-gray-50">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="space-y-4">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-12 bg-gray-200 rounded"></div>
-            ))}
+      <div className="h-[calc(100vh-64px)] bg-white overflow-y-auto">
+        <div className="p-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#8eba1e] mx-auto mb-4"></div>
+              <p className="text-gray-600">Загрузка настроек валют...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -91,9 +98,15 @@ export default function CurrencyPage() {
 
   if (error) {
     return (
-      <div className="h-[calc(100vh-110px)] overflow-y-auto px-6 py-6 bg-gray-50">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-          {error}
+      <div className="h-[calc(100vh-64px)] bg-white overflow-y-auto">
+        <div className="p-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="text-red-500 text-6xl mb-4">⚠️</div>
+              <p className="text-red-600 text-lg mb-2">Ошибка загрузки</p>
+              <p className="text-gray-600">{error}</p>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -102,69 +115,131 @@ export default function CurrencyPage() {
   if (!tempSettings) return null;
 
   return (
-    <div className="h-[calc(100vh-110px)] overflow-y-auto px-6 py-6 bg-gray-50">
-      <h2 className="text-2xl font-semibold mt-2">Курсы валют и настройки</h2>
-      <p className="text-sm text-gray-600 mt-1">
-        Укажите актуальные курсы валют и настройки
-      </p>
-
-      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[
-          { label: 'Доллар США (USD)', key: 'usdRate' },
-          { label: 'Евро (EUR)', key: 'eurRate' },
-          { label: 'Российский рубль (RUB)', key: 'rubRate' },
-        ].map(({ label, key }) => (
-          <div key={key} className="bg-white p-5 border rounded-xl shadow-sm space-y-2">
-            <label className="block text-sm font-medium text-gray-700">{label}</label>
-            <input
-              type="number"
-              value={tempSettings[key as keyof CurrencySettings]}
-              onChange={(e) => handleChange(key as keyof CurrencySettings, e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
-              step="0.01"
-              min="0"
-            />
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-8">
-        <h3 className="text-lg font-semibold mb-4">Настройки расчетов</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[
-            { label: 'Часовая заработная плата (₸)', key: 'hourlyWage' },
-            { label: 'НДС (%)', key: 'vatRate' },
-            { label: 'Административные расходы (%)', key: 'administrativeExpenses' },
-            { label: 'Плановые накопления (%)', key: 'plannedSavings' },
-            { label: 'Производственные расходы (%)', key: 'productionExpenses' },
-          ].map(({ label, key }) => (
-            <div key={key} className="bg-white p-5 border rounded-xl shadow-sm space-y-2">
-              <label className="block text-sm font-medium text-gray-700">{label}</label>
-              <input
-                type="number"
-                value={tempSettings[key as keyof CurrencySettings]}
-                onChange={(e) => handleChange(key as keyof CurrencySettings, e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
-                step="0.01"
-                min="0"
-              />
+    <div className="h-[calc(100vh-64px)] bg-white overflow-y-auto">
+      <div className="p-6">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="p-3 bg-gray-100 rounded-xl">
+              <DollarSign className="w-6 h-6 text-[#8eba1e]" />
             </div>
-          ))}
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Курсы валют и настройки</h1>
+              <p className="text-gray-600">Укажите актуальные курсы валют и настройки расчетов</p>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div className="mt-6">
-        <button
-          onClick={handleSave}
-          disabled={!isChanged}
-          className={`px-6 py-2 rounded-lg transition duration-150 ${
-            isChanged
-              ? 'bg-[#3A55DF] text-white hover:bg-[#2e46c5]'
-              : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-          }`}
-        >
-          Сохранить
-        </button>
+        {/* Курсы валют */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-gray-100 rounded-lg">
+              <DollarSign className="w-5 h-5 text-[#8eba1e]" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900">Курсы валют</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              { label: 'Доллар США (USD)', key: 'usdRate' },
+              { label: 'Евро (EUR)', key: 'eurRate' },
+              { label: 'Российский рубль (RUB)', key: 'rubRate' },
+            ].map(({ label, key }) => (
+              <div key={key} className="bg-white p-6 border border-gray-200 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:border-[#8eba1e]/30">
+                <label className="block text-sm font-medium text-gray-700 mb-3">{label}</label>
+                <input
+                  type="number"
+                  value={tempSettings[key as keyof CurrencySettings]}
+                  onChange={(e) => handleChange(key as keyof CurrencySettings, e.target.value)}
+                  disabled={!canEdit}
+                  readOnly={!canEdit}
+                  className={`w-full border border-gray-300 rounded-lg px-4 py-3 text-sm transition-all duration-200 ${
+                    canEdit
+                      ? 'focus:outline-none focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e]'
+                      : 'bg-gray-100 cursor-not-allowed opacity-75'
+                  }`}
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Настройки расчетов */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-gray-100 rounded-lg">
+              <Settings className="w-5 h-5 text-[#8eba1e]" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900">Настройки расчетов</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              { label: 'Часовая заработная плата (₸)', key: 'hourlyWage' },
+              { label: 'НДС (%)', key: 'vatRate' },
+              { label: 'Административные расходы (%)', key: 'administrativeExpenses' },
+              { label: 'Плановые накопления (%)', key: 'plannedSavings' },
+              { label: 'Производственные расходы (%)', key: 'productionExpenses' },
+            ].map(({ label, key }) => (
+              <div key={key} className="bg-white p-6 border border-gray-200 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:border-[#8eba1e]/30">
+                <label className="block text-sm font-medium text-gray-700 mb-3">{label}</label>
+                <input
+                  type="number"
+                  value={tempSettings[key as keyof CurrencySettings]}
+                  onChange={(e) => handleChange(key as keyof CurrencySettings, e.target.value)}
+                  disabled={!canEdit}
+                  readOnly={!canEdit}
+                  className={`w-full border border-gray-300 rounded-lg px-4 py-3 text-sm transition-all duration-200 ${
+                    canEdit
+                      ? 'focus:outline-none focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e]'
+                      : 'bg-gray-100 cursor-not-allowed opacity-75'
+                  }`}
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Кнопка сохранения - только для админов и ПТО */}
+        {canEdit && (
+          <div className="flex justify-end">
+            <button
+              onClick={handleSave}
+              disabled={!isChanged}
+              className={`flex items-center gap-2 px-8 py-4 rounded-xl transition-all duration-200 shadow-lg ${
+                isChanged
+                  ? 'bg-[#8eba1e] text-white hover:bg-[#7aa31a] hover:shadow-xl transform hover:scale-105'
+                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              <Save size={18} />
+              {isChanged ? 'Сохранить изменения' : 'Нет изменений'}
+            </button>
+          </div>
+        )}
+        
+        {/* Информационное сообщение для менеджера */}
+        {isManagerUser && (
+          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Settings className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-blue-900 mb-1">
+                  Только просмотр
+                </p>
+                <p className="text-sm text-blue-700">
+                  У вас нет прав на редактирование курсов валют. Обратитесь к администратору или пользователю ПТО для внесения изменений.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

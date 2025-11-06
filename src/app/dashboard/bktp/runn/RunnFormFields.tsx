@@ -3,28 +3,49 @@
 import { useState, useEffect } from 'react';
 import { useRunnStore } from '@/store/useRunnStore';
 import { useRunnSettings } from '@/hooks/useRunnSettings';
+import { useRunnMaterials } from '@/hooks/useRunnMaterials';
+import { useRunnBreakerCalculation, useRunnCounterCalculation, useRunnSectionSwitchCalculation, useRunnOutgoingCalculation } from '@/hooks/useRunnInputCalculation';
+import { useRunnBusbarBridgeCalculation } from '@/hooks/useRunnBusbarBridgeCalculation';
 import { getMaterialsByCategoryId, Material } from '@/api/material';
-import { getAllCategories } from '@/api/categories';
 import { useAutoMaterialSelection } from '@/hooks/useAutoMaterialSelection';
 import RunnGlobalConfig from './RunnGlobalConfig';
 import RunnCellTable from './RunnCellTable';
-import { RunnBusbarSystem } from '@/components/runn/RunnBusbarSystem';
-import { RunnBusBridge } from '@/components/runn/RunnBusBridge';
+import RunnGeneralSummary from './components/RunnGeneralSummary';
 import { RunnConfigTabs } from '@/components/runn/RunnConfigTabs';
+import { BusbarSystemContainer } from '@/components/runn/BusbarSystem/BusbarSystemContainer';
+import { BusbarBridgeCalculation } from '@/components/runn/BusbarBridge/BusbarBridgeCalculation';
+import RunnDguSection from './components/RunnDguSection';
 
-type TabType = 'global' | 'cells' | 'bus-bridge';
+type TabType = 'main' | 'bus-bridge' | 'dgu';
 
-export default function RunnFormFields() {
-  const { global } = useRunnStore();
+interface RunnFormFieldsProps {
+  onTabChange?: (tab: TabType) => void;
+}
+
+export default function RunnFormFields({ onTabChange }: RunnFormFieldsProps = {}) {
+  const { global, cellConfigs } = useRunnStore();
   const { selectedCategories } = useRunnSettings();
+  const { materials: runnMaterials, loading: runnMaterialsLoading } = useRunnMaterials();
+  
+  // Инициализируем расчеты для шинных мостов
+  useRunnBusbarBridgeCalculation();
+  
+  // Получаем калькуляции для разных типов ячеек
+  const inputCell = cellConfigs.find(cell => cell.purpose === 'Ввод');
+  const sectionSwitchCell = cellConfigs.find(cell => cell.purpose === 'Секционный выключатель');
+  
+  const { calculation: breakerCalculation } = useRunnBreakerCalculation(inputCell || null);
+  const { calculation: counterCalculation } = useRunnCounterCalculation(inputCell || null);
+  const { calculation: sectionSwitchCalculation } = useRunnSectionSwitchCalculation(sectionSwitchCell || null, inputCell || null);
+  const { calculation: outgoingCalculation } = useRunnOutgoingCalculation(inputCell || null);
 
-  // Состояние для материалов
+  // Упрощенное состояние для материалов
   const [materials, setMaterials] = useState<Material[]>([]);
-  const [materialsLoading, setMaterialsLoading] = useState(false);
   const [meterMaterials, setMeterMaterials] = useState<Material[]>([]);
-  const [meterMaterialsLoading, setMeterMaterialsLoading] = useState(false);
-  const [rpsLeftMaterials, setRpsLeftMaterials] = useState<Material[]>([]);
-  const [rpsLeftMaterialsLoading, setRpsLeftMaterialsLoading] = useState(false);
+  const [materialsLoading, setMaterialsLoading] = useState(false);
+  
+  // Определяем общее состояние загрузки
+  const isAnyLoading = runnMaterialsLoading || materialsLoading;
 
   // Получаем автоматически выбранные материалы
   const {
@@ -38,19 +59,33 @@ export default function RunnFormFields() {
     categoryName: global.withdrawableBreaker || '',
   });
 
-  // Сохраняем активную вкладку в localStorage
-  const [activeTab, setActiveTab] = useState<TabType>(() => {
-    if (typeof window !== 'undefined') {
-      const savedTab = localStorage.getItem('runn-active-tab') as TabType;
-      return savedTab || 'global';
-    }
-    return 'global';
-  });
 
-  // Функция для получения материалов по выбранной категории
-  const fetchMaterialsByCategory = async (categoryName: string) => {
+  // Сохраняем активную вкладку в localStorage
+  const [activeTab, setActiveTab] = useState<TabType>('main');
+
+  // Слушаем событие переключения на вкладку "Сборные шины"
+  useEffect(() => {
+    const handleSwitchToBusbar = () => {
+      setActiveTab('bus-bridge');
+    };
+
+    window.addEventListener('switchToBusbar', handleSwitchToBusbar);
+    return () => {
+      window.removeEventListener('switchToBusbar', handleSwitchToBusbar);
+    };
+  }, []);
+
+  // Уведомляем родительский компонент об изменении вкладки
+  useEffect(() => {
+    if (onTabChange) {
+      onTabChange(activeTab);
+    }
+  }, [activeTab, onTabChange]);
+
+  // Универсальная функция для получения материалов
+  const fetchMaterials = async (categoryName: string, categoryType: 'avtomatVyk' | 'counter' | 'avtomatLity', setter: (materials: Material[]) => void) => {
     if (!categoryName || !selectedCategories) {
-      setMaterials([]);
+      setter([]);
       return;
     }
 
@@ -62,99 +97,35 @@ export default function RunnFormFields() {
         return;
       }
 
-      const category = selectedCategories.avtomatVyk?.find((cat) => cat.name === categoryName);
+      const category = selectedCategories[categoryType]?.find((cat) => cat.name === categoryName);
+      
       if (!category) {
-        setMaterials([]);
+        setter([]);
         return;
       }
 
-      const materialsData = await getMaterialsByCategoryId(parseInt(category.id), token);
-      setMaterials(materialsData);
+      const categoryId = parseInt(category.id);
+
+      if (isNaN(categoryId) || categoryId <= 0 || categoryId > 2147483647) {
+        console.error(`Неправильный ID категории: ${category.id} (${category.name}). ID должен быть числом от 1 до 2147483647.`);
+        setter([]);
+        return;
+      }
+
+      const materialsData = await getMaterialsByCategoryId(categoryId, token);
+      setter(materialsData);
     } catch (error) {
       console.error('Ошибка получения материалов:', error);
-      setMaterials([]);
+      setter([]);
     } finally {
       setMaterialsLoading(false);
-    }
-  };
-
-  // Функция для получения материалов счетчика
-  const fetchMeterMaterialsByCategory = async (categoryName: string) => {
-    if (!categoryName || !selectedCategories) {
-      setMeterMaterials([]);
-      return;
-    }
-
-    setMeterMaterialsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.error('Токен не найден');
-        return;
-      }
-
-      const category = selectedCategories.counter?.find((cat) => cat.name === categoryName);
-      if (!category) {
-        setMeterMaterials([]);
-        return;
-      }
-
-      const materialsData = await getMaterialsByCategoryId(parseInt(category.id), token);
-      setMeterMaterials(materialsData);
-    } catch (error) {
-      console.error('Ошибка получения материалов счетчика:', error);
-      setMeterMaterials([]);
-    } finally {
-      setMeterMaterialsLoading(false);
-    }
-  };
-
-  // Функция для получения материалов РПС левый
-  const fetchRpsLeftMaterials = async () => {
-    setRpsLeftMaterialsLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.error('Токен не найден');
-        return;
-      }
-
-      console.log('🔍 Ищем категорию "РПС левый" среди всех категорий...');
-      
-      // Сначала получаем все категории
-      const allCategories = await getAllCategories(token);
-      console.log('📋 Все категории в системе:', allCategories.map(cat => `${cat.id}: ${cat.name}`));
-      
-      // Ищем категорию "РПС левый"
-      const rpsLeftCategory = allCategories.find(cat => 
-        cat.name.toLowerCase().includes('рпс') && cat.name.toLowerCase().includes('лев')
-      );
-      
-      if (!rpsLeftCategory) {
-        console.error('❌ Категория "РПС левый" не найдена в системе');
-        console.log('📝 Доступные категории:', allCategories.map(cat => cat.name));
-        setRpsLeftMaterials([]);
-        return;
-      }
-
-      console.log('✅ Найдена категория РПС левый:', rpsLeftCategory);
-      console.log('📦 Загружаем материалы из категории ID:', rpsLeftCategory.id);
-      
-      const materialsData = await getMaterialsByCategoryId(rpsLeftCategory.id, token);
-      console.log('✅ Полученные материалы РПС левый:', materialsData);
-      setRpsLeftMaterials(materialsData);
-    } catch (error) {
-      console.error('Ошибка получения материалов РПС левый:', error);
-      setRpsLeftMaterials([]);
-    } finally {
-      setRpsLeftMaterialsLoading(false);
     }
   };
 
   // При изменении выбранной категории автомата выкатного
   useEffect(() => {
     if (global.withdrawableBreaker && selectedCategories) {
-      fetchMaterialsByCategory(global.withdrawableBreaker);
+      fetchMaterials(global.withdrawableBreaker, 'avtomatVyk', setMaterials);
     } else {
       setMaterials([]);
     }
@@ -163,17 +134,12 @@ export default function RunnFormFields() {
   // При изменении выбранной категории счетчика
   useEffect(() => {
     if (global.meterType && selectedCategories) {
-      fetchMeterMaterialsByCategory(global.meterType);
+      fetchMaterials(global.meterType, 'counter', setMeterMaterials);
     } else {
       setMeterMaterials([]);
     }
   }, [global.meterType, selectedCategories]);
 
-  // Загружаем материалы РПС левый при монтировании компонента
-  useEffect(() => {
-    console.log('🔍 RunnFormFields: Загружаем материалы РПС левый при инициализации');
-    fetchRpsLeftMaterials();
-  }, []); // Пустой массив зависимостей - загружаем только один раз
 
   // Сохраняем активную вкладку при изменении
   const handleTabChange = (tab: TabType) => {
@@ -181,64 +147,130 @@ export default function RunnFormFields() {
     if (typeof window !== 'undefined') {
       localStorage.setItem('runn-active-tab', tab);
     }
+    // Вызываем callback для уведомления родительского компонента
+    if (onTabChange) {
+      onTabChange(tab);
+    }
   };
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'global':
+      case 'main':
         return (
-          <RunnGlobalConfig
-            materials={materials}
-            autoSelectedMaterial={autoSelectedMaterial}
-            autoSelectedSvMaterial={autoSelectedSvMaterial}
-            transformerPower={transformerPower}
-            recommendedCurrent={recommendedCurrent}
-            recommendedSvCurrent={recommendedSvCurrent}
-          />
-        );
-      case 'cells':
-        return (
-          <RunnCellTable
-            categoryMaterials={materials}
-            autoSelectedMaterial={autoSelectedMaterial}
-            autoSelectedSvMaterial={autoSelectedSvMaterial}
-            meterMaterials={meterMaterials}
-            meterMaterialsLoading={meterMaterialsLoading}
-            rpsLeftMaterials={rpsLeftMaterials}
-          />
+          <div className="space-y-8">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Общие настройки</h3>
+              <RunnGlobalConfig
+                materials={materials}
+              />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Ячейки</h3>
+              <RunnCellTable
+                categoryMaterials={materials}
+                autoSelectedMaterial={autoSelectedMaterial}
+                autoSelectedSvMaterial={autoSelectedSvMaterial}
+                meterMaterials={meterMaterials}
+                rpsLeftMaterials={runnMaterials.rpsLeft}
+                fusesPnMaterials={runnMaterials.fusesPn}
+                avtomatLityMaterials={runnMaterials.avtomatLity}
+              />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Общая сводка</h3>
+              <RunnGeneralSummary
+                cellConfigs={cellConfigs}
+                breakerCalculation={breakerCalculation}
+                counterCalculation={counterCalculation}
+                sectionSwitchCalculation={sectionSwitchCalculation}
+                outgoingCalculation={outgoingCalculation}
+                runnMaterials={runnMaterials}
+              />
+            </div>
+          </div>
         );
       case 'bus-bridge':
         return (
           <div className="space-y-8">
-            <RunnBusbarSystem />
-            <RunnBusBridge />
+            <BusbarSystemContainer />
+            <BusbarBridgeCalculation />
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Общая сводка</h3>
+              <RunnGeneralSummary
+                cellConfigs={cellConfigs}
+                breakerCalculation={breakerCalculation}
+                counterCalculation={counterCalculation}
+                sectionSwitchCalculation={sectionSwitchCalculation}
+                outgoingCalculation={outgoingCalculation}
+                runnMaterials={runnMaterials}
+              />
+            </div>
+          </div>
+        );
+      case 'dgu':
+        return (
+          <div className="space-y-8">
+            <RunnDguSection
+              categoryMaterials={materials}
+              meterMaterials={meterMaterials}
+              meterMaterialsLoading={materialsLoading}
+              rpsLeftMaterials={runnMaterials.rpsLeft}
+            />
           </div>
         );
       default:
         return (
-          <RunnGlobalConfig
-            materials={materials}
-            autoSelectedMaterial={autoSelectedMaterial}
-            autoSelectedSvMaterial={autoSelectedSvMaterial}
-            transformerPower={transformerPower}
-            recommendedCurrent={recommendedCurrent}
-            recommendedSvCurrent={recommendedSvCurrent}
-          />
+          <div className="space-y-8">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Общие настройки</h3>
+              <RunnGlobalConfig
+                materials={materials}
+              />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Ячейки</h3>
+              <RunnCellTable
+                categoryMaterials={materials}
+                autoSelectedMaterial={autoSelectedMaterial}
+                autoSelectedSvMaterial={autoSelectedSvMaterial}
+                meterMaterials={meterMaterials}
+                rpsLeftMaterials={runnMaterials.rpsLeft}
+                fusesPnMaterials={runnMaterials.fusesPn}
+                avtomatLityMaterials={runnMaterials.avtomatLity}
+              />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Общая сводка</h3>
+              <RunnGeneralSummary
+                cellConfigs={cellConfigs}
+                breakerCalculation={breakerCalculation}
+                counterCalculation={counterCalculation}
+                sectionSwitchCalculation={sectionSwitchCalculation}
+                outgoingCalculation={outgoingCalculation}
+                runnMaterials={runnMaterials}
+              />
+            </div>
+          </div>
         );
     }
   };
 
-  // Отладочная информация о состоянии материалов РПС
-  console.log('🔧 RunnFormFields состояние RPS материалов:', {
-    rpsLeftMaterials: rpsLeftMaterials.length,
-    rpsLeftMaterialsLoading,
-    selectedCategories: selectedCategories?.rpsLeft?.length || 0
-  });
+
 
   return (
     <div className="space-y-6">
       {/* Tabs Navigation */}
       <RunnConfigTabs activeTab={activeTab} onTabChange={handleTabChange} />
+
+      {/* Loading Indicator */}
+      {isAnyLoading && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-center gap-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-600 border-t-transparent"></div>
+            <span className="text-blue-700 font-medium">Загрузка конфигурации...</span>
+          </div>
+        </div>
+      )}
 
       {/* Tab Content */}
       <div className="pt-4">{renderTabContent()}</div>

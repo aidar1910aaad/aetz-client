@@ -4,6 +4,7 @@ import { BusMaterial } from '@/types/rusn';
 import { switchgearApi, Switchgear } from '@/api/switchgear';
 import { useRusnCalculation } from '@/hooks/useRusnCalculation';
 import { calculateCost } from '@/utils/calculationUtils';
+import { useMaterialPrices } from '@/hooks/useMaterialPrices';
 
 export const useBusbarBridgeCalculation = () => {
   const rusn = useRusnStore();
@@ -11,6 +12,7 @@ export const useBusbarBridgeCalculation = () => {
   const bridges = rusn.busBridges;
   const setBridges = rusn.setBusBridges;
   const [switchgearConfigs, setSwitchgearConfigs] = useState<Switchgear[]>([]);
+  const { aluminum: aluminumPrice, copper: copperPrice } = useMaterialPrices();
 
   // Получаем выбранную группу из localStorage
   const [selectedGroupSlug] = useState<string>(() => {
@@ -38,13 +40,13 @@ export const useBusbarBridgeCalculation = () => {
   const inputCell = rusn.cellConfigs.find((cell) => cell.purpose === 'Ввод');
   const selectedBreaker = inputCell?.breaker;
 
-  // Получаем цену за кг
+  // Получаем цену за кг (динамически из API)
   const getPricePerKg = (material: BusMaterial) => {
     if (material === 'АД' || material === 'АД2') {
-      return 2800;
+      return aluminumPrice;
     }
     if (material === 'МТ' || material === 'МТ2') {
-      return 5600;
+      return copperPrice;
     }
     return 0;
   };
@@ -127,13 +129,6 @@ export const useBusbarBridgeCalculation = () => {
 
   // Сохраняем summary данные в store
   useEffect(() => {
-    console.log('useBusbarBridgeCalculation - Сохранение summary:', {
-      matchingConfig: !!matchingConfig,
-      bridgeCell: !!bridgeCell,
-      totalPrice,
-      bridges,
-      busbarBridgeCalculationResult: !!busbarBridgeCalculationResult,
-    });
 
     if (matchingConfig && bridgeCell && totalPrice > 0) {
       const materialName =
@@ -190,13 +185,11 @@ export const useBusbarBridgeCalculation = () => {
         // Сохраняем все мосты в отдельном поле
         rusn.setBusBridgeSummaries(bridgeSummaries);
 
-        console.log('useBusbarBridgeCalculation - Сохранены мосты:', bridgeSummaries);
       } else {
         rusn.setBusBridgeSummary(null);
         rusn.setBusBridgeSummaries([]);
       }
     } else {
-      console.log('useBusbarBridgeCalculation - Очистка summary');
       rusn.setBusBridgeSummary(null);
       rusn.setBusBridgeSummaries([]);
     }
@@ -221,9 +214,7 @@ export const useBusbarBridgeCalculation = () => {
       );
 
       if (busbarBridgeCalculation) {
-        console.log('Калькуляция для шинного моста:', busbarBridgeCalculation);
       } else {
-        console.log('Калькуляция с типом "busbridge" не найдена');
       }
     }
   }, [selectedGroupSlug, calculations, calculationsLoading]);

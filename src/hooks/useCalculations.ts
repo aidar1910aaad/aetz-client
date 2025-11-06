@@ -33,9 +33,7 @@ export function useCalculations() {
     setLoading(true);
     try {
       const token = localStorage.getItem('token') || '';
-      console.log('Fetching calculation groups...');
       const result = await getAllCalculationGroups(token);
-      console.log('Fetched groups:', result);
       setGroups(result);
     } catch (err: unknown) {
       const error = err as Error;
@@ -47,22 +45,20 @@ export function useCalculations() {
   }, []);
 
   useEffect(() => {
-    console.log('Initial fetchGroups effect triggered');
     fetchGroups();
   }, [fetchGroups]);
 
   // ✅ Загрузка калькуляций по выбранной группе
   const fetchCalculations = useCallback(async () => {
     if (!selectedGroup) {
-      console.log('No selected group, skipping calculations fetch');
       return;
     }
     setLoading(true);
     try {
       const token = localStorage.getItem('token') || '';
-      console.log('Fetching calculations for group:', selectedGroup.slug);
       const result = await getCalculationsByGroup(selectedGroup.slug, token);
-      console.log('Fetched calculations:', result);
+      
+      
       setCalculations(result);
     } catch (err: unknown) {
       const error = err as Error;
@@ -74,7 +70,6 @@ export function useCalculations() {
   }, [selectedGroup]);
 
   useEffect(() => {
-    console.log('Selected group changed:', selectedGroup);
     fetchCalculations();
   }, [fetchCalculations, selectedGroup]);
 

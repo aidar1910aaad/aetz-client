@@ -94,7 +94,7 @@ export const BusbarCalculation: React.FC<BusbarCalculationProps> = ({
         </h3>
         <div className="flex items-center space-x-4">
           <span className="text-sm text-gray-600">
-            Итого: {busbarCalculationResult.totalWithNds.toLocaleString()} тг
+            Итого: {busbarCalculationResult?.totalWithNds?.toLocaleString() || '0'} тг
           </span>
           <svg
             className={`w-5 h-5 transition-transform ${showBusbarCalculation ? 'rotate-180' : ''}`}
@@ -158,31 +158,32 @@ export const BusbarCalculation: React.FC<BusbarCalculationProps> = ({
               <div>
                 <span className="text-gray-600">Материалы:</span>
                 <div className="font-medium">
-                  {busbarCalculationResult.materialsTotal.toLocaleString()} тг
+                  {busbarCalculationResult?.materialsTotal?.toLocaleString() || '0'} тг
                 </div>
               </div>
               <div>
                 <span className="text-gray-600">Работы:</span>
                 <div className="font-medium">
-                  {busbarCalculationResult.workTotal.toLocaleString()} тг
+                  {busbarCalculationResult?.workTotal?.toLocaleString() || '0'} тг
                 </div>
               </div>
               <div>
                 <span className="text-gray-600">Накладные:</span>
                 <div className="font-medium">
-                  {busbarCalculationResult.overhead.toLocaleString()} тг
+                  {busbarCalculationResult?.overhead?.toLocaleString() || '0'} тг
                 </div>
               </div>
               <div>
                 <span className="text-gray-600">Итого с НДС:</span>
                 <div className="font-medium text-green-700">
-                  {(busbarCalculationResult.totalWithNds + totalPrice).toLocaleString()} тг
+                  {((busbarCalculationResult?.totalWithNds || 0) + totalPrice).toLocaleString()} тг
                 </div>
               </div>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 };

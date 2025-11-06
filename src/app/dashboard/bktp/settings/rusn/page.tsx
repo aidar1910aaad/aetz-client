@@ -6,6 +6,8 @@ import { ChevronLeft, Save, Power, Settings2, Gauge } from 'lucide-react';
 import { Category } from '@/api/categories';
 import { getAllCategories } from '@/api/categories';
 import { showToast } from '@/shared/modals/ToastProvider';
+import RoleGuard from '@/components/common/RoleGuard';
+import { UserRole } from '@/types/user';
 
 interface CategorySettings {
   id: number;
@@ -80,7 +82,12 @@ export default function RusnSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <RoleGuard
+      allowedRoles={[UserRole.ADMIN, UserRole.PTO]}
+      redirectTo="/dashboard"
+      pagePath="/dashboard/bktp/settings/rusn"
+    >
+      <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -201,5 +208,6 @@ export default function RusnSettingsPage() {
         </div>
       </div>
     </div>
+    </RoleGuard>
   );
 }

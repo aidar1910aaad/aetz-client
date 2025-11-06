@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Material, UpdateMaterialRequest } from '@/api/material';
+import { Material, UpdateMaterialRequest } from '@/api/material/index';
 import { showToast } from '@/shared/modals/ToastProvider';
 import { Category } from '@/api/categories';
 import { useUserStore } from '@/store/useUserStore';

@@ -37,7 +37,9 @@ export const BusbarBridgesInput: React.FC<BusbarBridgesInputProps> = ({
   };
 
   const calculateBridgeWeight = (bridge: BusbarBridge) => {
-    return bridge.length * bridge.quantity * weightPerMeter;
+    // Применяем формулу: ((введенный метраж + 2) × 1.3) × 3
+    const calculatedLength = ((bridge.length + 2) * 1.3) * 3;
+    return calculatedLength * bridge.quantity * weightPerMeter;
   };
 
   const calculateBridgePrice = (bridge: BusbarBridge) => {
@@ -69,7 +71,7 @@ export const BusbarBridgesInput: React.FC<BusbarBridgesInputProps> = ({
           {bridges.map((bridge, index) => (
             <div key={index} className="border border-gray-200 rounded p-4 bg-gray-50">
               <div className="flex items-center justify-between mb-3">
-                <h5 className="font-medium text-gray-800">Мост #{index + 1}</h5>
+                <h5 className="font-medium text-gray-800">{bridge.name || `Шинный мост 0.4 #${index + 1}`}</h5>
                 <button
                   onClick={() => removeBridge(index)}
                   className="text-red-500 hover:text-red-700 text-sm"

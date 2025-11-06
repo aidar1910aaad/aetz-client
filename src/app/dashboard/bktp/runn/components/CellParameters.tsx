@@ -1,5 +1,6 @@
 import { RunnCell } from '@/store/useRunnStore';
 import { Material } from '@/api/material';
+import { useEffect } from 'react';
 import RpsRubilnikSelector from './RpsRubilnikSelector';
 import MoldedCaseWithRubilnikSelector from './MoldedCaseWithRubilnikSelector';
 
@@ -10,6 +11,9 @@ interface CellParametersProps {
   meterMaterialsLoading: boolean;
   categoryMaterials: Material[];
   rpsLeftMaterials?: Material[];
+  additionalRpsMaterials?: Material[];
+  avtomatLityMaterials?: Material[];
+  additionalMoldedCaseMaterials?: Material[];
 }
 
 export default function CellParameters({ 
@@ -18,7 +22,10 @@ export default function CellParameters({
   meterOptions, 
   meterMaterialsLoading,
   categoryMaterials,
-  rpsLeftMaterials = []
+  rpsLeftMaterials = [],
+  additionalRpsMaterials = [],
+  avtomatLityMaterials = [],
+  additionalMoldedCaseMaterials = []
 }: CellParametersProps) {
   // Функция для извлечения тока из названия материала
   const extractCurrentFromName = (name: string): number | null => {
@@ -132,6 +139,18 @@ export default function CellParameters({
 
   const filteredBreakerOptions = getFilteredBreakerOptions();
 
+  // Проверяем, выбрано ли 6 автоматов для "Литой корпус" или "Литой корпус + Рубильник"
+  const isMoldedCase = cell.switchingDevice === 'Литой корпус' || cell.switchingDevice === 'Литой корпус + Рубильник';
+  const selectedAutomatonsCount = cell.rubilniki?.filter(r => r && r.trim() !== '').length || 0;
+  const isMeterDisabled = isMoldedCase && selectedAutomatonsCount === 6;
+
+  // Очищаем ПУ, если выбрано 6 автоматов
+  useEffect(() => {
+    if (isMeterDisabled && cell.meterType) {
+      cell.update('meterType', '');
+    }
+  }, [isMeterDisabled]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const renderSelectBlock = (
     label: string,
     value: string,
@@ -156,9 +175,11 @@ export default function CellParameters({
   );
 
   return (
-    <div className="flex flex-wrap gap-4 items-end p-4 rounded bg-white border border-gray-100">
-      {/* Показываем поле "Автомат выкатной" только если не выбран РПС */}
-      {cell.switchingDevice !== 'РПС' && (
+    <div className="flex gap-4 items-end p-4 rounded bg-white border border-gray-100">
+      {/* Показываем поле "Автомат выкатной" только если не выбран РПС, Литой корпус или Литой корпус + Рубильник */}
+      {cell.switchingDevice !== 'РПС' && 
+       cell.switchingDevice !== 'Литой корпус' && 
+       cell.switchingDevice !== 'Литой корпус + Рубильник' && (
         renderSelectBlock(
           'Автомат выкатной',
           cell.breaker,
@@ -172,17 +193,21 @@ export default function CellParameters({
         cell.meterType ?? '',
         (val) => cell.update('meterType', val),
         meterOptions,
-        meterMaterialsLoading
+        meterMaterialsLoading || isMeterDisabled
       )}
 
       {/* Показываем селектор рубильников только если выбран РПС */}
       {cell.switchingDevice === 'РПС' && (
-        <RpsRubilnikSelector cell={cell} rpsLeftMaterials={rpsLeftMaterials} />
+        <RpsRubilnikSelector cell={cell} rpsLeftMaterials={rpsLeftMaterials} additionalRpsMaterials={additionalRpsMaterials} />
       )}
 
-      {/* Показываем селектор рубильников для "Литой корпус + Рубильник" */}
-      {cell.switchingDevice === 'Литой корпус + Рубильник' && (
-        <MoldedCaseWithRubilnikSelector cell={cell} />
+      {/* Показываем селектор рубильников для "Литой корпус" и "Литой корпус + Рубильник" */}
+      {(cell.switchingDevice === 'Литой корпус' || cell.switchingDevice === 'Литой корпус + Рубильник') && (
+        <MoldedCaseWithRubilnikSelector 
+          cell={cell} 
+          avtomatLityMaterials={avtomatLityMaterials}
+          additionalMoldedCaseMaterials={additionalMoldedCaseMaterials}
+        />
       )}
 
       <div className="flex flex-col gap-1 min-w-[100px]">

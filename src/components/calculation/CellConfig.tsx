@@ -107,7 +107,7 @@ const CELL_TYPE_GROUPS = [
             strokeWidth={2}
             viewBox="0 0 24 24"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M7 16l4-4m0 0l4 4m-4-4v12" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
         ),
       },
@@ -181,6 +181,21 @@ const CELL_TYPE_GROUPS = [
         value: 'tsn',
         label: 'ТСН',
         icon: <Cog6ToothIcon className="w-5 h-5 mr-1 text-orange-500" />,
+      },
+      {
+        value: 'rps',
+        label: 'РПС',
+        icon: (
+          <svg
+            className="w-5 h-5 mr-1 text-red-500"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+          </svg>
+        ),
       },
     ],
   },
@@ -284,6 +299,8 @@ const CELL_MATERIALS: Record<CellType, { type: MaterialType; label: string }[]> 
     { type: 'counter', label: 'Счетчик' },
     { type: 'sr', label: 'СР' },
     { type: 'tt', label: 'Трансформатор тока' },
+    { type: 'rps', label: 'РПС' },
+    { type: 'rubilnik', label: 'Рубильник' },
   ],
 };
 
@@ -293,7 +310,7 @@ export default function CellConfig({
   onConfigurationChange,
 }: CellConfigProps) {
   const [selectedMaterialType, setSelectedMaterialType] = useState<MaterialType | null>(null);
-  const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const buttonRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   // Validate and normalize cell type
   const validCellTypes: CellType[] = [
@@ -334,6 +351,8 @@ export default function CellConfig({
       tt: [],
       withdrawable_breaker: [],
       molded_case_breaker: [],
+      rps: [],
+      rubilnik: [],
     };
 
     if (!configuration.materials) {
@@ -374,30 +393,18 @@ export default function CellConfig({
   }) => {
     if (!selectedMaterialType) return;
 
-    console.log('Adding material:', material, 'to type:', selectedMaterialType);
 
     const updatedMaterials = [...(configuration.materials[selectedMaterialType] || [])];
     const materialId = Number(material.id);
-    const index = updatedMaterials.findIndex((m) => m.id === materialId);
+    
+    // Всегда добавляем новый экземпляр материала, даже если такой уже существует
+    updatedMaterials.push({
+      id: materialId,
+      name: material.name,
+      price: Number(material.price) || 0,
+      type: selectedMaterialType,
+    });
 
-    if (index !== -1) {
-      updatedMaterials[index] = {
-        ...updatedMaterials[index],
-        id: materialId,
-        name: material.name,
-        price: Number(material.price) || 0,
-        type: selectedMaterialType,
-      };
-    } else {
-      updatedMaterials.push({
-        id: materialId,
-        name: material.name,
-        price: Number(material.price) || 0,
-        type: selectedMaterialType,
-      });
-    }
-
-    console.log('Updated materials:', updatedMaterials);
 
     onConfigurationChange({
       ...configuration,
@@ -409,15 +416,13 @@ export default function CellConfig({
     setSelectedMaterialType(null);
   };
 
-  const removeMaterial = (materialType: MaterialType, materialId: number) => {
-    console.log('Removing material:', materialId, 'from type:', materialType);
+  const removeMaterial = (materialType: MaterialType, materialIndex: number) => {
 
     const updatedMaterials = {
       ...configuration.materials,
-      [materialType]: configuration.materials[materialType].filter((m) => m.id !== materialId),
+      [materialType]: configuration.materials[materialType].filter((_, index) => index !== materialIndex),
     };
 
-    console.log('Updated materials after removal:', updatedMaterials);
 
     onConfigurationChange({
       ...configuration,
@@ -435,15 +440,15 @@ export default function CellConfig({
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-gray-700">{label}</span>
           <div className="relative">
-            <button
+            <input
               ref={(el) => {
                 buttonRefs.current[materialType] = el;
               }}
               onClick={() => setSelectedMaterialType(materialType)}
-              className="px-4 py-2 bg-[#3A55DF] text-white rounded-lg hover:bg-[#2A45CF] transition-colors"
-            >
-              Добавить материал
-            </button>
+              type="button"
+              value="Добавить материал"
+              className="px-4 py-2 bg-[#3A55DF] text-white rounded-lg hover:bg-[#2A45CF] transition-colors cursor-pointer"
+            />
             {selectedMaterialType === materialType && (
               <MaterialSearch
                 onSelect={handleMaterialSelect}
@@ -458,9 +463,9 @@ export default function CellConfig({
         </div>
         <div className="space-y-2">
           {materials && materials.length > 0 ? (
-            materials.map((material) => (
+            materials.map((material, index) => (
               <div
-                key={`${materialType}-${material.id}`}
+                key={`${materialType}-${material.id}-${index}`}
                 className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg"
               >
                 <div className="flex-1">
@@ -470,7 +475,7 @@ export default function CellConfig({
                   </div>
                 </div>
                 <button
-                  onClick={() => removeMaterial(materialType, material.id)}
+                  onClick={() => removeMaterial(materialType, index)}
                   className="ml-4 text-gray-400 hover:text-gray-600"
                 >
                   <XMarkIcon className="w-5 h-5" />

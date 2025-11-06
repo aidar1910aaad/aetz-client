@@ -78,7 +78,7 @@ export const Summary: React.FC<SummaryProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
             {bridges.map((bridge, index) => (
               <div key={index} className="bg-white p-2 rounded border">
-                <span className="text-gray-600">Мост #{index + 1}:</span>
+                <span className="text-gray-600">{bridge.name || `Шинный мост 0.4 #${index + 1}`}:</span>
                 <span className="ml-2 font-medium">
                   {bridge.length}м × {bridge.width}мм × {bridge.quantity}шт
                 </span>

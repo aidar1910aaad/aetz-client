@@ -6,6 +6,7 @@ import { useBmzStore } from '@/store/useBmzStore';
 import { useBktpStore } from '@/store/useBktpStore';
 import { useUserStore } from '@/store/useUserStore';
 import { useRusnStore } from '@/store/useRusnStore';
+import { useRunnStore } from '@/store/useRunnStore';
 import Breadcrumbs from '@/components/Breadcrumbs/Breadcrumbs';
 import { useAdditionalEquipmentStore } from '@/store/useAdditionalEquipmentStore';
 import { useWorksStore } from '@/store/useWorksStore';
@@ -15,7 +16,7 @@ import type {
   AdditionalEquipmentState,
   AdditionalEquipmentItem,
 } from '@/store/useAdditionalEquipmentStore';
-import type { WorksState, WorkItem } from '@/store/useWorksStore';
+import type { WorkItem } from '@/store/useWorksStore';
 import { FinalReviewHeader, FinalReviewContent, FinalReviewTotal } from './components';
 
 export default function FinalReview() {
@@ -24,6 +25,7 @@ export default function FinalReview() {
   const { taskNumber, client, date } = useBktpStore();
   const { user } = useUserStore();
   const rusnStore: RusnState = useRusnStore();
+  const runnStore = useRunnStore();
   const filename = `${taskNumber}-БКТП-${client}-${date}`;
 
   const selectedEquipment: AdditionalEquipmentState['selected'] = useAdditionalEquipmentStore(
@@ -33,7 +35,7 @@ export default function FinalReview() {
     (s) => s.equipmentList
   );
 
-  const selectedWorks: WorksState['selected'] = useWorksStore((s) => s.selected);
+  const selectedWorks = useWorksStore((s) => s.selected);
   const worksList: WorkItem[] = useWorksStore((s) => s.worksList);
 
   // Формируем полное имя пользователя
@@ -99,7 +101,7 @@ export default function FinalReview() {
         settings: bmzStore.settings,
         equipmentState: bmzStore.equipmentState,
       },
-      transformer: selectedTransformer,
+        transformer: selectedTransformer as any,
       rusn: {
         cellConfigs: rusnStore.cellConfigs,
         busbarSummary: rusnStore.busbarSummary,
@@ -126,39 +128,25 @@ export default function FinalReview() {
     return payload;
   }
 
-  // Кнопка для теста
-  function handleShowPayload() {
-    const payload = getApplicationPayload();
-    // Можно отправить на сервер, сохранить в файл и т.д.
-    // Для примера просто покажем в alert и консоли
-    console.log('Application payload:', payload);
-    alert('Сформирован JSON заявки. Смотрите консоль.');
-  }
-
   return (
     <div className="h-[calc(100vh-110px)] overflow-y-auto px-6 py-6 bg-gray-50">
       <Breadcrumbs />
 
-      <button
-        onClick={handleShowPayload}
-        className="mb-4 bg-blue-700 hover:bg-blue-800 text-white font-bold px-6 py-3 rounded-lg shadow"
-      >
-        Сформировать JSON заявки
-      </button>
-
       <FinalReviewHeader
         filename={filename}
         fullName={fullName}
+        user={user}
         bmzStore={bmzStore}
-        selectedTransformer={selectedTransformer}
+        selectedTransformer={selectedTransformer as any}
         rusnStore={rusnStore}
         selectedWorks={selectedWorks}
         worksList={worksList}
+        runnStore={runnStore}
       />
 
       <FinalReviewContent
         bmzStore={bmzStore}
-        selectedTransformer={selectedTransformer}
+        selectedTransformer={selectedTransformer as any}
         rusnStore={rusnStore}
         selectedEquipment={selectedEquipment}
         equipmentList={equipmentList}
@@ -168,10 +156,17 @@ export default function FinalReview() {
 
       <FinalReviewTotal
         bmzStore={bmzStore}
-        selectedTransformer={selectedTransformer}
+        selectedTransformer={selectedTransformer as any}
         rusnStore={rusnStore}
+        runnStore={runnStore}
+        selectedEquipment={selectedEquipment}
+        equipmentList={equipmentList}
         selectedWorks={selectedWorks}
         worksList={worksList}
+        user={user}
+        taskNumber={taskNumber}
+        client={client}
+        date={date}
       />
     </div>
   );
