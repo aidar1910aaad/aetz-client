@@ -4,7 +4,7 @@ import { useDguStore } from '@/store/useDguStore';
 import {
   calculateNominalCurrentForDgu,
   findBestMaterialByNominalCurrent,
-} from '../../utils/runnDguMaterialFinder';
+} from '../../../utils/runnDguMaterialFinder';
 
 export function useDguAutoMaterial(categoryMaterials: Material[]) {
   const dgu = useDguStore();

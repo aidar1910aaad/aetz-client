@@ -1,11 +1,13 @@
 'use client';
 
+import React from 'react';
 import { Download } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import type { BmzData } from '@/utils/bmzCalculations';
 import type { Transformer } from '@/api/transformers';
 import type { RusnState } from '@/store/useRusnStore';
 import type { WorkItem } from '@/store/useWorksStore';
+import type { AdditionalEquipmentState, AdditionalEquipmentItem } from '@/store/useAdditionalEquipmentStore';
 
 // Динамический импорт PDF функционала для избежания ошибок SSR
 const PDFWrapper = dynamic(
@@ -24,6 +26,16 @@ const PDFWrapper = dynamic(
   }
 );
 
+interface Totals {
+  bmzTotal: number;
+  transformerTotal: number;
+  rusnTotal: number;
+  runnTotal: number;
+  additionalEquipmentTotal: number;
+  worksTotal: number;
+  grandTotal: number;
+}
+
 interface Props {
   filename: string;
   fullName: string;
@@ -34,9 +46,14 @@ interface Props {
   selectedWorks: any;
   worksList: WorkItem[];
   runnStore: any;
+  selectedEquipment: AdditionalEquipmentState['selected'];
+  equipmentList: AdditionalEquipmentItem[];
+  totals: Totals;
+  customRowsByTable?: Record<string, any[]>;
+  onReady?: () => void;
 }
 
-export default function PDFDownloadButton(props: Props) {
+const PDFDownloadButton = React.memo(function PDFDownloadButton(props: Props) {
   return (
     <PDFWrapper
       filename={props.filename}
@@ -48,6 +65,13 @@ export default function PDFDownloadButton(props: Props) {
       selectedWorks={props.selectedWorks}
       worksList={props.worksList}
       runnStore={props.runnStore}
+      selectedEquipment={props.selectedEquipment}
+      equipmentList={props.equipmentList}
+      totals={props.totals}
+      customRowsByTable={props.customRowsByTable}
+      onReady={props.onReady}
     />
   );
-}
+});
+
+export default PDFDownloadButton;

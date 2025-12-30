@@ -72,10 +72,10 @@ export default function BmzTable({ bmzData, roundedArea, unitPrice, totalPrice }
           ))}
 
           <tr className={`${COLORS.total} font-semibold`}>
-            <td colSpan={5} className="text-right pr-4">
+            <td colSpan={5} className="text-right pr-2">
               ВСЕГО:
             </td>
-            <td className="text-right pr-4">{totalPrice.toLocaleString()} тг</td>
+            <td className="text-right pl-2">{totalPrice.toLocaleString()} тг</td>
           </tr>
         </tbody>
       </table>

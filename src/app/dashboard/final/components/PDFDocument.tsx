@@ -10,9 +10,22 @@ import {
   BmzData,
 } from '@/utils/bmzCalculations';
 import type { Transformer } from '@/api/transformers';
+// Расширенный тип трансформатора с УСТ
+type ExtendedTransformer = Transformer & {
+  quantity?: number;
+  ustCalculation?: any;
+  ustCalculations?: any[];
+  busbarUstData?: {
+    mainUstWeight: number;
+    zeroUstWeight: number;
+    material: string;
+  };
+};
 import type { RusnState } from '@/store/useRusnStore';
 // import { useRunnStore } from '@/store/useRunnStore';
-import type { WorksState, WorkItem } from '@/store/useWorksStore';
+import type { WorkItem } from '@/store/useWorksStore';
+import type { AdditionalEquipmentState, AdditionalEquipmentItem } from '@/store/useAdditionalEquipmentStore';
+import { rusnTableConfig } from '@/components/FinalReview/tableConfigs';
 
 // Регистрируем шрифт с поддержкой кириллицы
 Font.register({
@@ -147,21 +160,35 @@ const styles = StyleSheet.create({
 });
 
 // Типы для PDF документа
+interface Totals {
+  bmzTotal: number;
+  transformerTotal: number;
+  rusnTotal: number;
+  runnTotal: number;
+  additionalEquipmentTotal: number;
+  worksTotal: number;
+  grandTotal: number;
+}
+
 interface PDFDocumentProps {
   filename: string;
   fullName: string;
   user: any;
   bmzStore: BmzData;
-  selectedTransformer: Transformer | null;
+  selectedTransformer: ExtendedTransformer | null;
   rusnStore: RusnState;
-  selectedWorks: WorksState['selected'];
+  selectedWorks: any;
   worksList: WorkItem[];
   runnStore: any;
+  selectedEquipment: AdditionalEquipmentState['selected'];
+  equipmentList: AdditionalEquipmentItem[];
+  totals: Totals;
+  customRowsByTable?: Record<string, any[]>;
 }
 
 // Функция для форматирования чисел
 const formatNumber = (num: number) => {
-  return num.toLocaleString('ru-RU');
+  return Math.round(num).toLocaleString('ru-RU', { maximumFractionDigits: 0 });
 };
 
 export const PDFDocument = ({
@@ -174,6 +201,10 @@ export const PDFDocument = ({
   selectedWorks,
   worksList,
   runnStore,
+  selectedEquipment,
+  equipmentList,
+  totals,
+  customRowsByTable = {},
 }: PDFDocumentProps) => {
   // Проверяем наличие необходимых данных
   if (!bmzStore || !rusnStore || !selectedWorks || !worksList || !runnStore) {
@@ -210,33 +241,71 @@ export const PDFDocument = ({
     );
   }
 
-  // Глобальный расчет БМЗ
+  // Используем переданные суммы из родительского компонента (единый источник истины)
+  const { bmzTotal, transformerTotal, rusnTotal, runnTotal, additionalEquipmentTotal, worksTotal, grandTotal } = totals;
+
+  // Данные для отображения таблиц (только для рендеринга, не для расчета сумм)
   const bmzArea = calculateArea(bmzStore.width || 0, bmzStore.length || 0);
   const roundedArea = Math.round(bmzArea * 10) / 10;
   const unitPrice = calculateBasePrice(bmzStore.settings, bmzStore.thickness, bmzArea);
   const buildingTotal = unitPrice * roundedArea;
   const activeEquipment = getActiveEquipment(bmzStore);
-  const bmzTotal = calculateTotalPrice(bmzStore);
 
-  // Итог по трансформатору
-  const transformerTotal = selectedTransformer?.price ? selectedTransformer.price * 2 : 0;
+  // Функция для расчета цены УСТ (только для отображения в таблице)
+  const calculateUstPrice = (calc: any, additionalUstCost: number = 0) => {
+    if (!calc?.data?.categories) return 0;
+    
+    let materialsTotal = 0;
+    calc.data.categories.forEach((category: any) => {
+      category.items.forEach((item: any) => {
+        materialsTotal += (item.price || 0) * (item.quantity || 0);
+      });
+    });
 
-  // Итог по РУСН
-  const rusnTotal =
-    (rusnStore.cellConfigs || []).reduce((sum: number, cell: any) => sum + (cell.totalPrice || 0), 0) +
-    (rusnStore.busBridgeSummary?.totalPrice || 0) +
-    (rusnStore.busbarSummary?.totalPrice || 0);
+    const totalMaterialsWithUst = materialsTotal + additionalUstCost;
+    const calculation = calc.data.calculation;
+    if (!calculation) return totalMaterialsWithUst;
 
-  // Итог по работам
-  const worksTotal = (worksList || [])
-    .filter((work) => selectedWorks[work.name]?.checked)
-    .reduce((sum, work) => {
-      const count = selectedWorks[work.name]?.count || 1;
-      return sum + (work.price || 0) * count;
-    }, 0);
+    const manufacturingCost = (calculation.manufacturingHours || 0) * (calculation.hourlyRate || 0);
+    const overheadCost = totalMaterialsWithUst * ((calculation.overheadPercentage || 0) / 100);
+    const productionCost = totalMaterialsWithUst + manufacturingCost + overheadCost;
+    const adminCost = totalMaterialsWithUst * ((calculation.adminPercentage || 0) / 100);
+    const fullCost = productionCost + adminCost;
+    const profitCost = fullCost * ((calculation.plannedProfitPercentage || 0) / 100);
+    const wholesalePrice = fullCost + profitCost;
+    const vatCost = wholesalePrice * ((calculation.ndsPercentage || 0) / 100);
+    const finalPrice = wholesalePrice + vatCost;
 
-  // Общая сумма
-  const grandTotal = bmzTotal + transformerTotal + rusnTotal + worksTotal;
+    return finalPrice;
+  };
+
+  // Данные для отображения трансформатора (только для таблицы)
+  const transformerQuantity = selectedTransformer?.quantity || 2;
+  const transformerBasePrice = selectedTransformer?.price || 0;
+  const transformerBaseTotal = transformerBasePrice * transformerQuantity;
+  const busbarUstData = selectedTransformer?.busbarUstData;
+  const busbarUstCost = busbarUstData ? 
+    (busbarUstData.mainUstWeight + busbarUstData.zeroUstWeight) * 
+    (busbarUstData.material === 'Алюминий' ? 2800 : 5600) : 0;
+
+  // Данные для отображения РУНН (только для таблицы)
+  const runnCellSummaries = runnStore?.cellSummaries || [];
+  const runnBusbarSummary = runnStore?.busbarSummary;
+  const runnBusBridgeSummary = runnStore?.busBridgeSummary;
+
+  // Данные для отображения дополнительного оборудования (только для таблицы)
+  const additionalEquipmentItems = Object.entries(selectedEquipment || {})
+    .filter(([name, val]) => val.checked && (val.count ?? 0) > 0)
+    .map(([name, val]) => {
+      const equipmentItem = (equipmentList || []).find(item => item.name === name);
+      return {
+        name,
+        unit: equipmentItem?.unit || 'шт.',
+        quantity: val.count ?? 0,
+        price: val.price || 0,
+        total: (val.price || 0) * (val.count ?? 0),
+      };
+    });
 
   return (
     <Document>
@@ -292,6 +361,26 @@ export const PDFDocument = ({
                 </View>
               ))}
 
+              {/* Пользовательские строки для БМЗ */}
+              {(customRowsByTable?.bmz || []).map((row: any, idx: number) => {
+                const rowNumber = activeEquipment.length + 2 + idx;
+                const indentLevel = row.indent || 0;
+                const indentPadding = indentLevel * 8; // Отступ для PDF
+                return (
+                  <View key={row.id || `custom-bmz-${idx}`} style={styles.tableRow}>
+                    <Text style={styles.tableCellNumber}>{rowNumber}</Text>
+                    <Text style={[styles.tableCellName, { paddingLeft: indentPadding }]}>
+                      {indentLevel > 0 && '└'.repeat(Math.min(indentLevel, 3))}
+                      {row.name || ''}
+                    </Text>
+                    <Text style={styles.tableCellUnit}>{row.unit || 'шт.'}</Text>
+                    <Text style={styles.tableCellQuantity}>{row.quantity || 1}</Text>
+                    <Text style={styles.tableCellPrice}>{formatNumber(row.price || 0)} тг</Text>
+                    <Text style={styles.tableCellTotal}>{formatNumber(row.total || 0)} тг</Text>
+                  </View>
+                );
+              })}
+
               {/* Итог БМЗ */}
               <View style={[styles.tableRow, styles.totalRow]}>
                 <Text style={[styles.tableCellNumber, styles.totalCell]}></Text>
@@ -320,20 +409,92 @@ export const PDFDocument = ({
                 <Text style={[styles.tableCellPrice, styles.totalCell]}>Цена</Text>
                 <Text style={[styles.tableCellTotal, styles.totalCell]}>Сумма</Text>
               </View>
+              
+              {/* Сам трансформатор */}
               <View style={styles.tableRow}>
                 <Text style={styles.tableCellNumber}>1</Text>
                 <Text style={styles.tableCellName}>
                   Силовой трансформатор {selectedTransformer.model}
                 </Text>
                 <Text style={styles.tableCellUnit}>шт</Text>
-                <Text style={styles.tableCellQuantity}>2</Text>
+                <Text style={styles.tableCellQuantity}>{transformerQuantity}</Text>
                 <Text style={styles.tableCellPrice}>
-                  {formatNumber(selectedTransformer.price || 0)} тг
+                  {formatNumber(transformerBasePrice)} тг
                 </Text>
                 <Text style={styles.tableCellTotal}>
-                  {formatNumber((selectedTransformer.price || 0) * 2)} тг
+                  {formatNumber(transformerBaseTotal)} тг
                 </Text>
               </View>
+
+              {/* УСТ калькуляции */}
+              {selectedTransformer.ustCalculations && selectedTransformer.ustCalculations.length > 0 ? (
+                selectedTransformer.ustCalculations.map((calc: any, index: number) => {
+                  const shouldAddBusbarCost = calc.name?.includes('0.4кВ') || calc.name?.includes('УСТ-0.4кВ');
+                  const additionalCost = shouldAddBusbarCost ? busbarUstCost : 0;
+                  const ustPrice = calculateUstPrice(calc, additionalCost);
+                  const ustTotal = ustPrice * transformerQuantity;
+                  
+                  return (
+                    <View key={`ust-${index}`} style={styles.tableRow}>
+                      <Text style={styles.tableCellNumber}>{index + 2}</Text>
+                      <Text style={styles.tableCellName}>{calc.name || 'УСТ'}</Text>
+                      <Text style={styles.tableCellUnit}>шт</Text>
+                      <Text style={styles.tableCellQuantity}>{transformerQuantity}</Text>
+                      <Text style={styles.tableCellPrice}>
+                        {formatNumber(ustPrice)} тг
+                      </Text>
+                      <Text style={styles.tableCellTotal}>
+                        {formatNumber(ustTotal)} тг
+                      </Text>
+                    </View>
+                  );
+                })
+              ) : selectedTransformer.ustCalculation ? (
+                (() => {
+                  const ustPrice = calculateUstPrice(selectedTransformer.ustCalculation);
+                  const ustTotal = ustPrice * transformerQuantity;
+                  
+                  return (
+                    <View style={styles.tableRow}>
+                      <Text style={styles.tableCellNumber}>2</Text>
+                      <Text style={styles.tableCellName}>
+                        {selectedTransformer.ustCalculation.name || 'УСТ'}
+                      </Text>
+                      <Text style={styles.tableCellUnit}>шт</Text>
+                      <Text style={styles.tableCellQuantity}>{transformerQuantity}</Text>
+                      <Text style={styles.tableCellPrice}>
+                        {formatNumber(ustPrice)} тг
+                      </Text>
+                      <Text style={styles.tableCellTotal}>
+                        {formatNumber(ustTotal)} тг
+                      </Text>
+                    </View>
+                  );
+                })()
+              ) : null}
+
+              {/* Пользовательские строки для трансформатора */}
+              {(customRowsByTable?.transformer || []).map((row: any, idx: number) => {
+                const baseRowCount = 1 + (selectedTransformer.ustCalculations?.length || (selectedTransformer.ustCalculation ? 1 : 0));
+                const rowNumber = baseRowCount + 1 + idx;
+                const indentLevel = row.indent || 0;
+                const indentPadding = indentLevel * 8;
+                return (
+                  <View key={row.id || `custom-transformer-${idx}`} style={styles.tableRow}>
+                    <Text style={styles.tableCellNumber}>{rowNumber}</Text>
+                    <Text style={[styles.tableCellName, { paddingLeft: indentPadding }]}>
+                      {indentLevel > 0 && '└'.repeat(Math.min(indentLevel, 3))}
+                      {row.name || ''}
+                    </Text>
+                    <Text style={styles.tableCellUnit}>{row.unit || 'шт.'}</Text>
+                    <Text style={styles.tableCellQuantity}>{row.quantity || 1}</Text>
+                    <Text style={styles.tableCellPrice}>{formatNumber(row.price || 0)} тг</Text>
+                    <Text style={styles.tableCellTotal}>{formatNumber(row.total || 0)} тг</Text>
+                  </View>
+                );
+              })}
+
+              {/* Итого по трансформатору */}
               <View style={[styles.tableRow, styles.totalRow]}>
                 <Text style={[styles.tableCellNumber, styles.totalCell]}></Text>
                 <Text style={[styles.tableCellName, styles.totalCell]}>ВСЕГО:</Text>
@@ -341,7 +502,7 @@ export const PDFDocument = ({
                 <Text style={[styles.tableCellQuantity, styles.totalCell]}></Text>
                 <Text style={[styles.tableCellPrice, styles.totalCell]}></Text>
                 <Text style={[styles.tableCellTotal, styles.totalCell]}>
-                  {formatNumber((selectedTransformer.price || 0) * 2)} тг
+                  {formatNumber(transformerTotal)} тг
                 </Text>
               </View>
             </View>
@@ -349,143 +510,79 @@ export const PDFDocument = ({
         )}
 
         {/* Секция РУСН */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>РУСН-10кВ</Text>
-          <View style={styles.table}>
-            <View style={[styles.tableRow, styles.tableHeader]}>
-              <Text style={[styles.tableCellNumber, styles.totalCell]}>№</Text>
-              <Text style={[styles.tableCellName, styles.totalCell]}>Наименование</Text>
-              <Text style={[styles.tableCellUnit, styles.totalCell]}>Ед. изм.</Text>
-              <Text style={[styles.tableCellQuantity, styles.totalCell]}>Кол-во</Text>
-              <Text style={[styles.tableCellPrice, styles.totalCell]}>Цена</Text>
-              <Text style={[styles.tableCellTotal, styles.totalCell]}>Сумма</Text>
-            </View>
+        {(() => {
+          // Используем rusnTableConfig.dataMapper для получения данных (единый источник истины)
+          const rusnRows = rusnTableConfig.dataMapper(rusnStore);
 
-            {/* Ячейки РУСН */}
-            {rusnStore.cellSummaries && rusnStore.cellSummaries.length > 0
-              ? // Используем сохраненные сводки ячеек
-                rusnStore.cellSummaries.map((summary: any, index: number) => (
-                  <View key={index} style={styles.tableRow}>
+          // Показываем секцию только если есть данные
+          if (!rusnRows || rusnRows.length === 0) {
+            return null;
+          }
+
+          return (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>РУСН-10кВ</Text>
+              <View style={styles.table}>
+                <View style={[styles.tableRow, styles.tableHeader]}>
+                  <Text style={[styles.tableCellNumber, styles.totalCell]}>№</Text>
+                  <Text style={[styles.tableCellName, styles.totalCell]}>Наименование</Text>
+                  <Text style={[styles.tableCellUnit, styles.totalCell]}>Ед. изм.</Text>
+                  <Text style={[styles.tableCellQuantity, styles.totalCell]}>Кол-во</Text>
+                  <Text style={[styles.tableCellPrice, styles.totalCell]}>Цена</Text>
+                  <Text style={[styles.tableCellTotal, styles.totalCell]}>Сумма</Text>
+                </View>
+
+                {/* Строки данных РУСН */}
+                {rusnRows.map((row: any, index: number) => (
+                  <View key={row.id || `rusn-row-${index}`} style={styles.tableRow}>
                     <Text style={styles.tableCellNumber}>{index + 1}</Text>
-                    <Text style={styles.tableCellName}>{summary.name}</Text>
-                    <Text style={styles.tableCellUnit}>шт</Text>
-                    <Text style={styles.tableCellQuantity}>{summary.quantity}</Text>
+                    <Text style={styles.tableCellName}>{row.name || '—'}</Text>
+                    <Text style={styles.tableCellUnit}>{row.unit || 'шт'}</Text>
+                    <Text style={styles.tableCellQuantity}>{row.quantity || 0}</Text>
                     <Text style={styles.tableCellPrice}>
-                      {formatNumber(summary.pricePerUnit)} тг
+                      {formatNumber(row.price || 0)} тг
                     </Text>
-                    <Text style={styles.tableCellTotal}>{formatNumber(summary.totalPrice)} тг</Text>
+                    <Text style={styles.tableCellTotal}>
+                      {formatNumber(row.total || 0)} тг
+                    </Text>
                   </View>
-                ))
-              : // Fallback к обычному отображению ячеек
-                (rusnStore.cellConfigs || []).map((cell: any, index: number) => {
-                  // Формируем полное название ячейки
-                  let cellName = `Ячейка ${cell.purpose}`;
+                ))}
 
-                  // Добавляем информацию о выключателе если есть
-                  if (cell.breaker?.name) {
-                    cellName += `, ${cell.breaker.name}`;
-                  }
-
-                  // Добавляем информацию о РЗА если есть
-                  if (cell.relay?.name) {
-                    cellName += `, РЗА: ${cell.relay.name}`;
-                  }
-
-                  // Добавляем информацию о трансформаторе тока если есть
-                  if (cell.currentTransformer?.name) {
-                    cellName += `, ТТ: ${cell.currentTransformer.name}`;
-                  }
-
-                  // Добавляем информацию о трансформаторе напряжения если есть
-                  if (cell.voltageTransformer?.name) {
-                    cellName += `, ТН: ${cell.voltageTransformer.name}`;
-                  }
-
-                  // Добавляем информацию о трансформаторе собственных нужд если есть
-                  if (cell.auxiliaryTransformer?.name) {
-                    cellName += `, ТСН: ${cell.auxiliaryTransformer.name}`;
-                  }
-
-                  // Добавляем информацию о приборе учета если есть
-                  if (cell.metering?.name) {
-                    cellName += `, ПУ: ${cell.metering.name}`;
-                  }
-
+                {/* Пользовательские строки для РУСН */}
+                {(customRowsByTable?.rusn || []).map((row: any, idx: number) => {
+                  const rowNumber = rusnRows.length + 1 + idx;
+                  const indentLevel = row.indent || 0;
+                  const indentPadding = indentLevel * 8;
                   return (
-                    <View key={index} style={styles.tableRow}>
-                      <Text style={styles.tableCellNumber}>{index + 1}</Text>
-                      <Text style={styles.tableCellName}>{cellName}</Text>
-                      <Text style={styles.tableCellUnit}>шт</Text>
-                      <Text style={styles.tableCellQuantity}>1</Text>
-                      <Text style={styles.tableCellPrice}>
-                        {formatNumber(cell.totalPrice || 0)} тг
+                    <View key={row.id || `custom-rusn-${idx}`} style={styles.tableRow}>
+                      <Text style={styles.tableCellNumber}>{rowNumber}</Text>
+                      <Text style={[styles.tableCellName, { paddingLeft: indentPadding }]}>
+                        {indentLevel > 0 && '└'.repeat(Math.min(indentLevel, 3))}
+                        {row.name || ''}
                       </Text>
-                      <Text style={styles.tableCellTotal}>
-                        {formatNumber(cell.totalPrice || 0)} тг
-                      </Text>
+                      <Text style={styles.tableCellUnit}>{row.unit || 'шт.'}</Text>
+                      <Text style={styles.tableCellQuantity}>{row.quantity || 1}</Text>
+                      <Text style={styles.tableCellPrice}>{formatNumber(row.price || 0)} тг</Text>
+                      <Text style={styles.tableCellTotal}>{formatNumber(row.total || 0)} тг</Text>
                     </View>
                   );
                 })}
 
-            {/* Шинный мост */}
-            {rusnStore.busBridgeSummary && (
-              <View style={styles.tableRow}>
-                <Text style={styles.tableCellNumber}>
-                  {(rusnStore.cellSummaries?.length || rusnStore.cellConfigs.length) + 1}
-                </Text>
-                <Text style={styles.tableCellName}>{rusnStore.busBridgeSummary.name}</Text>
-                <Text style={styles.tableCellUnit}>шт</Text>
-                <Text style={styles.tableCellQuantity}>{rusnStore.busBridgeSummary.quantity}</Text>
-                <Text style={styles.tableCellPrice}>
-                  {formatNumber(rusnStore.busBridgeSummary.pricePerUnit)} тг
-                </Text>
-                <Text style={styles.tableCellTotal}>
-                  {formatNumber(rusnStore.busBridgeSummary.totalPrice)} тг
-                </Text>
+                {/* Итого РУСН */}
+                <View style={[styles.tableRow, styles.totalRow]}>
+                  <Text style={[styles.tableCellNumber, styles.totalCell]}></Text>
+                  <Text style={[styles.tableCellName, styles.totalCell]}>ВСЕГО:</Text>
+                  <Text style={[styles.tableCellUnit, styles.totalCell]}></Text>
+                  <Text style={[styles.tableCellQuantity, styles.totalCell]}></Text>
+                  <Text style={[styles.tableCellPrice, styles.totalCell]}></Text>
+                  <Text style={[styles.tableCellTotal, styles.totalCell]}>
+                    {formatNumber(rusnTotal)} тг
+                  </Text>
+                </View>
               </View>
-            )}
-
-            {/* Сборные шины */}
-            {rusnStore.busbarSummary && (
-              <View style={styles.tableRow}>
-                <Text style={styles.tableCellNumber}>
-                  {(rusnStore.cellSummaries?.length || rusnStore.cellConfigs.length) +
-                    (rusnStore.busBridgeSummary ? 1 : 0) +
-                    1}
-                </Text>
-                <Text style={styles.tableCellName}>{rusnStore.busbarSummary.name}</Text>
-                <Text style={styles.tableCellUnit}>шт</Text>
-                <Text style={styles.tableCellQuantity}>{rusnStore.busbarSummary.quantity}</Text>
-                <Text style={styles.tableCellPrice}>
-                  {formatNumber(rusnStore.busbarSummary.pricePerUnit)} тг
-                </Text>
-                <Text style={styles.tableCellTotal}>
-                  {formatNumber(rusnStore.busbarSummary.totalPrice)} тг
-                </Text>
-              </View>
-            )}
-
-            {/* Итого РУСН */}
-            <View style={[styles.tableRow, styles.totalRow]}>
-              <Text style={[styles.tableCellNumber, styles.totalCell]}></Text>
-              <Text style={[styles.tableCellName, styles.totalCell]}>ВСЕГО:</Text>
-              <Text style={[styles.tableCellUnit, styles.totalCell]}></Text>
-              <Text style={[styles.tableCellQuantity, styles.totalCell]}></Text>
-              <Text style={[styles.tableCellPrice, styles.totalCell]}></Text>
-              <Text style={[styles.tableCellTotal, styles.totalCell]}>
-                {formatNumber(
-                  (rusnStore.cellConfigs || []).reduce(
-                    (sum: number, cell: any) => sum + (cell.totalPrice || 0),
-                    0
-                  ) +
-                    (rusnStore.busBridgeSummary?.totalPrice || 0) +
-                    (rusnStore.busbarSummary?.totalPrice || 0)
-                )}{' '}
-                тг
-              </Text>
             </View>
-          </View>
-        </View>
+          );
+        })()}
 
         {/* Секция РУ-0.4кВ - Общая сводка РУНН */}
         {(() => {
@@ -558,6 +655,27 @@ export const PDFDocument = ({
                 </View>
               )}
 
+              {/* Пользовательские строки для РУНН */}
+              {(customRowsByTable?.runn || []).map((row: any, idx: number) => {
+                const baseRowCount = runnCellSummaries.length + (runnBusbarSummary ? 1 : 0) + (runnBusBridgeSummary ? 1 : 0);
+                const rowNumber = baseRowCount + 1 + idx;
+                const indentLevel = row.indent || 0;
+                const indentPadding = indentLevel * 8;
+                return (
+                  <View key={row.id || `custom-runn-${idx}`} style={styles.tableRow}>
+                    <Text style={styles.tableCellNumber}>{rowNumber}</Text>
+                    <Text style={[styles.tableCellName, { paddingLeft: indentPadding }]}>
+                      {indentLevel > 0 && '└'.repeat(Math.min(indentLevel, 3))}
+                      {row.name || ''}
+                    </Text>
+                    <Text style={styles.tableCellUnit}>{row.unit || 'шт.'}</Text>
+                    <Text style={styles.tableCellQuantity}>{row.quantity || 1}</Text>
+                    <Text style={styles.tableCellPrice}>{formatNumber(row.price || 0)} тг</Text>
+                    <Text style={styles.tableCellTotal}>{formatNumber(row.total || 0)} тг</Text>
+                  </View>
+                );
+              })}
+
               {/* Итого РУ-0.4кВ */}
               <View style={[styles.tableRow, styles.totalRow]}>
                 <Text style={[styles.tableCellNumber, styles.totalCell]}>—</Text>
@@ -566,18 +684,73 @@ export const PDFDocument = ({
                 <Text style={[styles.tableCellQuantity, styles.totalCell]}>—</Text>
                 <Text style={[styles.tableCellPrice, styles.totalCell]}>—</Text>
                 <Text style={[styles.tableCellTotal, styles.totalCell]}>
-                  {formatNumber(
-                    (runnCellSummaries.reduce((sum: number, s: any) => sum + (s.totalPrice || 0), 0)) +
-                    (runnBusbarSummary?.totalPrice || 0) +
-                    (runnBusBridgeSummary?.totalPrice || 0)
-                  )}{' '}
-                  тг
+                  {formatNumber(runnTotal)} тг
                 </Text>
               </View>
             </View>
           </View>
         );
         })()}
+
+        {/* Секция дополнительного оборудования */}
+        {additionalEquipmentItems.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Дополнительное оборудование</Text>
+            <View style={styles.table}>
+              <View style={[styles.tableRow, styles.tableHeader]}>
+                <Text style={[styles.tableCellNumber, styles.totalCell]}>№</Text>
+                <Text style={[styles.tableCellName, styles.totalCell]}>Наименование</Text>
+                <Text style={[styles.tableCellUnit, styles.totalCell]}>Ед. изм.</Text>
+                <Text style={[styles.tableCellQuantity, styles.totalCell]}>Кол-во</Text>
+                <Text style={[styles.tableCellPrice, styles.totalCell]}>Цена</Text>
+                <Text style={[styles.tableCellTotal, styles.totalCell]}>Сумма</Text>
+              </View>
+
+              {additionalEquipmentItems.map((item, index) => (
+                <View key={item.name} style={styles.tableRow}>
+                  <Text style={styles.tableCellNumber}>{index + 1}</Text>
+                  <Text style={styles.tableCellName}>{item.name}</Text>
+                  <Text style={styles.tableCellUnit}>{String(item.unit)}</Text>
+                  <Text style={styles.tableCellQuantity}>{item.quantity}</Text>
+                  <Text style={styles.tableCellPrice}>{formatNumber(item.price)} тг</Text>
+                  <Text style={styles.tableCellTotal}>{formatNumber(item.total)} тг</Text>
+                </View>
+              ))}
+
+              {/* Пользовательские строки для дополнительного оборудования */}
+              {(customRowsByTable?.additionalEquipment || []).map((row: any, idx: number) => {
+                const rowNumber = additionalEquipmentItems.length + 1 + idx;
+                const indentLevel = row.indent || 0;
+                const indentPadding = indentLevel * 8;
+                return (
+                  <View key={row.id || `custom-additional-${idx}`} style={styles.tableRow}>
+                    <Text style={styles.tableCellNumber}>{rowNumber}</Text>
+                    <Text style={[styles.tableCellName, { paddingLeft: indentPadding }]}>
+                      {indentLevel > 0 && '└'.repeat(Math.min(indentLevel, 3))}
+                      {row.name || ''}
+                    </Text>
+                    <Text style={styles.tableCellUnit}>{row.unit || 'шт.'}</Text>
+                    <Text style={styles.tableCellQuantity}>{row.quantity || 1}</Text>
+                    <Text style={styles.tableCellPrice}>{formatNumber(row.price || 0)} тг</Text>
+                    <Text style={styles.tableCellTotal}>{formatNumber(row.total || 0)} тг</Text>
+                  </View>
+                );
+              })}
+
+              {/* Итого дополнительного оборудования */}
+              <View style={[styles.tableRow, styles.totalRow]}>
+                <Text style={[styles.tableCellNumber, styles.totalCell]}></Text>
+                <Text style={[styles.tableCellName, styles.totalCell]}>ВСЕГО:</Text>
+                <Text style={[styles.tableCellUnit, styles.totalCell]}></Text>
+                <Text style={[styles.tableCellQuantity, styles.totalCell]}></Text>
+                <Text style={[styles.tableCellPrice, styles.totalCell]}></Text>
+                <Text style={[styles.tableCellTotal, styles.totalCell]}>
+                  {formatNumber(additionalEquipmentTotal)} тг
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Секция работ */}
         {(worksList || []).filter((work) => selectedWorks[work.name]?.checked).length > 0 && (
@@ -609,6 +782,27 @@ export const PDFDocument = ({
                     </View>
                   );
                 })}
+
+              {/* Пользовательские строки для работ */}
+              {(customRowsByTable?.works || []).map((row: any, idx: number) => {
+                const worksCount = (worksList || []).filter((work) => selectedWorks[work.name]?.checked).length;
+                const rowNumber = worksCount + 1 + idx;
+                const indentLevel = row.indent || 0;
+                const indentPadding = indentLevel * 8;
+                return (
+                  <View key={row.id || `custom-works-${idx}`} style={styles.tableRow}>
+                    <Text style={styles.tableCellNumber}>{rowNumber}</Text>
+                    <Text style={[styles.tableCellName, { paddingLeft: indentPadding }]}>
+                      {indentLevel > 0 && '└'.repeat(Math.min(indentLevel, 3))}
+                      {row.name || ''}
+                    </Text>
+                    <Text style={styles.tableCellUnit}>{row.unit || 'раб'}</Text>
+                    <Text style={styles.tableCellQuantity}>{row.quantity || 1}</Text>
+                    <Text style={styles.tableCellPrice}>{formatNumber(row.price || 0)} тг</Text>
+                    <Text style={styles.tableCellTotal}>{formatNumber(row.total || 0)} тг</Text>
+                  </View>
+                );
+              })}
 
               {/* Итого работ */}
               <View style={[styles.tableRow, styles.totalRow]}>

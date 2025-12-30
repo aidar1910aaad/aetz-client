@@ -105,3 +105,120 @@ button[data-testid='vercel-feedback-button'] {
 .animate-fadeIn {
   animation: fadeIn 0.5s ease-out;
 }
+
+/* Премиум анимации для лоадера */
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes progress-loading {
+  0% {
+    width: 0%;
+    transform: translateX(-100%);
+  }
+  50% {
+    width: 70%;
+    transform: translateX(0%);
+  }
+  100% {
+    width: 100%;
+    transform: translateX(100%);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.animate-gradient-shift {
+  animation: gradient-shift 3s ease infinite;
+  background-size: 200% auto;
+}
+
+.animate-progress-loading {
+  animation: progress-loading 2s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s linear infinite;
+  background: linear-gradient(
+    to right,
+    rgba(142, 186, 30, 0.1) 0%,
+    rgba(142, 186, 30, 0.3) 50%,
+    rgba(142, 186, 30, 0.1) 100%
+  );
+  background-size: 1000px 100%;
+}
+
+@keyframes spin-reverse {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
+
+.animate-spin-reverse {
+  animation: spin-reverse 1.2s linear infinite;
+}
+
+@keyframes spin-pulse {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  25% {
+    transform: rotate(90deg) scale(1.05);
+    opacity: 0.9;
+  }
+  50% {
+    transform: rotate(180deg) scale(1.1);
+    opacity: 0.8;
+  }
+  75% {
+    transform: rotate(270deg) scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+@keyframes spin-pulse-reverse {
+  0%, 100% {
+    transform: rotate(360deg) scale(1);
+    opacity: 1;
+  }
+  25% {
+    transform: rotate(270deg) scale(1.05);
+    opacity: 0.9;
+  }
+  50% {
+    transform: rotate(180deg) scale(1.1);
+    opacity: 0.8;
+  }
+  75% {
+    transform: rotate(90deg) scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+.animate-spin-pulse {
+  animation: spin-pulse 2s ease-in-out infinite;
+}
+
+.animate-spin-pulse-reverse {
+  animation: spin-pulse-reverse 1.2s ease-in-out infinite;
+}
+
+.animate-spin-pulse-fast {
+  animation: spin-pulse 0.8s ease-in-out infinite;
+}

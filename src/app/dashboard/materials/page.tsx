@@ -43,10 +43,10 @@ function MaterialsPageContent() {
   const canEdit = !isManagerUser;
 
   return (
-    <div className="h-[calc(100vh-64px)] bg-white overflow-y-auto">
-      <div className="p-6">
+    <div className="h-[calc(100vh-64px)] bg-white flex flex-col overflow-hidden">
+      <div className="flex-shrink-0 p-6">
         {/* Header Section */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center gap-4 mb-6">
             <div className="p-3 bg-gray-100 rounded-xl">
               <Package className="w-6 h-6 text-[#8eba1e]" />
@@ -84,33 +84,16 @@ function MaterialsPageContent() {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Информационное сообщение для менеджера */}
-        {isManagerUser && (
-          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Package className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-blue-900 mb-1">
-                  Только просмотр
-                </p>
-                <p className="text-sm text-blue-700">
-                  У вас нет прав на создание, редактирование и удаление материалов. Обратитесь к администратору или пользователю ПТО для внесения изменений.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+      {modalOpen && canEdit && (
+        <CreateMaterialModal
+          onClose={() => setModalOpen(false)}
+          onCreate={handleCreate}
+        />
+      )}
 
-        {modalOpen && canEdit && (
-          <CreateMaterialModal
-            onClose={() => setModalOpen(false)}
-            onCreate={handleCreate}
-          />
-        )}
-
+      <div className="flex-1 flex flex-col overflow-hidden px-6 pb-6">
         <MaterialsTableSection
           materials={materials}
           loading={loading}
@@ -132,16 +115,16 @@ function MaterialsPageContent() {
           handleDelete={handleDelete}
           canEdit={canEdit}
         />
-
-        {editingMaterial && canEdit && (
-          <EditMaterialModal
-            material={editingMaterial}
-            categories={allCategories}
-            onClose={() => setEditingMaterial(null)}
-            onUpdate={handleUpdate}
-          />
-        )}
       </div>
+
+      {editingMaterial && canEdit && (
+        <EditMaterialModal
+          material={editingMaterial}
+          categories={allCategories}
+          onClose={() => setEditingMaterial(null)}
+          onUpdate={handleUpdate}
+        />
+      )}
     </div>
   );
 }

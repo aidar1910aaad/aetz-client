@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { RunnCell } from '@/store/useRunnStore';
-import TogglerWithInput from '../../TogglerWithInput';
+import TogglerWithInput from '../../../TogglerWithInput';
 import { useRunnTorcevaiaCalculation } from '@/hooks/useRunnInputCalculation';
 import { calculateCost } from '@/utils/calculationUtils';
 

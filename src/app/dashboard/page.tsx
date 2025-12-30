@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Settings, Zap, Cpu, TrendingUp, Users, FileText, History, Calculator, DollarSign, Activity, BarChart3, Clock, Building2, Package, AlertCircle, Gauge, BarChart, Settings2 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Settings, Zap, Cpu, Users, FileText, History, Calculator, DollarSign, Activity, BarChart3, Clock, Building2, Package, AlertCircle, Filter, Calendar, CheckCircle } from 'lucide-react';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { useMaterialHistory } from '@/hooks/useMaterialHistory';
+import HeroSection from './components/HeroSection';
 
 const cards = [
   { 
@@ -28,10 +30,232 @@ const quickActions = [
   { title: 'Пользователи', icon: Users, href: '/dashboard/users', color: 'text-[#8eba1e]' },
 ];
 
+type SortMode = 'totalValue' | 'count' | 'name';
+
+const sortModes: Array<{ mode: SortMode; label: string }> = [
+  { mode: 'totalValue', label: 'По сумме заявок' },
+  { mode: 'count', label: 'По количеству заявок' },
+  { mode: 'name', label: 'По названию' },
+];
+
+type PeriodFilter = 'all' | 'today' | 'week' | 'month' | 'quarter' | 'year';
+type StatusFilter = 'all' | 'active' | 'completed';
+
+const periodFilters: Array<{ value: PeriodFilter; label: string }> = [
+  { value: 'all', label: 'Все время' },
+  { value: 'today', label: 'Сегодня' },
+  { value: 'week', label: 'Неделя' },
+  { value: 'month', label: 'Месяц' },
+  { value: 'quarter', label: 'Квартал' },
+  { value: 'year', label: 'Год' },
+];
+
+const statusFilters: Array<{ value: StatusFilter; label: string; icon: any }> = [
+  { value: 'all', label: 'Все', icon: null },
+  { value: 'active', label: 'Активные', icon: Activity },
+  { value: 'completed', label: 'Завершенные', icon: CheckCircle },
+];
+
+type MaterialChangeTypeFilter = 'all' | 'name' | 'price' | 'category';
+
 export default function DashboardHome() {
   const router = useRouter();
   const stats = useDashboardStats();
   const materialHistory = useMaterialHistory();
+  const [sortModeIndex, setSortModeIndex] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [minAmount, setMinAmount] = useState<number>(0);
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Фильтры для истории материалов
+  const [materialPeriodFilter, setMaterialPeriodFilter] = useState<PeriodFilter>('all');
+  const [materialChangeTypeFilter, setMaterialChangeTypeFilter] = useState<MaterialChangeTypeFilter>('all');
+  const [materialUserFilter, setMaterialUserFilter] = useState<string>('all');
+  const [showMaterialFilters, setShowMaterialFilters] = useState(false);
+
+  // Функция для переключения режима сортировки
+  const switchSortMode = (newIndex: number) => {
+    if (newIndex === sortModeIndex) return;
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setSortModeIndex(newIndex);
+      setIsTransitioning(false);
+    }, 300);
+  };
+
+  // Фильтрация заявок
+  const filteredApplications = useMemo(() => {
+    if (!stats.allApplications.length) return [];
+
+    let filtered = [...stats.allApplications];
+
+    // Фильтр по периоду
+    if (periodFilter !== 'all') {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      filtered = filtered.filter((app: any) => {
+        const appDate = new Date(app.date);
+        const appDateOnly = new Date(appDate.getFullYear(), appDate.getMonth(), appDate.getDate());
+        
+        switch (periodFilter) {
+          case 'today':
+            return appDateOnly.getTime() === today.getTime();
+          case 'week':
+            const weekAgo = new Date(today);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            return appDateOnly >= weekAgo;
+          case 'month':
+            return appDate.getMonth() === now.getMonth() && appDate.getFullYear() === now.getFullYear();
+          case 'quarter':
+            const quarter = Math.floor(now.getMonth() / 3);
+            return Math.floor(appDate.getMonth() / 3) === quarter && appDate.getFullYear() === now.getFullYear();
+          case 'year':
+            return appDate.getFullYear() === now.getFullYear();
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Фильтр по статусу
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((app: any) => {
+        if (statusFilter === 'active') return !app.completed;
+        if (statusFilter === 'completed') return app.completed;
+        return true;
+      });
+    }
+
+    // Фильтр по минимальной сумме
+    if (minAmount > 0) {
+      filtered = filtered.filter((app: any) => {
+        const amount = parseFloat(app.totalAmount) || 0;
+        return amount >= minAmount;
+      });
+    }
+
+    return filtered;
+  }, [stats.allApplications, periodFilter, statusFilter, minAmount]);
+
+  // Группировка и сортировка отфильтрованных клиентов
+  const sortedClients = useMemo(() => {
+    if (!filteredApplications.length) return [];
+
+    // Группируем по клиентам
+    const clientStats = filteredApplications.reduce((acc: any, app: any) => {
+      const client = app.client || 'Неизвестный клиент';
+      if (!acc[client]) {
+        acc[client] = { count: 0, totalValue: 0 };
+      }
+      acc[client].count += 1;
+      acc[client].totalValue += parseFloat(app.totalAmount) || 0;
+      return acc;
+    }, {});
+
+    const clients = Object.entries(clientStats)
+      .map(([client, data]: [string, any]) => ({
+        client,
+        count: data.count,
+        totalValue: data.totalValue,
+      }))
+      .slice(0, 8);
+
+    // Сортировка по текущему режиму
+    const currentMode = sortModes[sortModeIndex].mode;
+    switch (currentMode) {
+      case 'totalValue':
+        return clients.sort((a, b) => b.totalValue - a.totalValue);
+      case 'count':
+        return clients.sort((a, b) => b.count - a.count);
+      case 'name':
+        return clients.sort((a, b) => a.client.localeCompare(b.client, 'ru'));
+      default:
+        return clients;
+    }
+  }, [filteredApplications, sortModeIndex]);
+
+  // Переключение режима сортировки каждые 5 секунд
+  useEffect(() => {
+    if (sortedClients.length === 0) return;
+
+    const interval = setInterval(() => {
+      setSortModeIndex((prev) => {
+        const nextIndex = (prev + 1) % sortModes.length;
+        setIsTransitioning(true);
+        setTimeout(() => {
+          setIsTransitioning(false);
+        }, 300);
+        return nextIndex;
+      });
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [sortedClients.length]);
+
+  // Фильтрация истории материалов
+  const filteredMaterialChanges = useMemo(() => {
+    if (!materialHistory.allChanges.length) return [];
+
+    let filtered = [...materialHistory.allChanges];
+
+    // Фильтр по периоду
+    if (materialPeriodFilter !== 'all') {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      filtered = filtered.filter((change: any) => {
+        const changeDate = new Date(change.changedAt);
+        const changeDateOnly = new Date(changeDate.getFullYear(), changeDate.getMonth(), changeDate.getDate());
+        
+        switch (materialPeriodFilter) {
+          case 'today':
+            return changeDateOnly.getTime() === today.getTime();
+          case 'week':
+            const weekAgo = new Date(today);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            return changeDateOnly >= weekAgo;
+          case 'month':
+            return changeDate.getMonth() === now.getMonth() && changeDate.getFullYear() === now.getFullYear();
+          case 'quarter':
+            const quarter = Math.floor(now.getMonth() / 3);
+            return Math.floor(changeDate.getMonth() / 3) === quarter && changeDate.getFullYear() === now.getFullYear();
+          case 'year':
+            return changeDate.getFullYear() === now.getFullYear();
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Фильтр по типу изменения
+    if (materialChangeTypeFilter !== 'all') {
+      filtered = filtered.filter((change: any) => {
+        return change.fieldChanged === materialChangeTypeFilter;
+      });
+    }
+
+    // Фильтр по пользователю
+    if (materialUserFilter !== 'all') {
+      filtered = filtered.filter((change: any) => {
+        return change.changedBy === materialUserFilter;
+      });
+    }
+
+    // Сортируем по дате (новые сначала) и берем только 4 последних
+    return filtered
+      .sort((a: any, b: any) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime())
+      .slice(0, 4);
+  }, [materialHistory.allChanges, materialPeriodFilter, materialChangeTypeFilter, materialUserFilter]);
+
+  // Получаем уникальных пользователей для фильтра
+  const uniqueUsers = useMemo(() => {
+    if (!materialHistory.allChanges.length) return [];
+    const users = new Set(materialHistory.allChanges.map((change: any) => change.changedBy));
+    return Array.from(users).sort();
+  }, [materialHistory.allChanges]);
 
   const handleSettingsClick = (e: React.MouseEvent, settingsHref: string) => {
     e.preventDefault();
@@ -60,90 +284,25 @@ export default function DashboardHome() {
   };
 
   return (
-    <div className="h-[calc(100vh-64px)] overflow-y-auto bg-gray-50 ">
+    <div className="h-[calc(100vh-64px)] overflow-y-auto bg-gray-50">
       {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#8eba1e] via-[#7aa31a] to-[#6b8f16]">
-        {/* Decorative background elements */}
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/5 to-transparent"></div>
-          <div className="absolute top-20 right-20 w-32 h-32 bg-white/10 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-20 left-20 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-white/5 rounded-full blur-3xl"></div>
-        </div>
-        
-        <div className="relative px-6 py-16">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center text-white">
-              {/* Main heading with enhanced typography */}
-              <div className="mb-6">
-                <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-4 bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent leading-tight">
-                  Добро пожаловать в систему
-                </h1>
-                <div className="w-24 h-1 bg-gradient-to-r from-white to-white/50 mx-auto rounded-full"></div>
-              </div>
-              
-              {/* Subtitle with better spacing */}
-              <p className="text-xl md:text-2xl text-white/90 mb-12 max-w-3xl mx-auto leading-relaxed font-light">
-                Профессиональные инструменты для проектирования и расчёта электротехнического оборудования
-              </p>
-              
-              {/* Enhanced feature badges */}
-              <div className="flex flex-wrap justify-center gap-8 mb-8">
-                <div className="group bg-white/15 backdrop-blur-md rounded-3xl px-10 py-6 border border-white/20 hover:bg-white/25 transition-all duration-500 hover:scale-110 hover:shadow-2xl hover:rotate-1">
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 via-orange-500 to-red-500 rounded-2xl flex items-center justify-center text-white shadow-2xl group-hover:rotate-12 transition-transform duration-500">
-                      <Gauge className="w-8 h-8" />
-                    </div>
-                    <div className="text-center">
-                      <span className="text-white font-bold text-xl block">Быстрые расчёты</span>
-                      <span className="text-white/70 text-sm">Мгновенные результаты</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="group bg-white/15 backdrop-blur-md rounded-3xl px-10 py-6 border border-white/20 hover:bg-white/25 transition-all duration-500 hover:scale-110 hover:shadow-2xl hover:-rotate-1">
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-blue-400 via-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-2xl group-hover:rotate-12 transition-transform duration-500">
-                      <BarChart className="w-8 h-8" />
-                    </div>
-                    <div className="text-center">
-                      <span className="text-white font-bold text-xl block">Аналитика</span>
-                      <span className="text-white/70 text-sm">Детальная статистика</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="group bg-white/15 backdrop-blur-md rounded-3xl px-10 py-6 border border-white/20 hover:bg-white/25 transition-all duration-500 hover:scale-110 hover:shadow-2xl hover:rotate-1">
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-green-400 via-teal-500 to-cyan-600 rounded-2xl flex items-center justify-center text-white shadow-2xl group-hover:rotate-12 transition-transform duration-500">
-                      <Settings2 className="w-8 h-8" />
-                    </div>
-                    <div className="text-center">
-                      <span className="text-white font-bold text-xl block">Настройки</span>
-                      <span className="text-white/70 text-sm">Персонализация</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Additional decorative element */}
-              <div className="flex justify-center">
-                <div className="w-16 h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent rounded-full"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <HeroSection />
 
-      <div className="px-6 py-8">
+      <div className="px-6 py-8 -mt-6 relative z-10">
         <div className="max-w-7xl mx-auto">
           {/* Key Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 min-h-[100px]">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Всего заявок</p>
-                  <p className="text-3xl font-bold text-gray-900">{stats.loading ? '...' : stats.totalApplications}</p>
+                  <p className="text-3xl font-bold text-gray-900 min-h-[42px] flex items-center">
+                    {stats.loading ? (
+                      <span className="inline-block w-16 h-8 bg-gray-200 rounded animate-pulse"></span>
+                    ) : (
+                      stats.totalApplications
+                    )}
+                  </p>
                 </div>
                 <div className="p-3 bg-blue-100 rounded-xl">
                   <FileText className="w-6 h-6 text-blue-600" />
@@ -151,11 +310,17 @@ export default function DashboardHome() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 min-h-[100px]">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Активные заявки</p>
-                  <p className="text-3xl font-bold text-gray-900">{stats.loading ? '...' : stats.activeApplications}</p>
+                  <p className="text-3xl font-bold text-gray-900 min-h-[42px] flex items-center">
+                    {stats.loading ? (
+                      <span className="inline-block w-16 h-8 bg-gray-200 rounded animate-pulse"></span>
+                    ) : (
+                      stats.activeApplications
+                    )}
+                  </p>
                 </div>
                 <div className="p-3 bg-green-100 rounded-xl">
                   <Activity className="w-6 h-6 text-green-600" />
@@ -163,11 +328,17 @@ export default function DashboardHome() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 min-h-[100px]">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Заявки за месяц</p>
-                  <p className="text-3xl font-bold text-gray-900">{stats.loading ? '...' : stats.monthlyApplications}</p>
+                  <p className="text-3xl font-bold text-gray-900 min-h-[42px] flex items-center">
+                    {stats.loading ? (
+                      <span className="inline-block w-16 h-8 bg-gray-200 rounded animate-pulse"></span>
+                    ) : (
+                      stats.monthlyApplications
+                    )}
+                  </p>
                 </div>
                 <div className="p-3 bg-purple-100 rounded-xl">
                   <BarChart3 className="w-6 h-6 text-purple-600" />
@@ -175,12 +346,16 @@ export default function DashboardHome() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+            <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 min-h-[100px]">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Средняя сумма</p>
-                  <p className="text-3xl font-bold text-gray-900">
-                    {stats.loading ? '...' : formatCurrency(stats.averageApplicationValue)}
+                  <p className="text-xl font-bold text-gray-900 min-h-[42px] flex items-center">
+                    {stats.loading ? (
+                      <span className="inline-block w-20 h-8 bg-gray-200 rounded animate-pulse"></span>
+                    ) : (
+                      formatCurrency(stats.averageApplicationValue)
+                    )}
                   </p>
                 </div>
                 <div className="p-3 bg-yellow-100 rounded-xl">
@@ -262,60 +437,327 @@ export default function DashboardHome() {
           {/* Analytics Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
             {/* Top Clients */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 bg-gray-100 rounded-xl">
-                  <Building2 className="w-6 h-6 text-[#8eba1e]" />
+            <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 min-h-[320px] flex flex-col">
+              <div className="flex items-center justify-between mb-4 flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-gray-100 rounded-xl">
+                    <Building2 className="w-6 h-6 text-[#8eba1e]" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">Топ клиентов</h3>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900">Топ клиентов</h3>
+                {!stats.loading && stats.allApplications.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-1">
+                      {sortModes.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => switchSortMode(index)}
+                          className={`rounded-full transition-all duration-300 cursor-pointer hover:opacity-80 ${
+                            index === sortModeIndex
+                              ? 'bg-[#8eba1e] w-6 h-2'
+                              : 'bg-gray-300 w-2 h-2 hover:bg-gray-400'
+                          }`}
+                          aria-label={sortModes[index].label}
+                          title={sortModes[index].label}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-xs text-gray-500 ml-2 min-w-[120px] text-right">
+                      {sortModes[sortModeIndex].label}
+                    </span>
+                    <button
+                      onClick={() => setShowFilters(!showFilters)}
+                      className={`p-2 rounded-lg transition-all duration-200 ${
+                        showFilters || periodFilter !== 'all' || statusFilter !== 'all' || minAmount > 0
+                          ? 'bg-[#8eba1e] text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                      title="Фильтры"
+                    >
+                      <Filter className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </div>
-              
-              {stats.loading ? (
-                <div className="space-y-4">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="animate-pulse">
-                      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                    </div>
-                  ))}
-                </div>
-              ) : stats.topClients.length > 0 ? (
-                <div className="space-y-4">
-                  {stats.topClients.map((client, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-gray-900">{client.client}</p>
-                        <p className="text-sm text-gray-600">{client.count} заявок</p>
+
+              {/* Панель фильтров */}
+              {showFilters && !stats.loading && (
+                <div className="mb-4 p-4 bg-gray-50 rounded-xl border border-gray-200 flex-shrink-0 animate-fadeIn">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Фильтр по периоду */}
+                    <div>
+                      <label className="flex items-center gap-2 text-xs font-medium text-gray-700 mb-2">
+                        <Calendar className="w-3 h-3" />
+                        Период
+                      </label>
+                      <div className="flex flex-wrap gap-1">
+                        {periodFilters.map((filter) => (
+                          <button
+                            key={filter.value}
+                            onClick={() => setPeriodFilter(filter.value)}
+                            className={`px-2 py-1 text-xs rounded-md transition-all duration-200 ${
+                              periodFilter === filter.value
+                                ? 'bg-[#8eba1e] text-white'
+                                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                            }`}
+                          >
+                            {filter.label}
+                          </button>
+                        ))}
                       </div>
-                      <div className="text-right">
-                        <p className="font-bold text-gray-900">{formatCurrency(client.totalValue)}</p>
+                    </div>
+
+                    {/* Фильтр по статусу */}
+                    <div>
+                      <label className="flex items-center gap-2 text-xs font-medium text-gray-700 mb-2">
+                        <Activity className="w-3 h-3" />
+                        Статус
+                      </label>
+                      <div className="flex flex-wrap gap-1">
+                        {statusFilters.map((filter) => {
+                          const Icon = filter.icon;
+                          return (
+                            <button
+                              key={filter.value}
+                              onClick={() => setStatusFilter(filter.value)}
+                              className={`px-2 py-1 text-xs rounded-md transition-all duration-200 flex items-center gap-1 ${
+                                statusFilter === filter.value
+                                  ? 'bg-[#8eba1e] text-white'
+                                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                              }`}
+                            >
+                              {Icon && <Icon className="w-3 h-3" />}
+                              {filter.label}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">Нет данных о клиентах</p>
+
+                    {/* Фильтр по минимальной сумме */}
+                    <div>
+                      <label className="flex items-center gap-2 text-xs font-medium text-gray-700 mb-2">
+                        <DollarSign className="w-3 h-3" />
+                        Мин. сумма
+                      </label>
+                      <input
+                        type="number"
+                        value={minAmount || ''}
+                        onChange={(e) => setMinAmount(Number(e.target.value) || 0)}
+                        placeholder="0"
+                        className="w-full px-2 py-1 text-xs rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#8eba1e] focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Счетчик результатов и кнопка сброса */}
+                  <div className="mt-3 pt-3 border-t border-gray-200 flex items-center justify-between">
+                    <p className="text-xs text-gray-500">
+                      Найдено клиентов: <span className="font-semibold text-gray-900">{sortedClients.length}</span>
+                    </p>
+                    <button
+                      onClick={() => {
+                        setPeriodFilter('all');
+                        setStatusFilter('all');
+                        setMinAmount(0);
+                      }}
+                      className="px-3 py-1 text-xs rounded-md bg-white text-gray-600 hover:bg-gray-100 border border-gray-200 transition-colors"
+                    >
+                      Сброс фильтров
+                    </button>
+                  </div>
                 </div>
               )}
+              
+              <div className="flex-1 overflow-y-auto">
+                {stats.loading ? (
+                  <div className="space-y-4">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="animate-pulse">
+                        <div className="h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
+                        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                      </div>
+                    ))}
+                  </div>
+                ) : sortedClients.length > 0 ? (
+                  <div
+                    className={`space-y-4 transition-opacity duration-500 ease-in-out ${
+                      isTransitioning ? 'opacity-0' : 'opacity-100'
+                    }`}
+                  >
+                    {sortedClients.map((client, index) => (
+                      <div
+                        key={`${client.client}-${sortModeIndex}-${index}`}
+                        className="flex items-center justify-between"
+                      >
+                        <div>
+                          <p className="font-medium text-gray-900">{client.client}</p>
+                          <p className="text-sm text-gray-600">{client.count} заявок</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-gray-900">{formatCurrency(client.totalValue)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500">Нет данных о клиентах</p>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Material History */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 bg-gray-100 rounded-xl">
-                  <History className="w-6 h-6 text-[#8eba1e]" />
+            <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100 min-h-[320px] flex flex-col">
+              <div className="flex items-center justify-between mb-4 flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-gray-100 rounded-xl">
+                    <History className="w-6 h-6 text-[#8eba1e]" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">Последние изменения материалов</h3>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900">Последние изменения материалов</h3>
+                {!materialHistory.loading && materialHistory.allChanges.length > 0 && (
+                  <button
+                    onClick={() => setShowMaterialFilters(!showMaterialFilters)}
+                    className={`p-2 rounded-lg transition-all duration-200 ${
+                      showMaterialFilters || materialPeriodFilter !== 'all' || materialChangeTypeFilter !== 'all' || materialUserFilter !== 'all'
+                        ? 'bg-[#8eba1e] text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                    title="Фильтры"
+                  >
+                    <Filter className="w-4 h-4" />
+                  </button>
+                )}
               </div>
+
+              {/* Панель фильтров для истории материалов */}
+              {showMaterialFilters && !materialHistory.loading && (
+                <div className="mb-4 p-4 bg-gray-50 rounded-xl border border-gray-200 flex-shrink-0 animate-fadeIn">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Фильтр по периоду */}
+                    <div>
+                      <label className="flex items-center gap-2 text-xs font-medium text-gray-700 mb-2">
+                        <Calendar className="w-3 h-3" />
+                        Период
+                      </label>
+                      <div className="flex flex-wrap gap-1">
+                        {periodFilters.map((filter) => (
+                          <button
+                            key={filter.value}
+                            onClick={() => setMaterialPeriodFilter(filter.value)}
+                            className={`px-2 py-1 text-xs rounded-md transition-all duration-200 ${
+                              materialPeriodFilter === filter.value
+                                ? 'bg-[#8eba1e] text-white'
+                                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                            }`}
+                          >
+                            {filter.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Фильтр по типу изменения */}
+                    <div>
+                      <label className="flex items-center gap-2 text-xs font-medium text-gray-700 mb-2">
+                        <FileText className="w-3 h-3" />
+                        Тип изменения
+                      </label>
+                      <div className="flex flex-wrap gap-1">
+                        <button
+                          onClick={() => setMaterialChangeTypeFilter('all')}
+                          className={`px-2 py-1 text-xs rounded-md transition-all duration-200 ${
+                            materialChangeTypeFilter === 'all'
+                              ? 'bg-[#8eba1e] text-white'
+                              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                          }`}
+                        >
+                          Все
+                        </button>
+                        <button
+                          onClick={() => setMaterialChangeTypeFilter('name')}
+                          className={`px-2 py-1 text-xs rounded-md transition-all duration-200 ${
+                            materialChangeTypeFilter === 'name'
+                              ? 'bg-[#8eba1e] text-white'
+                              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                          }`}
+                        >
+                          Название
+                        </button>
+                        <button
+                          onClick={() => setMaterialChangeTypeFilter('price')}
+                          className={`px-2 py-1 text-xs rounded-md transition-all duration-200 ${
+                            materialChangeTypeFilter === 'price'
+                              ? 'bg-[#8eba1e] text-white'
+                              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                          }`}
+                        >
+                          Цена
+                        </button>
+                        <button
+                          onClick={() => setMaterialChangeTypeFilter('category')}
+                          className={`px-2 py-1 text-xs rounded-md transition-all duration-200 ${
+                            materialChangeTypeFilter === 'category'
+                              ? 'bg-[#8eba1e] text-white'
+                              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                          }`}
+                        >
+                          Категория
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Фильтр по пользователю */}
+                    <div>
+                      <label className="flex items-center gap-2 text-xs font-medium text-gray-700 mb-2">
+                        <Users className="w-3 h-3" />
+                        Пользователь
+                      </label>
+                      <select
+                        value={materialUserFilter}
+                        onChange={(e) => setMaterialUserFilter(e.target.value)}
+                        className="w-full px-2 py-1 text-xs rounded-md border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#8eba1e] focus:border-transparent"
+                      >
+                        <option value="all">Все пользователи</option>
+                        {uniqueUsers.map((user) => (
+                          <option key={user} value={user}>
+                            {user}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Счетчик результатов и кнопка сброса */}
+                  <div className="mt-3 pt-3 border-t border-gray-200 flex items-center justify-between">
+                    <p className="text-xs text-gray-500">
+                      Найдено изменений: <span className="font-semibold text-gray-900">{filteredMaterialChanges.length}</span>
+                    </p>
+                    <button
+                      onClick={() => {
+                        setMaterialPeriodFilter('all');
+                        setMaterialChangeTypeFilter('all');
+                        setMaterialUserFilter('all');
+                      }}
+                      className="px-3 py-1 text-xs rounded-md bg-white text-gray-600 hover:bg-gray-100 border border-gray-200 transition-colors"
+                    >
+                      Сброс фильтров
+                    </button>
+                  </div>
+                </div>
+              )}
               
+              <div className="flex-1 overflow-y-auto">
               {materialHistory.loading ? (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {[...Array(3)].map((_, i) => (
-                    <div key={i} className="animate-pulse">
+                    <div key={i} className="animate-pulse bg-gray-50 rounded-lg p-3 border border-gray-200">
                       <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-2/3"></div>
                     </div>
                   ))}
                 </div>
@@ -324,9 +766,9 @@ export default function DashboardHome() {
                   <AlertCircle className="w-12 h-12 text-red-300 mx-auto mb-4" />
                   <p className="text-red-500">Ошибка: {materialHistory.error}</p>
                 </div>
-              ) : materialHistory.recentChanges.length > 0 ? (
+              ) : filteredMaterialChanges.length > 0 ? (
                 <div className="space-y-2">
-                  {materialHistory.recentChanges.map((change, index) => (
+                  {filteredMaterialChanges.map((change, index) => (
                     <div key={index} className="bg-white rounded-lg p-3 border border-gray-200 hover:border-[#8eba1e] hover:shadow-sm transition-all duration-200">
                       <div className="flex items-start gap-3">
                         <div className="w-6 h-6 bg-[#8eba1e] rounded-full flex items-center justify-center flex-shrink-0">
@@ -392,11 +834,12 @@ export default function DashboardHome() {
                   </p>
                 </div>
               )}
+              </div>
             </div>
           </div>
 
           {/* Recent Activity */}
-          <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
+          <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100 min-h-[400px]">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-3 bg-gray-100 rounded-xl">
                 <Clock className="w-6 h-6 text-[#8eba1e]" />
@@ -407,9 +850,9 @@ export default function DashboardHome() {
             {stats.loading ? (
               <div className="space-y-4">
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="animate-pulse">
-                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                  <div key={i} className="animate-pulse py-3 border-b border-gray-100 last:border-b-0">
+                    <div className="h-5 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
                   </div>
                 ))}
               </div>

@@ -189,10 +189,10 @@ export default function RusnSection({ voltage = '10' }: RusnSectionProps) {
             </tr>
           ))}
           <tr className={`${COLORS.total} font-semibold`}>
-            <td colSpan={5} className="text-right pr-4">
+            <td colSpan={5} className="text-right pr-2">
               ВСЕГО:
             </td>
-            <td className="text-right pr-4">{formatPrice(totalSum)}</td>
+            <td className="text-right pl-2">{formatPrice(totalSum)}</td>
           </tr>
         </tbody>
       </table>

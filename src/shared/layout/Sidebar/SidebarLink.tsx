@@ -30,7 +30,7 @@ export default function SidebarLink({
   const rusn = useRusnStore();
 
   const handleClick = () => {
-    if (label === 'Новая заявка') {
+    if (label === 'Главная') {
       bktp.reset();
       bmz.reset();
       transformer.reset();

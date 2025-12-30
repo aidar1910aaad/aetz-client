@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { RunnCell } from '@/store/useRunnStore';
 import { Material } from '@/api/material';
-import DguGeneralSummary from './DguGeneralSummary';
+import DguGeneralSummary from './summary/DguGeneralSummary';
 import { useDguCellsSync } from './dgu/hooks/useDguCellsSync';
 import { useDguAutoMaterial } from './dgu/hooks/useDguAutoMaterial';
 import { SWITCHING_DEVICE_OPTIONS } from './dgu/constants';

@@ -41,3 +41,6 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# tree-maker (temporary files)
+tree-maker/

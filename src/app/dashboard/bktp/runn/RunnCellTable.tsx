@@ -4,19 +4,19 @@ import { useRunnStore, type RunnCellSummary } from '@/store/useRunnStore';
 import { useCellSummariesStore } from '@/store/useCellSummariesStore';
 import { useTransformerStore } from '@/store/useTransformerStore';
 import TogglerWithInput from './TogglerWithInput';
-import OutgoingCellSection from './components/OutgoingCellSection';
+import OutgoingCellSection from './components/cells/OutgoingCellSection';
 import { useState, useEffect, useRef } from 'react';
 import type { RunnCell } from '@/store/useRunnStore';
 import { Material } from '@/api/material';
 import { useRunnBreakerCalculation, useRunnCounterCalculation, useRunnSectionSwitchCalculation, useRunnOutgoingCalculation, useRunnTorcevaiaCalculation } from '@/hooks/useRunnInputCalculation';
 import { useRunnMaterials } from '@/hooks/useRunnMaterials';
 import { useCalculationResultsStore } from '@/store/useCalculationResultsStore';
-import CalculationDisplay from './components/CalculationDisplay';
-import SectionSwitchCalculation from './components/SectionSwitchCalculation';
-import OutgoingCalculation from './components/OutgoingCalculation';
+import CalculationDisplay from './components/calculations/CalculationDisplay';
+import SectionSwitchCalculation from './components/calculations/SectionSwitchCalculation';
+import OutgoingCalculation from './components/calculations/OutgoingCalculation';
 import { calculateCost } from '@/utils/calculationUtils';
 import { getPanelNameForBreaker, extractCurrentFromBreakerName } from '@/utils/panelNameUtils';
-import RunnCellSummaryTable from './components/RunnCellSummaryTable';
+import RunnCellSummaryTable from './components/summary/RunnCellSummaryTable';
 
 const cellTypes = ['Ввод', 'Секционный выключатель', 'Торцевая панель'];
 

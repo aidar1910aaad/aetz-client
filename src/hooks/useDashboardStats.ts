@@ -14,6 +14,7 @@ export interface DashboardStats {
   averageApplicationValue: number;
   topClients: Array<{ client: string; count: number; totalValue: number }>;
   applicationsByType: Array<{ type: string; count: number; percentage: number }>;
+  allApplications: any[]; // Добавляем все заявки для фильтрации
   loading: boolean;
   error: string | null;
 }
@@ -30,6 +31,7 @@ export function useDashboardStats() {
     averageApplicationValue: 0,
     topClients: [],
     applicationsByType: [],
+    allApplications: [],
     loading: true,
     error: null,
   });
@@ -83,7 +85,7 @@ export function useDashboardStats() {
             totalValue: data.totalValue,
           }))
           .sort((a, b) => b.totalValue - a.totalValue)
-          .slice(0, 5);
+          .slice(0, 8);
 
         // Группируем по типам
         const typeStats = applications.reduce((acc: any, app: any) => {
@@ -116,6 +118,7 @@ export function useDashboardStats() {
           averageApplicationValue: averageValue,
           topClients,
           applicationsByType,
+          allApplications: applications,
           loading: false,
           error: null,
         });

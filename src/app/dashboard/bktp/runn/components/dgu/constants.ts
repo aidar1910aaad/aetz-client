@@ -50,3 +50,10 @@ export const DGU_CABLE_SPECS: DguCableSpec[] = [
 
 export const SWITCHING_DEVICE_OPTIONS = ['Воздушный', 'Литой корпус', 'Литой корпус + Рубильник', 'РПС'];
 
+// Маппинг сечения кабеля на ID материала
+export const CABLE_SECTION_TO_MATERIAL_ID: Record<number, number> = {
+  120: 3709,
+  240: 1703,
+  400: 1704,
+};
+

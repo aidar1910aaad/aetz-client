@@ -7,44 +7,48 @@ import type { AdditionalEquipmentState, AdditionalEquipmentItem } from '@/store/
 import type { WorkItem } from '@/store/useWorksStore';
 import { useRunnStore } from '@/store/useRunnStore';
 import { useCellSummariesStore } from '@/store/useCellSummariesStore';
+import { formatAmount } from '@/utils/formatAmount';
 
 // Общие колонки для всех таблиц
+// Ширины: Номер (5%) + Наименование (60%) + Ед. изм. (5%) + Кол-во (5%) + Цена (12.5%) + Сумма (12.5%) = 100%
 const commonColumns = [
   {
     key: 'name',
     title: 'Наименование',
-    width: 'w-1/2',
+    width: '60%',
     align: 'left' as const,
   },
   {
     key: 'unit',
     title: 'Ед. изм.',
-    width: 'w-16',
+    width: '5%',
     align: 'center' as const,
   },
   {
     key: 'quantity',
     title: 'Кол-во',
-    width: 'w-16',
+    width: '5%',
     align: 'center' as const,
   },
   {
     key: 'price',
     title: 'Цена',
-    width: 'w-24',
+    width: '12.5%',
     align: 'center' as const,
-    formatter: (value: any) => typeof value === 'number' ? value.toLocaleString('ru-RU') + ' ₸' : '—',
+    formatter: (value: any) => typeof value === 'number' ? formatAmount(value) + ' ₸' : '—',
   },
   {
     key: 'total',
     title: 'Сумма',
-    width: 'w-24',
+    width: '12.5%',
     align: 'center' as const,
     formatter: (value: any, row: any) => {
-      const price = typeof row.price === 'number' ? row.price : 0;
-      const quantity = typeof row.quantity === 'number' ? row.quantity : 1;
-      const total = price * quantity;
-      return typeof total === 'number' ? total.toLocaleString('ru-RU') + ' ₸' : '—';
+      // Используем value если оно есть, иначе вычисляем из price * quantity
+      const total = typeof value === 'number' ? value : (
+        (typeof row.price === 'number' ? row.price : 0) * 
+        (typeof row.quantity === 'number' ? row.quantity : 1)
+      );
+      return typeof total === 'number' ? formatAmount(total) + ' ₸' : '—';
     },
   },
 ];
@@ -60,7 +64,8 @@ export const bmzTableConfig: TableConfig = {
     }
     
     const area = (bmzData.length / 1000) * (bmzData.width / 1000);
-    const roundedArea = Math.round(area * 10) / 10;
+    // Округляем площадь до целого числа
+    const roundedArea = Math.round(area);
     
     // Используем импортированные функции для расчетов
     
@@ -93,15 +98,16 @@ export const bmzTableConfig: TableConfig = {
       });
     }
     
-    // Активное оборудование
+    // Активное оборудование - округляем количество до целого числа
     activeEquipment.forEach((equipment, index) => {
+      const roundedQuantity = Math.round(equipment.quantity);
       rows.push({
         id: `equipment-${index}`,
         name: equipment.name,
         unit: equipment.unit,
-        quantity: equipment.quantity,
+        quantity: roundedQuantity,
         price: equipment.price,
-        total: equipment.totalPrice,
+        total: equipment.price * roundedQuantity,
       });
     });
     
@@ -328,31 +334,57 @@ export const rusnTableConfig: TableConfig = {
           total: cellSummary.totalPrice,
         });
       });
-    } else if (cellConfigs && cellConfigs.length > 0) {
-      // Fallback: используем данные из cellConfigs
-      cellConfigs.forEach((cell) => {
+          } else if (cellConfigs && cellConfigs.length > 0) {
+            // Fallback: используем данные из cellConfigs
+            cellConfigs.forEach((cell: any) => {
+              // Вычисляем totalPrice из компонентов ячейки, если нет готового значения
+              const cellTotalPrice = cell.totalPrice || 
+                ((cell.breakerPrice || 0) + 
+                 (cell.meterPrice || 0) + 
+                 (cell.rzaPrice || 0) + 
+                 (cell.transformerPrice || 0));
+              
+              const cellQuantity = cell.count || cell.quantity || 1;
+              const cellPricePerUnit = cellQuantity > 0 ? cellTotalPrice / cellQuantity : cellTotalPrice;
+              
+              // Формируем название ячейки
+              const cellName = cell.purpose || 
+                cell.selectedCalculationName || 
+                cell.calculationName || 
+                `Ячейка ${rowNumber}`;
+
         rows.push({
           id: `cell-${rowNumber++}`,
-          name: cell.purpose || `Ячейка ${rowNumber - 1}`,
+          name: cellName,
           unit: 'шт',
-          quantity: cell.count || 1,
-          price: 0, // Будет рассчитано через хук
-          total: 0, // Будет рассчитано через хук
+          quantity: cellQuantity,
+          price: cellPricePerUnit,
+          total: cellTotalPrice,
         });
       });
     }
 
-    // Добавляем шинные мосты, если есть данные
+    // Добавляем шинные мосты, если есть данные (сначала массив, потом один объект)
     if (busBridgeSummaries && busBridgeSummaries.length > 0) {
       busBridgeSummaries.forEach((busBridgeSummary) => {
         rows.push({
           id: `busbridge-${rowNumber++}`,
-          name: busBridgeSummary.name,
+          name: busBridgeSummary.name || 'Шинный мост',
           unit: 'шт',
-          quantity: busBridgeSummary.quantity,
-          price: busBridgeSummary.pricePerUnit,
-          total: busBridgeSummary.totalPrice,
+          quantity: busBridgeSummary.quantity || 1,
+          price: busBridgeSummary.pricePerUnit || 0,
+          total: busBridgeSummary.totalPrice || 0,
         });
+      });
+    } else if (busBridgeSummary) {
+      // Если нет массива, но есть один объект
+      rows.push({
+        id: `busbridge-${rowNumber++}`,
+        name: busBridgeSummary.name || 'Шинный мост',
+        unit: 'шт',
+        quantity: busBridgeSummary.quantity || 1,
+        price: busBridgeSummary.pricePerUnit || 0,
+        total: busBridgeSummary.totalPrice || 0,
       });
     }
 
@@ -360,11 +392,11 @@ export const rusnTableConfig: TableConfig = {
     if (busbarSummary) {
       rows.push({
         id: `busbar-${rowNumber++}`,
-        name: busbarSummary.name,
+        name: busbarSummary.name || 'Сборные шины',
         unit: 'шт',
-        quantity: busbarSummary.quantity,
-        price: busbarSummary.pricePerUnit,
-        total: busbarSummary.totalPrice,
+        quantity: busbarSummary.quantity || 1,
+        price: busbarSummary.pricePerUnit || 0,
+        total: busbarSummary.totalPrice || 0,
       });
     }
 
@@ -392,44 +424,61 @@ export const runnTableConfig: TableConfig = {
     {
       key: 'name',
       title: 'Наименование',
-      width: 'w-1/2',
+      width: '60%',
       align: 'left' as const,
     },
     {
       key: 'unit',
       title: 'Ед. изм.',
-      width: 'w-16',
+      width: '5%',
       align: 'center' as const,
     },
     {
       key: 'quantity',
       title: 'Кол-во',
-      width: 'w-16',
+      width: '5%',
       align: 'center' as const,
     },
     {
       key: 'price',
       title: 'Цена',
-      width: 'w-32',
+      width: '12.5%',
       align: 'center' as const,
-      formatter: (value: any) => typeof value === 'number' && value > 0 ? value.toLocaleString('ru-RU') : '—',
+      formatter: (value: any) => typeof value === 'number' && value > 0 ? formatAmount(value) : '—',
     },
     {
       key: 'total',
       title: 'Сумма',
-      width: 'w-32',
+      width: '12.5%',
       align: 'center' as const,
       formatter: (value: any, row: any) => {
-        const price = typeof row.price === 'number' ? row.price : 0;
-        const quantity = typeof row.quantity === 'number' ? row.quantity : 1;
-        const total = price * quantity;
-        return typeof total === 'number' && total > 0 ? total.toLocaleString('ru-RU') : '—';
+        const total = typeof value === 'number' ? value : (
+          (typeof row.price === 'number' ? row.price : 0) * 
+          (typeof row.quantity === 'number' ? row.quantity : 1)
+        );
+        return typeof total === 'number' && total > 0 ? formatAmount(total) : '—';
       },
     },
   ],
   dataMapper: (data?: ReturnType<typeof useRunnStore.getState>) => {
     // Приоритет: использовать переданные данные (реактивно), иначе текущее состояние стора
     const runnStoreState = (data as any) || useRunnStore.getState();
+    
+    // Логирование для отладки (только в development)
+    if (process.env.NODE_ENV === 'development' && data) {
+      console.log('🔍 runnTableConfig.dataMapper - полученные данные:', {
+        hasCellSummaries: !!(runnStoreState.cellSummaries && runnStoreState.cellSummaries.length > 0),
+        cellSummariesCount: runnStoreState.cellSummaries?.length || 0,
+        hasCellConfigs: !!(runnStoreState.cellConfigs && runnStoreState.cellConfigs.length > 0),
+        cellConfigsCount: runnStoreState.cellConfigs?.length || 0,
+        hasBusbarSummary: !!runnStoreState.busbarSummary,
+        hasBusBridgeSummary: !!runnStoreState.busBridgeSummary,
+        busBridgeSummariesCount: runnStoreState.busBridgeSummaries?.length || 0,
+      });
+    }
+    
+    // Если данные переданы через пропсы (из API), используем их напрямую
+    // Иначе проверяем Zustand store и внешний store сводок
     const externalCellSummaries = useCellSummariesStore.getState().cellSummaries || [];
     const cellSummaries = (runnStoreState.cellSummaries && runnStoreState.cellSummaries.length > 0)
       ? runnStoreState.cellSummaries
@@ -505,5 +554,18 @@ export const runnTableConfig: TableConfig = {
     return allItems;
   },
   emptyMessage: 'Нет данных РУНН',
+  showTotal: true,
+};
+
+// Конфигурация для ДГУ (Дизельный генератор)
+export const dguTableConfig: TableConfig = {
+  id: 'dgu',
+  title: 'ДГУ',
+  columns: commonColumns,
+  dataMapper: () => {
+    // Заглушка - в будущем здесь будет логика для ДГУ
+    return [];
+  },
+  emptyMessage: 'Нет данных ДГУ',
   showTotal: true,
 };

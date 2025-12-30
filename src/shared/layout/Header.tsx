@@ -45,7 +45,7 @@ export default function Header() {
             style={{ width: "auto", height: "auto" }} 
           />
         </Link>
-        <Link href="/dashboard/final">
+        <Link href={hasStarted ? "/dashboard/final" : "/dashboard/bktp"}>
           <button className="bg-[#8eba1e] text-white px-6 py-3 rounded-2xl hover:bg-[#7aa31a] transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 font-medium">
             {hasStarted ? 'Текущая заявка' : 'Новая заявка'}
           </button>

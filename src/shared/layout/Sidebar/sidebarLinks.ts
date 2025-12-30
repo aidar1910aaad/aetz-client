@@ -10,13 +10,14 @@ import {
   Calculator,
   DollarSign,
   Settings,
+  FileDiff,
 } from 'lucide-react';
 
 export const sidebarLinks = [
  
   {
     type: 'link',
-    label: 'Новая заявка',
+    label: 'Главная',
     icon: PackagePlus,
     href: '/dashboard',
   },
@@ -61,5 +62,11 @@ export const sidebarLinks = [
     label: 'Настройки БКТП',
     icon: Settings,
     href: '/dashboard/bktp/settings',
+  },
+  {
+    type: 'link',
+    label: 'История изменений',
+    icon: FileDiff,
+    href: '/dashboard/history',
   },
 ];

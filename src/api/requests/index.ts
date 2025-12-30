@@ -17,6 +17,11 @@ export interface ApplicationData {
   
   // Все данные конфигурации
   data: {
+    managerMarkupPercent?: number;
+    tableMarkupPercents?: Record<string, number>;
+    tableMarkupTotals?: Record<string, number | null>;
+    originalBidId?: number; // ID исходной заявки (если это измененная версия)
+    notes?: string; // Заметки к заявке
     bmz: {
       buildingType: string;
       length: number;
@@ -41,10 +46,13 @@ export interface ApplicationData {
       total: number;
     };
     runn: {
+      cellConfigs?: any[];
       cellSummaries: any[];
       busbarSummary: any;
       busBridgeSummary: any;
       busBridgeSummaries: any[];
+      global?: any;
+      busBridges?: any[];
       total: number;
     };
     additionalEquipment: {
@@ -66,6 +74,12 @@ export async function createApplication(data: ApplicationData, token: string): P
   console.log('📡 URL:', `${api}/bids`);
   console.log('🔑 Токен:', token ? `${token.substring(0, 10)}...` : 'Отсутствует');
   console.log('📊 Размер данных:', JSON.stringify(data).length, 'символов');
+  console.log('📊 Наценки в отправляемых данных:', {
+    managerMarkupPercent: data.data?.managerMarkupPercent,
+    tableMarkupPercents: data.data?.tableMarkupPercents,
+    tableMarkupTotals: data.data?.tableMarkupTotals,
+  });
+  console.log('📊 Полные данные для отправки (JSON):', JSON.stringify(data, null, 2));
   
   const response = await fetch(`${api}/bids`, {
     method: 'POST',
@@ -90,6 +104,15 @@ export async function createApplication(data: ApplicationData, token: string): P
 
   const result = await response.json();
   console.log('✅ Заявка успешно создана:', result);
+  console.log('✅ Наценки в ответе сервера:', {
+    managerMarkupPercent: result.data?.managerMarkupPercent || result.managerMarkupPercent,
+    tableMarkupPercents: result.data?.tableMarkupPercents || result.tableMarkupPercents,
+    tableMarkupTotals: result.data?.tableMarkupTotals || result.tableMarkupTotals,
+    hasManagerMarkupPercent: 'managerMarkupPercent' in (result.data || result),
+    hasTableMarkupPercents: 'tableMarkupPercents' in (result.data || result),
+    hasTableMarkupTotals: 'tableMarkupTotals' in (result.data || result),
+  });
+  console.log('✅ Полный ответ сервера (JSON):', JSON.stringify(result, null, 2));
   return result;
 }
 
@@ -109,8 +132,16 @@ export async function getAllApplications(token: string): Promise<any[]> {
   return response.json();
 }
 
+// Интерфейс для полных данных заявки из API (с метаданными)
+export interface ApplicationResponse extends ApplicationData {
+  id: number;
+  bidNumber: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Получить заявку по ID
-export async function getApplicationById(id: number, token: string): Promise<ApplicationData> {
+export async function getApplicationById(id: number, token: string): Promise<ApplicationResponse> {
   const response = await fetch(`${api}/bids/${id}`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -122,7 +153,18 @@ export async function getApplicationById(id: number, token: string): Promise<App
     throw new Error(error.message || 'Ошибка при получении заявки');
   }
 
-  return response.json();
+  const data = await response.json();
+  console.log('📥 Получена заявка с сервера:', {
+    id: data.id,
+    bidNumber: data.bidNumber,
+    hasManagerMarkupPercent: 'managerMarkupPercent' in (data.data || data),
+    hasTableMarkupPercents: 'tableMarkupPercents' in (data.data || data),
+    hasTableMarkupTotals: 'tableMarkupTotals' in (data.data || data),
+    managerMarkupPercent: data.data?.managerMarkupPercent || data.managerMarkupPercent,
+    tableMarkupPercents: data.data?.tableMarkupPercents || data.tableMarkupPercents,
+    tableMarkupTotals: data.data?.tableMarkupTotals || data.tableMarkupTotals,
+  });
+  return data;
 }
 
 // Получить заявку по номеру

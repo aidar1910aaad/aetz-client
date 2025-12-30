@@ -2,6 +2,7 @@
 
 import React from 'react';
 import type { WorkItem, WorksState } from '@/store/useWorksStore';
+import { formatAmount } from '@/utils/formatAmount';
 
 interface WorksTableProps {
   selected: WorksState['selected'];
@@ -10,7 +11,7 @@ interface WorksTableProps {
 }
 
 const formattedPrice = (num?: number) =>
-  typeof num === 'number' ? num.toLocaleString('ru-RU') + ' ₸' : '—';
+  typeof num === 'number' ? formatAmount(num) + ' ₸' : '—';
 
 export default function WorksTable({ selected, worksList, businessTravelTotal = 0 }: WorksTableProps) {
   console.log('WorksTable: businessTravelTotal =', businessTravelTotal);
@@ -64,7 +65,15 @@ export default function WorksTable({ selected, worksList, businessTravelTotal = 
           <h3 className="text-xl font-bold text-gray-900">Работы и транспортные расходы</h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full table-auto border border-gray-200 rounded-lg overflow-hidden">
+          <table className="w-full table-fixed border border-gray-200 rounded-lg overflow-hidden">
+            <colgroup>
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '60%' }} />
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '12.5%' }} />
+              <col style={{ width: '12.5%' }} />
+            </colgroup>
             <thead className="bg-[#8eba1e] text-white">
               <tr>
                 <th className="p-4 text-left font-semibold">№</th>
@@ -102,7 +111,15 @@ export default function WorksTable({ selected, worksList, businessTravelTotal = 
         <h3 className="text-xl font-bold text-gray-900">Работы и транспортные расходы</h3>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full table-auto border border-gray-200 rounded-lg overflow-hidden">
+        <table className="w-full table-fixed border border-gray-200 rounded-lg overflow-hidden">
+          <colgroup>
+            <col style={{ width: '5%' }} />
+            <col style={{ width: '60%' }} />
+            <col style={{ width: '5%' }} />
+            <col style={{ width: '5%' }} />
+            <col style={{ width: '12.5%' }} />
+            <col style={{ width: '12.5%' }} />
+          </colgroup>
           <thead className="bg-[#8eba1e] text-white">
             <tr>
               <th className="p-4 text-left font-semibold">№</th>
@@ -122,7 +139,7 @@ export default function WorksTable({ selected, worksList, businessTravelTotal = 
               return (
                 <tr key={work.name} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="p-4 text-center font-semibold">{idx + 1}</td>
-                  <td className="p-4 text-left font-medium">{work.name}</td>
+                  <td className="p-4 text-left font-medium break-words">{work.name}</td>
                   <td className="p-4 text-center text-gray-600">{`${work.unit || 'раб'}.`}</td>
                   <td className="p-4 text-center font-semibold">{count}</td>
                   <td className="p-4 text-center text-gray-900 font-semibold">{formattedPrice(work.price)}</td>
@@ -133,10 +150,11 @@ export default function WorksTable({ selected, worksList, businessTravelTotal = 
               );
             })}
             <tr className="bg-[#8eba1e]/10 font-bold border-t-2 border-[#8eba1e]">
-              <td colSpan={5} className="text-right pr-4 p-4 text-lg">
+              <td className="p-4"></td>
+              <td colSpan={4} className="text-right pr-2 p-4 text-lg">
                 ВСЕГО:
               </td>
-              <td className="text-right pr-4 p-4 text-lg text-gray-900">{formattedPrice(total)}</td>
+              <td className="text-right pl-2 p-4 text-lg text-gray-900">{formattedPrice(total)}</td>
             </tr>
           </tbody>
         </table>

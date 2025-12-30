@@ -60,22 +60,22 @@ export interface MaterialHistoryWithMaterial extends MaterialHistoryItem {
 }
 
 export interface GetMaterialHistoryParams {
-  materialName?: string;
-  materialCode?: string;
-  categoryId?: number;
+  page?: number;
+  limit?: number;
+  materialId?: number;
   fieldChanged?: string;
   changedBy?: string;
   dateFrom?: string;
   dateTo?: string;
-  limit?: number;
-  offset?: number;
+  search?: string;
 }
 
 export interface MaterialHistoryResponse {
   data: MaterialHistoryWithMaterial[];
   total: number;
   limit: number;
-  offset: number;
+  offset?: number;
+  page?: number;
 }
 
 // ✅ Создание материала
@@ -155,8 +155,17 @@ export const getAllMaterials = async (
 
 // ✅ Получить материал по ID
 export async function getMaterialById(id: number, token: string): Promise<Material> {
+  // Валидация ID
+  if (!id || isNaN(id) || id <= 0) {
+    throw new Error('Некорректный ID материала');
+  }
+
   console.log('[getMaterialById] id:', id, 'token:', !!token);
-  const response = await fetch(`${api}/materials/${id}`, {
+  
+  // Убеждаемся, что ID - это целое число
+  const materialId = Math.floor(id);
+  
+  const response = await fetch(`${api}/materials/${materialId}`, {
     method: 'GET',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -165,7 +174,8 @@ export async function getMaterialById(id: number, token: string): Promise<Materi
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Ошибка при получении материала по ID');
+    const errorMessage = error.message || error.error || 'Ошибка при получении материала по ID';
+    throw new Error(errorMessage);
   }
 
   return response.json();
@@ -230,7 +240,15 @@ export async function getMaterialHistory(
   id: number,
   token: string
 ): Promise<MaterialHistoryItem[]> {
-  const response = await fetch(`${api}/materials/${id}/history`, {
+  // Валидация ID
+  if (!id || isNaN(id) || id <= 0) {
+    throw new Error('Некорректный ID материала');
+  }
+
+  // Убеждаемся, что ID - это целое число
+  const materialId = Math.floor(id);
+  
+  const response = await fetch(`${api}/materials/${materialId}/history`, {
     method: 'GET',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -239,7 +257,8 @@ export async function getMaterialHistory(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Ошибка при получении истории материала');
+    const errorMessage = error.message || error.error || 'Ошибка при получении истории материала';
+    throw new Error(errorMessage);
   }
 
   return response.json();
@@ -291,10 +310,41 @@ export const getMaterialsByCategoryId = async (
 
 // ✅ Получить историю изменений материалов
 export async function getMaterialHistoryList(
-  token: string
+  token: string,
+  params?: GetMaterialHistoryParams
 ): Promise<MaterialHistoryResponse> {
   try {
-    const url = `${api}/materials/history`;
+    const query = new URLSearchParams();
+
+    // Обязательные параметры пагинации
+    if (params?.page) {
+      query.append('page', params.page.toString());
+    }
+    if (params?.limit) {
+      query.append('limit', params.limit.toString());
+    }
+
+    // Опциональные параметры фильтрации
+    if (params?.materialId) {
+      query.append('materialId', params.materialId.toString());
+    }
+    if (params?.fieldChanged) {
+      query.append('fieldChanged', params.fieldChanged);
+    }
+    if (params?.changedBy) {
+      query.append('changedBy', params.changedBy);
+    }
+    if (params?.dateFrom) {
+      query.append('dateFrom', params.dateFrom);
+    }
+    if (params?.dateTo) {
+      query.append('dateTo', params.dateTo);
+    }
+    if (params?.search) {
+      query.append('search', params.search.trim());
+    }
+
+    const url = `${api}/materials/history${query.toString() ? `?${query.toString()}` : ''}`;
     
     const response = await fetch(url, {
       method: 'GET',
@@ -310,11 +360,23 @@ export async function getMaterialHistoryList(
 
     const data = await response.json();
     
+    // Если ответ содержит data и total, используем их
+    if (data.data && typeof data.total === 'number') {
+      return {
+        data: data.data,
+        total: data.total,
+        limit: params?.limit || 20,
+        offset: ((params?.page || 1) - 1) * (params?.limit || 20)
+      };
+    }
+    
+    // Иначе, если это массив, обрабатываем как раньше
+    const historyArray = Array.isArray(data) ? data : (data.data || []);
     return {
-      data: data,
-      total: data.length,
-      limit: 10,
-      offset: 0
+      data: historyArray,
+      total: historyArray.length,
+      limit: params?.limit || 20,
+      offset: ((params?.page || 1) - 1) * (params?.limit || 20)
     };
   } catch (error) {
     throw error;

@@ -1,8 +1,8 @@
 import { RunnCell } from '@/store/useRunnStore';
 import { Material } from '@/api/material';
 import { useEffect } from 'react';
-import RpsRubilnikSelector from './RpsRubilnikSelector';
-import MoldedCaseWithRubilnikSelector from './MoldedCaseWithRubilnikSelector';
+import RpsRubilnikSelector from '../selectors/RpsRubilnikSelector';
+import MoldedCaseWithRubilnikSelector from '../selectors/MoldedCaseWithRubilnikSelector';
 
 interface CellParametersProps {
   cell: RunnCell & { update: (field: keyof RunnCell, val: string | number | string[]) => void; remove: () => void; };

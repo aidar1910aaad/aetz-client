@@ -56,11 +56,11 @@ export const calculateEquipmentPrice = (equipment: any, area: number): Equipment
 
   if (equipment.priceType === 'perSquareMeter') {
     price = equipment.pricePerSquareMeter || 0;
-    quantity = area;
+    quantity = Math.round(area);
     unit = 'м²';
   } else if (equipment.priceType === 'perHalfSquareMeter') {
     price = equipment.pricePerSquareMeter || 0;
-    quantity = area / 2;
+    quantity = Math.round(area / 2);
     unit = 'м²';
   } else if (equipment.priceType === 'fixed') {
     price = equipment.fixedPrice || 0;

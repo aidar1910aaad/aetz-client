@@ -221,25 +221,6 @@ export default function CurrencyPage() {
             </button>
           </div>
         )}
-        
-        {/* Информационное сообщение для менеджера */}
-        {isManagerUser && (
-          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Settings className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-blue-900 mb-1">
-                  Только просмотр
-                </p>
-                <p className="text-sm text-blue-700">
-                  У вас нет прав на редактирование курсов валют. Обратитесь к администратору или пользователю ПТО для внесения изменений.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

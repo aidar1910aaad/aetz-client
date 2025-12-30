@@ -134,10 +134,10 @@ export function TransformerSummary({ model, price, quantity, busbars, ustCalcula
               );
             })}
             <tr className="bg-[#8eba1e]/10 font-bold border-t-2 border-[#8eba1e]">
-              <td colSpan={5} className="text-right pr-4 p-4 text-lg">
+              <td colSpan={5} className="text-right pr-2 p-4 text-lg">
                 ВСЕГО:
               </td>
-              <td className="text-right pr-4 p-4 text-lg text-gray-900">{formattedPrice(totalPrice)}</td>
+              <td className="text-right pl-2 p-4 text-lg text-gray-900">{formattedPrice(totalPrice)}</td>
             </tr>
           </tbody>
         </table>

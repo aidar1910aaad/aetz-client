@@ -11,6 +11,7 @@ import type { RusnState } from '@/store/useRusnStore';
 
 interface RusnUniversalTableProps {
   voltage?: '10' | '20';
+  managerMarkupPercent?: number;
 }
 
 // Компонент для расчета стоимости ячейки
@@ -37,7 +38,7 @@ function CellCalculator({
   return null;
 }
 
-export default function RusnUniversalTable({ voltage = '10' }: RusnUniversalTableProps) {
+export default function RusnUniversalTable({ voltage = '10', managerMarkupPercent = 0 }: RusnUniversalTableProps) {
   const rusnData = useRusnStore();
   const [cellTotals, setCellTotals] = React.useState<Record<string, number>>({});
   const { materials } = useRusnMaterials();
@@ -113,23 +114,21 @@ export default function RusnUniversalTable({ voltage = '10' }: RusnUniversalTabl
     emptyMessage: `РУСН-${voltage}кВ не предусмотрено`,
   }), [voltage, cellTotals, materials]);
 
-  // Если нет данных, показываем пустое состояние
-  if (
-    (!rusnData.cellConfigs || rusnData.cellConfigs.length === 0) &&
-    (!rusnData.cellSummaries || rusnData.cellSummaries.length === 0) &&
-    !rusnData.busbarSummary &&
-    !rusnData.busBridgeSummary &&
-    (!rusnData.busBridgeSummaries || rusnData.busBridgeSummaries.length === 0)
-  ) {
+  // Проверяем, есть ли данные для отображения (простая проверка без вызова dataMapper)
+  const hasData = React.useMemo(() => {
+    const { cellConfigs, cellSummaries, busbarSummary, busBridgeSummary, busBridgeSummaries } = rusnData;
     return (
-      <UniversalTable 
-        config={{
-          ...modifiedConfig,
-          dataMapper: () => [],
-        }}
-        data={rusnData}
-      />
+      (cellConfigs && cellConfigs.length > 0) ||
+      (cellSummaries && cellSummaries.length > 0) ||
+      !!busbarSummary ||
+      !!busBridgeSummary ||
+      (busBridgeSummaries && busBridgeSummaries.length > 0)
     );
+  }, [rusnData]);
+
+  // Если нет данных, не показываем таблицу вообще
+  if (!hasData) {
+    return null;
   }
 
   return (
@@ -150,6 +149,7 @@ export default function RusnUniversalTable({ voltage = '10' }: RusnUniversalTabl
       <UniversalTable 
         config={modifiedConfig}
         data={rusnData}
+        managerMarkupPercent={managerMarkupPercent}
       />
     </>
   );

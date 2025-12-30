@@ -10,7 +10,7 @@ import { getMaterialsByCategoryId, Material } from '@/api/material';
 import { useAutoMaterialSelection } from '@/hooks/useAutoMaterialSelection';
 import RunnGlobalConfig from './RunnGlobalConfig';
 import RunnCellTable from './RunnCellTable';
-import RunnGeneralSummary from './components/RunnGeneralSummary';
+import RunnGeneralSummary from './components/summary/RunnGeneralSummary';
 import { RunnConfigTabs } from '@/components/runn/RunnConfigTabs';
 import { BusbarSystemContainer } from '@/components/runn/BusbarSystem/BusbarSystemContainer';
 import { BusbarBridgeCalculation } from '@/components/runn/BusbarBridge/BusbarBridgeCalculation';

@@ -1,7 +1,7 @@
 import type { RunnCell } from '@/store/useRunnStore';
 import { Material } from '@/api/material';
-import TogglerWithInput from '../../TogglerWithInput';
-import MaterialSummaryTable from '../../MaterialSummaryTable';
+import TogglerWithInput from '../../../TogglerWithInput';
+import MaterialSummaryTable from '../../common/MaterialSummaryTable';
 
 interface DguInputCellProps {
   cell: RunnCell;

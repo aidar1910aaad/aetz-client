@@ -49,3 +49,4 @@ export const useCalculationResultsStore = create<CalculationResultsState>((set, 
     set({ results: {} });
   }
 }));
+

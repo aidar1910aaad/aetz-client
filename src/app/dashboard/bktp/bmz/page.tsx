@@ -296,10 +296,10 @@ export default function BmzConfigPage() {
                         })}
 
                         <tr className="bg-[#8eba1e]/10 font-bold border-t-2 border-[#8eba1e]">
-                          <td colSpan={4} className="text-right pr-4 p-4 text-lg">
+                          <td colSpan={4} className="text-right pr-2 p-4 text-lg">
                             ВСЕГО:
                           </td>
-                          <td className="text-right pr-4 p-4 text-lg text-[#8eba1e]">{totalPrice.toLocaleString()} тг</td>
+                          <td className="text-right pl-2 p-4 text-lg text-[#8eba1e]">{totalPrice.toLocaleString()} тг</td>
                         </tr>
                       </tbody>
                     </table>

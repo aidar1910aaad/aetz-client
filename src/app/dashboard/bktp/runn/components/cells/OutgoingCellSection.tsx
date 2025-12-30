@@ -2,9 +2,9 @@
 
 import { useRunnStore } from '@/store/useRunnStore';
 import { Material } from '@/api/material';
-import TogglerWithInput from '../TogglerWithInput';
+import TogglerWithInput from '../../TogglerWithInput';
 import CellItem from './CellItem';
-import RunnCellSummaryTable from './RunnCellSummaryTable';
+import RunnCellSummaryTable from '../summary/RunnCellSummaryTable';
 import { RunnCell } from '@/store/useRunnStore';
 import { useCalculationResultsStore } from '@/store/useCalculationResultsStore';
 import { useMemo } from 'react';

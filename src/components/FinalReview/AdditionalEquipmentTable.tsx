@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { formatAmount } from '@/utils/formatAmount';
 
 interface EquipmentItem {
   name: string;
@@ -14,7 +15,7 @@ interface Props {
 }
 
 const formattedPrice = (num?: number) =>
-  typeof num === 'number' ? num.toLocaleString('ru-RU') + ' ₸' : '—';
+  typeof num === 'number' ? formatAmount(num) + ' ₸' : '—';
 
 // Функция для расчета стоимости из калькуляции
 const calculateCost = (calc: any) => {
@@ -132,7 +133,15 @@ export default function AdditionalEquipmentTable({ selected, equipmentList }: Pr
           <h3 className="text-xl font-bold text-gray-900">Доп. оборудование</h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full table-auto border border-gray-200 rounded-lg overflow-hidden">
+          <table className="w-full table-fixed border border-gray-200 rounded-lg overflow-hidden">
+            <colgroup>
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '60%' }} />
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '12.5%' }} />
+              <col style={{ width: '12.5%' }} />
+            </colgroup>
             <thead className="bg-[#8eba1e] text-white">
               <tr>
                 <th className="p-4 text-left font-semibold">№</th>
@@ -170,7 +179,15 @@ export default function AdditionalEquipmentTable({ selected, equipmentList }: Pr
         <h3 className="text-xl font-bold text-gray-900">Доп. оборудование</h3>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full table-auto border border-gray-200 rounded-lg overflow-hidden">
+        <table className="w-full table-fixed border border-gray-200 rounded-lg overflow-hidden">
+          <colgroup>
+            <col style={{ width: '5%' }} />
+            <col style={{ width: '60%' }} />
+            <col style={{ width: '5%' }} />
+            <col style={{ width: '5%' }} />
+            <col style={{ width: '12.5%' }} />
+            <col style={{ width: '12.5%' }} />
+          </colgroup>
           <thead className="bg-[#8eba1e] text-white">
             <tr>
               <th className="p-4 text-left font-semibold">№</th>
@@ -187,7 +204,7 @@ export default function AdditionalEquipmentTable({ selected, equipmentList }: Pr
               return (
                 <tr key={item.name} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="p-4 text-center font-semibold">{idx + 1}</td>
-                  <td className="p-4 text-left font-medium">{item.name}</td>
+                  <td className="p-4 text-left font-medium break-words">{item.name}</td>
                   <td className="p-4 text-center text-gray-600">{item.unit || 'шт.'}</td>
                   <td className="p-4 text-center font-semibold">{count}</td>
                   <td className="p-4 text-center text-gray-900 font-semibold">{formattedPrice(item.price)}</td>
@@ -198,10 +215,11 @@ export default function AdditionalEquipmentTable({ selected, equipmentList }: Pr
               );
             })}
             <tr className="bg-[#8eba1e]/10 font-bold border-t-2 border-[#8eba1e]">
-              <td colSpan={5} className="text-right pr-4 p-4 text-lg">
+              <td className="p-4"></td>
+              <td colSpan={4} className="text-right pr-2 p-4 text-lg">
                 ВСЕГО:
               </td>
-              <td className="text-right pr-4 p-4 text-lg text-gray-900">{formattedPrice(total)}</td>
+              <td className="text-right pl-2 p-4 text-lg text-gray-900">{formattedPrice(total)}</td>
             </tr>
           </tbody>
         </table>

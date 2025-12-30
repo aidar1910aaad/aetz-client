@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Pencil, Trash2, UserPlus, Users, Mail, Phone, Shield, Search, X, KeyRound } from 'lucide-react';
 import PageLoader from '@/shared/loader/PageLoader';
 import Pagination from '@/shared/components/Pagination';
@@ -14,6 +15,7 @@ import { useUserStore } from '@/store/useUserStore';
 import { showToast } from '@/shared/modals/ToastProvider';
 
 export default function AllUsersPage() {
+  const router = useRouter();
   const { users, loading, handleCreate, handleUpdate, handleDelete } = useUsers();
   const { user: currentUser } = useUserStore();
 
@@ -27,6 +29,10 @@ export default function AllUsersPage() {
   
   // Проверка, является ли текущий пользователь администратором
   const isAdmin = currentUser?.role?.toLowerCase() === 'admin';
+
+  const handleUserCardClick = (userId: number) => {
+    router.push(`/dashboard/users/${userId}`);
+  };
   
   // Filter users based on search query
   const filteredUsers = useMemo(() => {
@@ -176,20 +182,24 @@ export default function AllUsersPage() {
           <>
             <div className="space-y-4">
               {paginatedUsers.map((user) => (
-            <div key={user.id} className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 hover:border-[#8eba1e]/30 group">
+            <div 
+              key={user.id} 
+              onClick={() => handleUserCardClick(user.id)}
+              className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 hover:border-[#8eba1e]/30 group cursor-pointer"
+            >
               <div className="p-6">
-                <div className="flex items-center justify-between">
-                  {/* User Info */}
-                  <div className="flex items-center gap-6">
-                    {/* Avatar */}
+                <div className="grid items-center gap-4" style={{ gridTemplateColumns: '8% 22% 28% 22% 20%' }}>
+                  {/* Avatar - 8% */}
+                  <div className="flex justify-center">
                     <div className="w-16 h-16 bg-[#8eba1e] rounded-full flex items-center justify-center">
                       <span className="text-white font-bold text-xl">
                         {user.firstName[0]}{user.lastName[0]}
                       </span>
                     </div>
+                    </div>
                     
-                    {/* Name and Role */}
-                    <div className="flex-1">
+                  {/* Name and Role - 22% */}
+                  <div>
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="text-xl font-semibold text-gray-900">
                           {user.lastName} {user.firstName}
@@ -206,55 +216,68 @@ export default function AllUsersPage() {
                       </div>
                     </div>
                     
-                    {/* Contact Info */}
-                    <div className="flex items-center gap-8">
+                  {/* Email - 28% */}
+                  <div className="min-w-0">
                       <div className="flex items-center gap-3">
-                        <div className="p-2 bg-gray-100 rounded-lg">
+                      <div className="p-2 bg-gray-100 rounded-lg flex-shrink-0">
                           <Mail className="w-4 h-4 text-[#8eba1e]" />
                         </div>
-                        <div>
+                      <div className="min-w-0 flex-1">
                           <p className="text-xs text-gray-500">Email</p>
-                          <p className="font-medium text-gray-900">{user.email}</p>
+                        <p className="font-medium text-gray-900 truncate" title={user.email}>{user.email}</p>
+                      </div>
                         </div>
                       </div>
                       
+                  {/* Phone - 22% */}
+                  <div className="min-w-0">
                       <div className="flex items-center gap-3">
-                        <div className="p-2 bg-gray-100 rounded-lg">
+                      <div className="p-2 bg-gray-100 rounded-lg flex-shrink-0">
                           <Phone className="w-4 h-4 text-[#8eba1e]" />
                         </div>
-                        <div>
+                      <div className="min-w-0 flex-1">
                           <p className="text-xs text-gray-500">Телефон</p>
-                          <p className="font-medium text-gray-900">{user.phone}</p>
-                        </div>
+                        <p className="font-medium text-gray-900 truncate" title={user.phone}>{user.phone}</p>
                       </div>
                     </div>
                   </div>
                   
-                  {/* Actions - только для админа */}
+                  {/* Actions - только для админа - 20% */}
+                  <div className="flex justify-end gap-3" onClick={(e) => e.stopPropagation()}>
                   {isAdmin && (
-                    <div className="flex gap-3">
+                      <>
                       <button
-                        onClick={() => setEditUser(user)}
-                        className="flex items-center gap-2 bg-[#8eba1e] hover:bg-[#7aa31a] text-white px-4 py-2 rounded-lg transition-all duration-200 hover:shadow-md"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditUser(user);
+                          }}
+                          className="flex items-center gap-2 bg-[#8eba1e] hover:bg-[#7aa31a] text-white px-4 py-2 rounded-lg transition-all duration-200 hover:shadow-md z-10 relative"
                       >
                         <Pencil size={16} />
                         Редактировать
                       </button>
                       <button
-                        onClick={() => setChangePasswordUser(user)}
-                        className="flex items-center justify-center p-2 bg-amber-100 hover:bg-amber-200 text-amber-600 hover:text-amber-700 rounded-lg transition-all duration-200"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setChangePasswordUser(user);
+                          }}
+                          className="flex items-center justify-center p-2 bg-amber-100 hover:bg-amber-200 text-amber-600 hover:text-amber-700 rounded-lg transition-all duration-200 z-10 relative"
                         title="Изменить пароль"
                       >
                         <KeyRound size={16} />
                       </button>
                       <button
-                        onClick={() => handleDelete(user.id)}
-                        className="flex items-center justify-center p-2 bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-700 rounded-lg transition-all duration-200"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(user.id);
+                          }}
+                          className="flex items-center justify-center p-2 bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-700 rounded-lg transition-all duration-200 z-10 relative"
                       >
                         <Trash2 size={16} />
                       </button>
+                      </>
+                    )}
                     </div>
-                  )}
                 </div>
               </div>
             </div>

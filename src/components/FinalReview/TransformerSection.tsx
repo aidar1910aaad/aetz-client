@@ -68,10 +68,10 @@ export default function TransformerSection({ transformer }: Props) {
             <td className="p-2">{formattedPrice(transformer.price * transformer.quantity)}</td>
           </tr>
           <tr className="bg-[#f3f4f6] font-semibold">
-            <td colSpan={5} className="text-right pr-4">
+            <td colSpan={5} className="text-right pr-2">
               ВСЕГО:
             </td>
-            <td className="text-right pr-4">
+            <td className="text-right pl-2">
               {formattedPrice(transformer.price * transformer.quantity)}
             </td>
           </tr>

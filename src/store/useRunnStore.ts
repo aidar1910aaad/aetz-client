@@ -214,9 +214,14 @@ export const useRunnStore = create<RunnState>()(
         })),
 
       reset: () => {
-        console.log('RunnStore reset called - this will clear cellSummaries!');
-        // Очищаем localStorage для шинных мостов
-        localStorage.removeItem('busbar-bridges');
+        console.log('🔄 RunnStore reset called - очистка всех данных РУНН');
+        
+        // Очищаем localStorage для шинных мостов и самого store
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('busbar-bridges');
+          // Очищаем persist storage для РУНН
+          localStorage.removeItem('runn-storage');
+        }
         
         set({
           global: {
@@ -235,12 +240,20 @@ export const useRunnStore = create<RunnState>()(
               material: null,
               bridges: [],
             },
+            zeroBusbar: {
+              enabled: false,
+              material: null,
+              configuration: '',
+              weight: 0,
+              pricePerKg: 0,
+            },
           },
           cellConfigs: [],
           cellSummaries: [],
           busbarSummary: null,
           busBridgeSummary: null,
           busBridgeSummaries: [],
+          busBridges: [],
         });
       },
 

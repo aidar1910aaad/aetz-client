@@ -6,8 +6,8 @@ import { useRunnStore } from '@/store/useRunnStore';
 import RunnFormFields from './RunnFormFields';
 import { RunnNotConfigured } from '@/components/runn/RunnNotConfigured';
 import { RunnNextStepButton } from '@/components/runn/RunnNextStepButton';
-import RunnHeaderSimple from './components/RunnHeaderSimple';
-import RunnModeSelector from './components/RunnModeSelector';
+import RunnHeaderSimple from './components/common/RunnHeaderSimple';
+import RunnModeSelector from './components/selectors/RunnModeSelector';
 
 type RunnMode = 'configured' | 'not-configured';
 

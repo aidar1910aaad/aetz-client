@@ -3,6 +3,7 @@ import { getMaterialHistoryList, MaterialHistoryWithMaterial } from '@/api/mater
 
 export interface MaterialHistoryStats {
   recentChanges: MaterialHistoryWithMaterial[];
+  allChanges: MaterialHistoryWithMaterial[]; // Все изменения для фильтрации
   loading: boolean;
   error: string | null;
 }
@@ -10,6 +11,7 @@ export interface MaterialHistoryStats {
 export function useMaterialHistory() {
   const [stats, setStats] = useState<MaterialHistoryStats>({
     recentChanges: [],
+    allChanges: [],
     loading: true,
     error: null,
   });
@@ -22,14 +24,16 @@ export function useMaterialHistory() {
 
         setStats(prev => ({ ...prev, loading: true, error: null }));
 
-        // Получаем последние 4 изменения материалов через новый API
-        const historyResponse = await getMaterialHistoryList(token);
+        // Получаем все изменения материалов через новый API
+        const historyResponse = await getMaterialHistoryList(token, { page: 1, limit: 100 });
         
-        // Берем только первые 4 изменения
-        const recentChanges = (historyResponse.data || []).slice(0, 4);
+        const allChanges = historyResponse.data || [];
+        // Берем только первые 4 изменения для отображения по умолчанию
+        const recentChanges = allChanges.slice(0, 4);
 
         setStats({
           recentChanges: recentChanges,
+          allChanges: allChanges,
           loading: false,
           error: null,
         });

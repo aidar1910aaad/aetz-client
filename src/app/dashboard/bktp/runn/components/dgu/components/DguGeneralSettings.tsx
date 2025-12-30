@@ -1,8 +1,8 @@
 import { useDguStore } from '@/store/useDguStore';
-import TogglerWithInput from '../../TogglerWithInput';
+import TogglerWithInput from '../../../TogglerWithInput';
 import {
   calculateNominalCurrentForDgu,
-} from '../../utils/runnDguMaterialFinder';
+} from '../../../utils/runnDguMaterialFinder';
 
 interface DguGeneralSettingsProps {
   nominalCurrent: number;

@@ -8,6 +8,7 @@ interface PaginationProps {
   onPageChange: (page: number) => void;
   totalItems: number;
   itemsPerPage: number;
+  itemName?: string; // Название элементов (по умолчанию "элементов")
 }
 
 export default function Pagination({
@@ -15,7 +16,8 @@ export default function Pagination({
   totalPages,
   onPageChange,
   totalItems,
-  itemsPerPage
+  itemsPerPage,
+  itemName = 'элементов'
 }: PaginationProps) {
   const startItem = (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
@@ -61,7 +63,7 @@ export default function Pagination({
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-gray-200">
       {/* Info */}
       <div className="text-sm text-gray-600">
-        Показано {startItem}-{endItem} из {totalItems} пользователей
+        Показано {startItem}-{endItem} из {totalItems} {itemName}
       </div>
 
       {/* Pagination Controls */}

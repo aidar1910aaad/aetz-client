@@ -1,15 +1,27 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import clsx from 'clsx';
 import { ChevronLeft, Menu } from 'lucide-react';
+import Link from 'next/link';
 import { sidebarLinks } from './Sidebar/sidebarLinks';
 import SidebarLink from './Sidebar/SidebarLink';
 import SidebarGroup from './Sidebar/SidebarGroup';
+import { useRoleCheck } from '@/hooks/useRoleCheck';
+import { hasPageAccess } from '@/utils/permissions';
 
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const { userRole } = useRoleCheck();
+
+  // Фильтруем ссылки в зависимости от роли пользователя
+  const visibleLinks = useMemo(() => {
+    return sidebarLinks.filter((link) => {
+      // Проверяем доступ к странице через систему разрешений
+      return hasPageAccess(userRole, link.href);
+    });
+  }, [userRole]);
 
   const toggleGroup = (label: string) => {
     setOpenGroups((prev) => ({ ...prev, [label]: !prev[label] }));
@@ -24,7 +36,7 @@ export default function Sidebar() {
     >
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center gap-3">
+        <Link href="/dashboard" className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer">
           <div className="w-8 h-8 bg-[#8eba1e] rounded-lg flex items-center justify-center">
             <Menu className="w-5 h-5 text-white" />
           </div>
@@ -34,12 +46,12 @@ export default function Sidebar() {
               <p className="text-xs text-gray-600">Навигация</p>
             </div>
           )}
-        </div>
+        </Link>
       </div>
 
       {/* Навигация (прокручиваемая) */}
       <div className="p-4 space-y-2 overflow-y-auto flex-1">
-        {sidebarLinks.map((item, index) => {
+        {visibleLinks.map((item, index) => {
           if (item.type === 'group') {
             return (
               <SidebarGroup
