@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getCalculationsByGroup } from '@/api/calculations';
+import { loadRunnPanelCalculations } from '@/domain/runn/calculationLoader';
 
 export const useOutgoingCalculations = () => {
   const [calculations, setCalculations] = useState<any[]>([]);
@@ -13,7 +13,7 @@ export const useOutgoingCalculations = () => {
 
       try {
         const token = localStorage.getItem('token') || '';
-        const allCalculations = await getCalculationsByGroup('panel-sho-70', token);
+        const allCalculations = await loadRunnPanelCalculations(token);
         
         // Фильтруем калькуляции по типу "Отходящий ячейка"
         const outgoingCalculations = allCalculations.filter((calc: any) => 

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import {
   calculateArea,
   calculateBasePrice,
@@ -26,26 +26,25 @@ import type { RusnState } from '@/store/useRusnStore';
 import type { WorkItem } from '@/store/useWorksStore';
 import type { AdditionalEquipmentState, AdditionalEquipmentItem } from '@/store/useAdditionalEquipmentStore';
 import { rusnTableConfig } from '@/components/FinalReview/tableConfigs';
+import { getRunnTableRows } from '@/utils/runnExportRows';
+import { PdfSpecTableSection } from './PdfSpecTableSection';
+import { useMaterialPrices } from '@/hooks/useMaterialPrices';
+import { calculateBusbarUstCost, isUst04CalculationName } from '@/utils/busbarUstCost';
+import { PdfCommercialHeader, type PdfHeaderMeta } from './PdfCommercialHeader';
+import { registerPdfFonts, PDF_FONT_REGULAR, PDF_FONT_BOLD } from '@/lib/pdfFonts';
 
-// Регистрируем шрифт с поддержкой кириллицы
-Font.register({
-  family: 'Roboto',
-  src: 'https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-regular-webfont.ttf',
-});
-
-Font.register({
-  family: 'Roboto-Bold',
-  src: 'https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-bold-webfont.ttf',
-});
+registerPdfFonts();
 
 // Создаем стили для PDF
 const styles = StyleSheet.create({
   page: {
     flexDirection: 'column',
     backgroundColor: '#ffffff',
-    padding: 20,
+    paddingTop: 0,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
     fontSize: 8,
-    fontFamily: 'Roboto',
+    fontFamily: PDF_FONT_REGULAR,
   },
   header: {
     marginBottom: 15,
@@ -55,13 +54,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 8,
     color: '#000000',
-    fontFamily: 'Roboto-Bold',
+    fontFamily: PDF_FONT_BOLD,
   },
   subtitle: {
     fontSize: 10,
     marginBottom: 3,
     color: '#666666',
-    fontFamily: 'Roboto',
+    fontFamily: PDF_FONT_REGULAR,
   },
   section: {
     marginBottom: 12,
@@ -71,7 +70,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 6,
     color: '#000000',
-    fontFamily: 'Roboto-Bold',
+    fontFamily: PDF_FONT_BOLD,
   },
   table: {
     width: '100%',
@@ -92,13 +91,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#90bd20',
     color: '#fff',
     fontWeight: 'bold',
-    fontFamily: 'Roboto-Bold',
+    fontFamily: PDF_FONT_BOLD,
   },
   tableCell: {
     padding: 3,
     fontSize: 7,
     flex: 1,
-    fontFamily: 'Roboto',
+    fontFamily: PDF_FONT_REGULAR,
     color: '#000',
   },
   tableCellNumber: {
@@ -106,14 +105,14 @@ const styles = StyleSheet.create({
     fontSize: 7,
     width: 25,
     textAlign: 'center',
-    fontFamily: 'Roboto',
+    fontFamily: PDF_FONT_REGULAR,
     color: '#000',
   },
   tableCellName: {
     padding: 3,
     fontSize: 7,
     flex: 3,
-    fontFamily: 'Roboto',
+    fontFamily: PDF_FONT_REGULAR,
     color: '#000',
   },
   tableCellUnit: {
@@ -121,7 +120,7 @@ const styles = StyleSheet.create({
     fontSize: 7,
     width: 35,
     textAlign: 'center',
-    fontFamily: 'Roboto',
+    fontFamily: PDF_FONT_REGULAR,
     color: '#000',
   },
   tableCellQuantity: {
@@ -129,7 +128,7 @@ const styles = StyleSheet.create({
     fontSize: 7,
     width: 35,
     textAlign: 'center',
-    fontFamily: 'Roboto',
+    fontFamily: PDF_FONT_REGULAR,
     color: '#000',
   },
   tableCellPrice: {
@@ -137,7 +136,7 @@ const styles = StyleSheet.create({
     fontSize: 7,
     width: 80,
     textAlign: 'right',
-    fontFamily: 'Roboto',
+    fontFamily: PDF_FONT_REGULAR,
     color: '#000',
   },
   tableCellTotal: {
@@ -145,7 +144,7 @@ const styles = StyleSheet.create({
     fontSize: 7,
     width: 80,
     textAlign: 'right',
-    fontFamily: 'Roboto',
+    fontFamily: PDF_FONT_REGULAR,
     color: '#000',
   },
   totalRow: {
@@ -155,9 +154,14 @@ const styles = StyleSheet.create({
   totalCell: {
     color: '#fff',
     fontWeight: 'bold',
-    fontFamily: 'Roboto-Bold',
+    fontFamily: PDF_FONT_BOLD,
   },
 });
+
+/** Минимум места под заголовком секции (заголовок + шапка таблицы) */
+const SECTION_TITLE_MIN_AHEAD = 32;
+/** Минимум места под шапкой таблицы (шапка + одна строка) */
+const TABLE_HEADER_MIN_AHEAD = 22;
 
 // Типы для PDF документа
 interface Totals {
@@ -174,6 +178,8 @@ interface PDFDocumentProps {
   filename: string;
   fullName: string;
   user: any;
+  pdfHeader?: PdfHeaderMeta;
+  pdfLogoSrc?: string;
   bmzStore: BmzData;
   selectedTransformer: ExtendedTransformer | null;
   rusnStore: RusnState;
@@ -195,6 +201,8 @@ export const PDFDocument = ({
   filename,
   fullName,
   user,
+  pdfHeader,
+  pdfLogoSrc,
   bmzStore,
   selectedTransformer,
   rusnStore,
@@ -206,6 +214,9 @@ export const PDFDocument = ({
   totals,
   customRowsByTable = {},
 }: PDFDocumentProps) => {
+  const { aluminum: aluminumPrice, copper: copperPrice } = useMaterialPrices();
+  const busbarMaterialPrices = { aluminum: aluminumPrice, copper: copperPrice };
+
   // Проверяем наличие необходимых данных
   if (!bmzStore || !rusnStore || !selectedWorks || !worksList || !runnStore) {
     return (
@@ -247,7 +258,12 @@ export const PDFDocument = ({
   // Данные для отображения таблиц (только для рендеринга, не для расчета сумм)
   const bmzArea = calculateArea(bmzStore.width || 0, bmzStore.length || 0);
   const roundedArea = Math.round(bmzArea * 10) / 10;
-  const unitPrice = calculateBasePrice(bmzStore.settings, bmzStore.thickness, bmzArea);
+  const unitPrice = calculateBasePrice(
+    bmzStore.settings,
+    bmzStore.thickness,
+    bmzArea,
+    bmzStore.height,
+  );
   const buildingTotal = unitPrice * roundedArea;
   const activeEquipment = getActiveEquipment(bmzStore);
 
@@ -284,14 +300,9 @@ export const PDFDocument = ({
   const transformerBasePrice = selectedTransformer?.price || 0;
   const transformerBaseTotal = transformerBasePrice * transformerQuantity;
   const busbarUstData = selectedTransformer?.busbarUstData;
-  const busbarUstCost = busbarUstData ? 
-    (busbarUstData.mainUstWeight + busbarUstData.zeroUstWeight) * 
-    (busbarUstData.material === 'Алюминий' ? 2800 : 5600) : 0;
+  const busbarUstCost = calculateBusbarUstCost(busbarUstData, busbarMaterialPrices);
 
-  // Данные для отображения РУНН (только для таблицы)
-  const runnCellSummaries = runnStore?.cellSummaries || [];
-  const runnBusbarSummary = runnStore?.busbarSummary;
-  const runnBusBridgeSummary = runnStore?.busBridgeSummary;
+  const runnTableRows = getRunnTableRows(runnStore);
 
   // Данные для отображения дополнительного оборудования (только для таблицы)
   const additionalEquipmentItems = Object.entries(selectedEquipment || {})
@@ -310,24 +321,33 @@ export const PDFDocument = ({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Заголовок */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Итоговая спецификация {filename}</Text>
-          <Text style={styles.subtitle}>Исполнитель: ТОО &#34;АЭТЗ&#34;</Text>
-          <Text style={styles.subtitle}>
-            Исполнитель {user?.lastName || ''} {user?.firstName || ''}
-            {user?.phone && ` | ${user.phone}`}
-            {user?.email && ` | ${user.email}`}
-          </Text>
-          <Text style={styles.subtitle}>Дата: {new Date().toLocaleDateString('ru-RU')}</Text>
-        </View>
+        {pdfHeader ? (
+          <PdfCommercialHeader meta={pdfHeader} user={user} logoSrc={pdfLogoSrc} />
+        ) : (
+          <View style={styles.header}>
+            <Text style={styles.title}>Итоговая спецификация {filename}</Text>
+            <Text style={styles.subtitle}>Исполнитель: ТОО &#34;АЭТЗ&#34;</Text>
+            <Text style={styles.subtitle}>
+              Исполнитель {user?.lastName || ''} {user?.firstName || ''}
+              {user?.phone && ` | ${user.phone}`}
+              {user?.email && ` | ${user.email}`}
+            </Text>
+            <Text style={styles.subtitle}>Дата: {new Date().toLocaleDateString('ru-RU')}</Text>
+          </View>
+        )}
 
         {/* Секция БМЗ */}
         {bmzStore.buildingType !== 'none' && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Блочно модульное здание</Text>
+            <Text style={styles.sectionTitle} minPresenceAhead={SECTION_TITLE_MIN_AHEAD}>
+              Блочно модульное здание
+            </Text>
             <View style={styles.table}>
-              <View style={[styles.tableRow, styles.tableHeader]}>
+              <View
+                style={[styles.tableRow, styles.tableHeader]}
+                wrap={false}
+                minPresenceAhead={TABLE_HEADER_MIN_AHEAD}
+              >
                 <Text style={[styles.tableCellNumber, styles.totalCell]}>№</Text>
                 <Text style={[styles.tableCellName, styles.totalCell]}>Наименование</Text>
                 <Text style={[styles.tableCellUnit, styles.totalCell]}>Ед. изм.</Text>
@@ -382,7 +402,7 @@ export const PDFDocument = ({
               })}
 
               {/* Итог БМЗ */}
-              <View style={[styles.tableRow, styles.totalRow]}>
+              <View style={[styles.tableRow, styles.totalRow]} wrap={false}>
                 <Text style={[styles.tableCellNumber, styles.totalCell]}></Text>
                 <Text style={[styles.tableCellName, styles.totalCell]}>ВСЕГО:</Text>
                 <Text style={[styles.tableCellUnit, styles.totalCell]}></Text>
@@ -399,9 +419,15 @@ export const PDFDocument = ({
         {/* Секция трансформатора */}
         {selectedTransformer && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Трансформатор</Text>
+            <Text style={styles.sectionTitle} minPresenceAhead={SECTION_TITLE_MIN_AHEAD}>
+              Трансформатор
+            </Text>
             <View style={styles.table}>
-              <View style={[styles.tableRow, styles.tableHeader]}>
+              <View
+                style={[styles.tableRow, styles.tableHeader]}
+                wrap={false}
+                minPresenceAhead={TABLE_HEADER_MIN_AHEAD}
+              >
                 <Text style={[styles.tableCellNumber, styles.totalCell]}>№</Text>
                 <Text style={[styles.tableCellName, styles.totalCell]}>Наименование</Text>
                 <Text style={[styles.tableCellUnit, styles.totalCell]}>Ед. изм.</Text>
@@ -429,7 +455,7 @@ export const PDFDocument = ({
               {/* УСТ калькуляции */}
               {selectedTransformer.ustCalculations && selectedTransformer.ustCalculations.length > 0 ? (
                 selectedTransformer.ustCalculations.map((calc: any, index: number) => {
-                  const shouldAddBusbarCost = calc.name?.includes('0.4кВ') || calc.name?.includes('УСТ-0.4кВ');
+                  const shouldAddBusbarCost = isUst04CalculationName(calc.name || '');
                   const additionalCost = shouldAddBusbarCost ? busbarUstCost : 0;
                   const ustPrice = calculateUstPrice(calc, additionalCost);
                   const ustTotal = ustPrice * transformerQuantity;
@@ -495,7 +521,7 @@ export const PDFDocument = ({
               })}
 
               {/* Итого по трансформатору */}
-              <View style={[styles.tableRow, styles.totalRow]}>
+              <View style={[styles.tableRow, styles.totalRow]} wrap={false}>
                 <Text style={[styles.tableCellNumber, styles.totalCell]}></Text>
                 <Text style={[styles.tableCellName, styles.totalCell]}>ВСЕГО:</Text>
                 <Text style={[styles.tableCellUnit, styles.totalCell]}></Text>
@@ -509,195 +535,33 @@ export const PDFDocument = ({
           </View>
         )}
 
-        {/* Секция РУСН */}
-        {(() => {
-          // Используем rusnTableConfig.dataMapper для получения данных (единый источник истины)
-          const rusnRows = rusnTableConfig.dataMapper(rusnStore);
+        <PdfSpecTableSection
+          title="РУСН-10кВ"
+          rows={rusnTableConfig.dataMapper(rusnStore)}
+          total={rusnTotal}
+          customRows={customRowsByTable?.rusn || []}
+          totalLabel="ВСЕГО:"
+        />
 
-          // Показываем секцию только если есть данные
-          if (!rusnRows || rusnRows.length === 0) {
-            return null;
-          }
-
-          return (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>РУСН-10кВ</Text>
-              <View style={styles.table}>
-                <View style={[styles.tableRow, styles.tableHeader]}>
-                  <Text style={[styles.tableCellNumber, styles.totalCell]}>№</Text>
-                  <Text style={[styles.tableCellName, styles.totalCell]}>Наименование</Text>
-                  <Text style={[styles.tableCellUnit, styles.totalCell]}>Ед. изм.</Text>
-                  <Text style={[styles.tableCellQuantity, styles.totalCell]}>Кол-во</Text>
-                  <Text style={[styles.tableCellPrice, styles.totalCell]}>Цена</Text>
-                  <Text style={[styles.tableCellTotal, styles.totalCell]}>Сумма</Text>
-                </View>
-
-                {/* Строки данных РУСН */}
-                {rusnRows.map((row: any, index: number) => (
-                  <View key={row.id || `rusn-row-${index}`} style={styles.tableRow}>
-                    <Text style={styles.tableCellNumber}>{index + 1}</Text>
-                    <Text style={styles.tableCellName}>{row.name || '—'}</Text>
-                    <Text style={styles.tableCellUnit}>{row.unit || 'шт'}</Text>
-                    <Text style={styles.tableCellQuantity}>{row.quantity || 0}</Text>
-                    <Text style={styles.tableCellPrice}>
-                      {formatNumber(row.price || 0)} тг
-                    </Text>
-                    <Text style={styles.tableCellTotal}>
-                      {formatNumber(row.total || 0)} тг
-                    </Text>
-                  </View>
-                ))}
-
-                {/* Пользовательские строки для РУСН */}
-                {(customRowsByTable?.rusn || []).map((row: any, idx: number) => {
-                  const rowNumber = rusnRows.length + 1 + idx;
-                  const indentLevel = row.indent || 0;
-                  const indentPadding = indentLevel * 8;
-                  return (
-                    <View key={row.id || `custom-rusn-${idx}`} style={styles.tableRow}>
-                      <Text style={styles.tableCellNumber}>{rowNumber}</Text>
-                      <Text style={[styles.tableCellName, { paddingLeft: indentPadding }]}>
-                        {indentLevel > 0 && '└'.repeat(Math.min(indentLevel, 3))}
-                        {row.name || ''}
-                      </Text>
-                      <Text style={styles.tableCellUnit}>{row.unit || 'шт.'}</Text>
-                      <Text style={styles.tableCellQuantity}>{row.quantity || 1}</Text>
-                      <Text style={styles.tableCellPrice}>{formatNumber(row.price || 0)} тг</Text>
-                      <Text style={styles.tableCellTotal}>{formatNumber(row.total || 0)} тг</Text>
-                    </View>
-                  );
-                })}
-
-                {/* Итого РУСН */}
-                <View style={[styles.tableRow, styles.totalRow]}>
-                  <Text style={[styles.tableCellNumber, styles.totalCell]}></Text>
-                  <Text style={[styles.tableCellName, styles.totalCell]}>ВСЕГО:</Text>
-                  <Text style={[styles.tableCellUnit, styles.totalCell]}></Text>
-                  <Text style={[styles.tableCellQuantity, styles.totalCell]}></Text>
-                  <Text style={[styles.tableCellPrice, styles.totalCell]}></Text>
-                  <Text style={[styles.tableCellTotal, styles.totalCell]}>
-                    {formatNumber(rusnTotal)} тг
-                  </Text>
-                </View>
-              </View>
-            </View>
-          );
-        })()}
-
-        {/* Секция РУ-0.4кВ - Общая сводка РУНН */}
-        {(() => {
-          const runnCellSummaries = runnStore?.cellSummaries || [];
-          const runnBusbarSummary = runnStore?.busbarSummary;
-          const runnBusBridgeSummary = runnStore?.busBridgeSummary;
-          
-          return (runnCellSummaries.length > 0 || runnBusbarSummary || runnBusBridgeSummary) && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>РУ-0.4кВ</Text>
-            <View style={styles.table}>
-              <View style={[styles.tableRow, styles.tableHeader]}>
-                <Text style={[styles.tableCellNumber, styles.totalCell]}>№</Text>
-                <Text style={[styles.tableCellName, styles.totalCell]}>Наименование</Text>
-                <Text style={[styles.tableCellUnit, styles.totalCell]}>Ед. изм.</Text>
-                <Text style={[styles.tableCellQuantity, styles.totalCell]}>Кол-во</Text>
-                <Text style={[styles.tableCellPrice, styles.totalCell]}>Цена за ед., в тенге, без НДС</Text>
-                <Text style={[styles.tableCellTotal, styles.totalCell]}>Сумма, в тенге, без НДС</Text>
-              </View>
-              
-              {/* Ячейки из общей сводки */}
-              {runnCellSummaries.map((summary: any, index: number) => (
-                <View key={`cell-${summary.cellId}`} style={styles.tableRow}>
-                  <Text style={styles.tableCellNumber}>{index + 1}</Text>
-                  <Text style={styles.tableCellName}>{summary.name}</Text>
-                  <Text style={styles.tableCellUnit}>шт.</Text>
-                  <Text style={styles.tableCellQuantity}>{summary.quantity}</Text>
-                  <Text style={styles.tableCellPrice}>
-                    {summary.pricePerUnit > 0 ? formatNumber(summary.pricePerUnit) : '—'}
-                  </Text>
-                  <Text style={styles.tableCellTotal}>
-                    {summary.totalPrice > 0 ? formatNumber(summary.totalPrice) : '—'}
-                  </Text>
-                </View>
-              ))}
-
-              {/* Шина */}
-              {runnBusbarSummary && (
-                <View style={styles.tableRow}>
-                  <Text style={styles.tableCellNumber}>
-                    {runnCellSummaries.length + 1}
-                  </Text>
-                  <Text style={styles.tableCellName}>{runnBusbarSummary.name}</Text>
-                  <Text style={styles.tableCellUnit}>шт.</Text>
-                  <Text style={styles.tableCellQuantity}>{runnBusbarSummary.quantity}</Text>
-                  <Text style={styles.tableCellPrice}>
-                    {runnBusbarSummary.pricePerUnit > 0 ? formatNumber(runnBusbarSummary.pricePerUnit) : '—'}
-                  </Text>
-                  <Text style={styles.tableCellTotal}>
-                    {runnBusbarSummary.totalPrice > 0 ? formatNumber(runnBusbarSummary.totalPrice) : '—'}
-                  </Text>
-                </View>
-              )}
-
-              {/* Мостовая шина */}
-              {runnBusBridgeSummary && (
-                <View style={styles.tableRow}>
-                  <Text style={styles.tableCellNumber}>
-                    {runnCellSummaries.length + (runnBusbarSummary ? 1 : 0) + 1}
-                  </Text>
-                  <Text style={styles.tableCellName}>{runnBusBridgeSummary.name}</Text>
-                  <Text style={styles.tableCellUnit}>шт.</Text>
-                  <Text style={styles.tableCellQuantity}>{runnBusBridgeSummary.quantity}</Text>
-                  <Text style={styles.tableCellPrice}>
-                    {runnBusBridgeSummary.pricePerUnit > 0 ? formatNumber(runnBusBridgeSummary.pricePerUnit) : '—'}
-                  </Text>
-                  <Text style={styles.tableCellTotal}>
-                    {runnBusBridgeSummary.totalPrice > 0 ? formatNumber(runnBusBridgeSummary.totalPrice) : '—'}
-                  </Text>
-                </View>
-              )}
-
-              {/* Пользовательские строки для РУНН */}
-              {(customRowsByTable?.runn || []).map((row: any, idx: number) => {
-                const baseRowCount = runnCellSummaries.length + (runnBusbarSummary ? 1 : 0) + (runnBusBridgeSummary ? 1 : 0);
-                const rowNumber = baseRowCount + 1 + idx;
-                const indentLevel = row.indent || 0;
-                const indentPadding = indentLevel * 8;
-                return (
-                  <View key={row.id || `custom-runn-${idx}`} style={styles.tableRow}>
-                    <Text style={styles.tableCellNumber}>{rowNumber}</Text>
-                    <Text style={[styles.tableCellName, { paddingLeft: indentPadding }]}>
-                      {indentLevel > 0 && '└'.repeat(Math.min(indentLevel, 3))}
-                      {row.name || ''}
-                    </Text>
-                    <Text style={styles.tableCellUnit}>{row.unit || 'шт.'}</Text>
-                    <Text style={styles.tableCellQuantity}>{row.quantity || 1}</Text>
-                    <Text style={styles.tableCellPrice}>{formatNumber(row.price || 0)} тг</Text>
-                    <Text style={styles.tableCellTotal}>{formatNumber(row.total || 0)} тг</Text>
-                  </View>
-                );
-              })}
-
-              {/* Итого РУ-0.4кВ */}
-              <View style={[styles.tableRow, styles.totalRow]}>
-                <Text style={[styles.tableCellNumber, styles.totalCell]}>—</Text>
-                <Text style={[styles.tableCellName, styles.totalCell]}>Итого:</Text>
-                <Text style={[styles.tableCellUnit, styles.totalCell]}>—</Text>
-                <Text style={[styles.tableCellQuantity, styles.totalCell]}>—</Text>
-                <Text style={[styles.tableCellPrice, styles.totalCell]}>—</Text>
-                <Text style={[styles.tableCellTotal, styles.totalCell]}>
-                  {formatNumber(runnTotal)} тг
-                </Text>
-              </View>
-            </View>
-          </View>
-        );
-        })()}
+        <PdfSpecTableSection
+          title="РУ-0.4кВ"
+          rows={runnTableRows}
+          total={runnTotal}
+          customRows={customRowsByTable?.runn || []}
+        />
 
         {/* Секция дополнительного оборудования */}
         {additionalEquipmentItems.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Дополнительное оборудование</Text>
+            <Text style={styles.sectionTitle} minPresenceAhead={SECTION_TITLE_MIN_AHEAD}>
+              Дополнительное оборудование
+            </Text>
             <View style={styles.table}>
-              <View style={[styles.tableRow, styles.tableHeader]}>
+              <View
+                style={[styles.tableRow, styles.tableHeader]}
+                wrap={false}
+                minPresenceAhead={TABLE_HEADER_MIN_AHEAD}
+              >
                 <Text style={[styles.tableCellNumber, styles.totalCell]}>№</Text>
                 <Text style={[styles.tableCellName, styles.totalCell]}>Наименование</Text>
                 <Text style={[styles.tableCellUnit, styles.totalCell]}>Ед. изм.</Text>
@@ -738,7 +602,7 @@ export const PDFDocument = ({
               })}
 
               {/* Итого дополнительного оборудования */}
-              <View style={[styles.tableRow, styles.totalRow]}>
+              <View style={[styles.tableRow, styles.totalRow]} wrap={false}>
                 <Text style={[styles.tableCellNumber, styles.totalCell]}></Text>
                 <Text style={[styles.tableCellName, styles.totalCell]}>ВСЕГО:</Text>
                 <Text style={[styles.tableCellUnit, styles.totalCell]}></Text>
@@ -755,9 +619,15 @@ export const PDFDocument = ({
         {/* Секция работ */}
         {(worksList || []).filter((work) => selectedWorks[work.name]?.checked).length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Работы и транспортные расходы</Text>
+            <Text style={styles.sectionTitle} minPresenceAhead={SECTION_TITLE_MIN_AHEAD}>
+              Работы и транспортные расходы
+            </Text>
             <View style={styles.table}>
-              <View style={[styles.tableRow, styles.tableHeader]}>
+              <View
+                style={[styles.tableRow, styles.tableHeader]}
+                wrap={false}
+                minPresenceAhead={TABLE_HEADER_MIN_AHEAD}
+              >
                 <Text style={[styles.tableCellNumber, styles.totalCell]}>№</Text>
                 <Text style={[styles.tableCellName, styles.totalCell]}>Наименование</Text>
                 <Text style={[styles.tableCellUnit, styles.totalCell]}>Ед. изм.</Text>
@@ -805,7 +675,7 @@ export const PDFDocument = ({
               })}
 
               {/* Итого работ */}
-              <View style={[styles.tableRow, styles.totalRow]}>
+              <View style={[styles.tableRow, styles.totalRow]} wrap={false}>
                 <Text style={[styles.tableCellNumber, styles.totalCell]}></Text>
                 <Text style={[styles.tableCellName, styles.totalCell]}>ВСЕГО:</Text>
                 <Text style={[styles.tableCellUnit, styles.totalCell]}></Text>
@@ -822,7 +692,7 @@ export const PDFDocument = ({
         {/* Итоговая сумма по всем секциям */}
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 20 }}>
           <Text
-            style={{ fontSize: 11, fontWeight: 'bold', fontFamily: 'Roboto-Bold', color: '#000' }}
+            style={{ fontSize: 11, fontWeight: 'bold', fontFamily: PDF_FONT_BOLD, color: '#000' }}
           >
             Сумма: {formatNumber(grandTotal)} тг
           </Text>

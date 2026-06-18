@@ -5,6 +5,7 @@ import {
   createMaterial,
   updateMaterial,
   deleteMaterial,
+  deleteMaterialsBatch,
   getMaterialHistory,
   getMaterialHistoryList,
   Material,
@@ -15,7 +16,6 @@ import {
   GetMaterialsParams,
   GetMaterialHistoryParams,
 } from '../api/material/index';
-import { searchMaterials } from '../api/material';
 import { getAllCategories, Category } from '@/api/categories';
 import { showToast } from '@/shared/modals/ToastProvider';
 import { showConfirm } from '@/shared/modals/ConfirmModal';
@@ -28,11 +28,14 @@ export function useMaterials() {
   const [total, setTotal] = useState(0);
 
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(50);
+  const [limit, setLimit] = useState(500);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<'name' | 'price' | 'code'>('name');
   const [order, setOrder] = useState<'ASC' | 'DESC'>('ASC');
   const [selectedCategory, setSelectedCategory] = useState('Все');
+  const [selectedCurrency, setSelectedCurrency] = useState<
+    'ALL' | 'FOREIGN' | 'KZT' | 'USD' | 'RUB' | 'EUR' | 'CNY'
+  >('ALL');
   const [loading, setLoading] = useState(true);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
 
@@ -41,7 +44,7 @@ export function useMaterials() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, selectedCategory, sort, order]);
+  }, [debouncedSearch, selectedCategory, selectedCurrency, sort, order]);
 
   // ✅ Загрузка категорий при первом рендере
   useEffect(() => {
@@ -89,71 +92,51 @@ export function useMaterials() {
         selectedCategory !== 'Все'
           ? allCategories.find((cat) => cat.name === selectedCategory)?.id
           : undefined;
+      const matchesCurrency = (item: Material) => {
+        const currency = (item.currency || 'KZT').toUpperCase();
+        if (selectedCurrency === 'ALL') return true;
+        if (selectedCurrency === 'FOREIGN') return currency !== 'KZT';
+        return currency === selectedCurrency;
+      };
 
 
-      // If there's a search term, use searchMaterials instead of getAllMaterials
-      if (debouncedSearch?.trim()) {
-        const results = await searchMaterials(debouncedSearch.trim(), token);
+      const effectiveLimit = limit === 0 ? 10000 : limit;
+      const effectivePage = limit === 0 ? 1 : page;
 
-        if (results && Array.isArray(results)) {
-          // Filter by category if selected
-          let filteredResults = results;
-          if (selectedCategoryId) {
-            filteredResults = results.filter((item) => {
-              const matches = item.category?.id === selectedCategoryId;
-              return matches;
-            });
-          }
-
-          // Apply sorting
-          filteredResults.sort((a, b) => {
-            let valueA, valueB;
-            switch (sort) {
-              case 'price':
-                valueA = typeof a.price === 'string' ? parseFloat(a.price) : a.price;
-                valueB = typeof b.price === 'string' ? parseFloat(b.price) : b.price;
-                break;
-              case 'code':
-                valueA = a.code || '';
-                valueB = b.code || '';
-                break;
-              default: // name
-                valueA = a.name.toLowerCase();
-                valueB = b.name.toLowerCase();
-            }
-
-            if (order === 'ASC') {
-              return valueA > valueB ? 1 : -1;
-            } else {
-              return valueA < valueB ? 1 : -1;
-            }
-          });
-
-          // Apply pagination
-          const startIndex = (page - 1) * limit;
-          const endIndex = startIndex + limit;
-          const paginatedResults = filteredResults.slice(startIndex, endIndex);
-
-
-          setMaterials(paginatedResults);
-          setTotal(filteredResults.length);
-        } else {
-          setMaterials([]);
-          setTotal(0);
-        }
-      } else {
-        // If no search term, use getAllMaterials with pagination
+      if (selectedCurrency === 'ALL') {
         const params: GetMaterialsParams = {
-          page,
-          limit,
+          page: effectivePage,
+          limit: effectiveLimit,
           sort,
           order,
           categoryId: selectedCategoryId,
+          search: debouncedSearch?.trim() || undefined,
         };
         const { data, total } = await getAllMaterials(token, params);
-
         setMaterials(data);
         setTotal(total);
+      } else {
+        // При фильтре по валюте берём расширенную выборку и пагинируем на клиенте,
+        // чтобы корректно показывать только выбранные валюты.
+        const params: GetMaterialsParams = {
+          page: 1,
+          limit: 10000,
+          sort,
+          order,
+          categoryId: selectedCategoryId,
+          search: debouncedSearch?.trim() || undefined,
+        };
+        const { data } = await getAllMaterials(token, params);
+        const filteredByCurrency = data.filter(matchesCurrency);
+        if (limit === 0) {
+          setMaterials(filteredByCurrency);
+          setTotal(filteredByCurrency.length);
+        } else {
+          const startIndex = (page - 1) * limit;
+          const endIndex = startIndex + limit;
+          setMaterials(filteredByCurrency.slice(startIndex, endIndex));
+          setTotal(filteredByCurrency.length);
+        }
       }
     } catch (error) {
       console.error('Error fetching materials:', error);
@@ -163,7 +146,7 @@ export function useMaterials() {
     } finally {
       setLoading(false);
     }
-  }, [page, limit, debouncedSearch, selectedCategory, sort, order, allCategories]);
+  }, [page, limit, debouncedSearch, selectedCategory, selectedCurrency, sort, order, allCategories]);
 
   // Загружаем материалы после загрузки категорий
   useEffect(() => {
@@ -177,7 +160,7 @@ export function useMaterials() {
     if (allCategories.length > 0) {
       fetchMaterials();
     }
-  }, [page, limit, debouncedSearch, selectedCategory, sort, order, fetchMaterials]);
+  }, [page, limit, debouncedSearch, selectedCategory, selectedCurrency, sort, order, fetchMaterials]);
 
   // Custom page setter that triggers fetch
   const handlePageChange = useCallback((newPage: number) => {
@@ -200,6 +183,7 @@ export function useMaterials() {
       showToast('Материал создан!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Ошибка при создании', 'error');
+      throw err;
     }
   };
 
@@ -221,6 +205,30 @@ export function useMaterials() {
     }
   };
 
+  const handleDeleteMany = async (ids: number[]): Promise<boolean> => {
+    if (ids.length === 0) {
+      return false;
+    }
+
+    const confirmed = await showConfirm({
+      title: `Удалить ${ids.length} материал(ов)?`,
+      message: `Будут безвозвратно удалены ${ids.length} выбранных материалов. Это действие нельзя отменить.`,
+      confirmText: `Удалить (${ids.length})`,
+    });
+    if (!confirmed) return false;
+
+    try {
+      const token = localStorage.getItem('token') || '';
+      const result = await deleteMaterialsBatch(ids, token);
+      await fetchMaterials();
+      showToast(`Удалено материалов: ${result.deleted}`, 'success');
+      return true;
+    } catch (err: any) {
+      showToast(err.message || 'Ошибка при массовом удалении материалов', 'error');
+      return false;
+    }
+  };
+
   // ✅ Обновление
   const handleUpdate = async (id: number, data: UpdateMaterialRequest) => {
     try {
@@ -230,6 +238,7 @@ export function useMaterials() {
       showToast('Материал обновлён!', 'success');
     } catch (err: any) {
       showToast(err.message || 'Ошибка при обновлении материала', 'error');
+      throw err;
     }
   };
 
@@ -259,10 +268,13 @@ export function useMaterials() {
     setOrder,
     selectedCategory,
     setSelectedCategory,
+    selectedCurrency,
+    setSelectedCurrency,
     categories,
     loading,
     handleCreate,
     handleDelete,
+    handleDeleteMany,
     handleUpdate,
     fetchHistory,
     allCategories,

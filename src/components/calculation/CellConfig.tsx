@@ -7,6 +7,8 @@ import {
   Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
 import { CellConfiguration, CellType, MaterialType } from '@/types/calculation';
+import { BHA_CALCULATION_PRESETS, isBhaCellType, isKsoA12CalculationGroup } from '@/domain/calculation/bhaPresets';
+import { ALL_CELL_TYPES, STANDARD_CELL_TYPES } from '@/domain/calculation/cellTypes';
 import MaterialSearch from '@/app/dashboard/calc/[groupSlug]/[calcSlug]/components/MaterialSearch';
 import React, { useRef } from 'react';
 
@@ -14,12 +16,12 @@ interface CellConfigProps {
   cellType: CellType;
   configuration: CellConfiguration;
   onConfigurationChange: (config: CellConfiguration) => void;
+  groupSlug?: string;
 }
 
-const CELL_TYPE_GROUPS = [
-  {
-    label: 'Основные',
-    types: [
+const CORE_CELL_TYPE_GROUP = {
+  label: 'Основные',
+  types: [
       {
         value: '10kv',
         label: '10 кВ',
@@ -112,10 +114,44 @@ const CELL_TYPE_GROUPS = [
         ),
       },
     ],
-  },
-  {
-    label: 'Оборудование',
-    types: [
+};
+
+const BHA_CELL_TYPE_GROUP = {
+  label: 'BHA (КСО А12-10)',
+  types: [
+      {
+        value: 'bha_input',
+        label: BHA_CALCULATION_PRESETS.bha_input.label,
+        icon: (
+          <svg className="w-5 h-5 mr-1 text-indigo-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+          </svg>
+        ),
+      },
+      {
+        value: 'bha_transformer',
+        label: BHA_CALCULATION_PRESETS.bha_transformer.label,
+        icon: (
+          <svg className="w-5 h-5 mr-1 text-indigo-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        ),
+      },
+      {
+        value: 'bha_outgoing',
+        label: BHA_CALCULATION_PRESETS.bha_outgoing.label,
+        icon: (
+          <svg className="w-5 h-5 mr-1 text-indigo-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        ),
+      },
+    ],
+};
+
+const EQUIPMENT_CELL_TYPE_GROUP = {
+  label: 'Оборудование',
+  types: [
       {
         value: 'pu',
         label: 'ПУ',
@@ -198,8 +234,18 @@ const CELL_TYPE_GROUPS = [
         ),
       },
     ],
-  },
-];
+};
+
+function getVisibleCellTypeGroups(groupSlug?: string) {
+  if (isKsoA12CalculationGroup(groupSlug)) {
+    return [CORE_CELL_TYPE_GROUP, BHA_CELL_TYPE_GROUP, EQUIPMENT_CELL_TYPE_GROUP];
+  }
+  return [CORE_CELL_TYPE_GROUP, EQUIPMENT_CELL_TYPE_GROUP];
+}
+
+function getAllowedCellTypes(groupSlug?: string): CellType[] {
+  return isKsoA12CalculationGroup(groupSlug) ? ALL_CELL_TYPES : STANDARD_CELL_TYPES;
+}
 
 const CELL_MATERIALS: Record<CellType, { type: MaterialType; label: string }[]> = {
   '10kv': [
@@ -302,38 +348,28 @@ const CELL_MATERIALS: Record<CellType, { type: MaterialType; label: string }[]> 
     { type: 'rps', label: 'РПС' },
     { type: 'rubilnik', label: 'Рубильник' },
   ],
+  bha_input: [],
+  bha_transformer: [],
+  bha_outgoing: [],
 };
 
 export default function CellConfig({
   cellType,
   configuration,
   onConfigurationChange,
+  groupSlug,
 }: CellConfigProps) {
   const [selectedMaterialType, setSelectedMaterialType] = useState<MaterialType | null>(null);
   const buttonRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const visibleCellTypeGroups = getVisibleCellTypeGroups(groupSlug);
+  const allowedCellTypes = getAllowedCellTypes(groupSlug);
 
-  // Validate and normalize cell type
-  const validCellTypes: CellType[] = [
-    '0.4kv',
-    '10kv',
-    '20kv',
-    'rza',
-    'pu',
-    'disconnector',
-    'busbar',
-    'busbridge',
-    'switch',
-    'tn',
-    'tsn',
-    'input',
-    'section_switch',
-    'outgoing',
-  ];
-  const normalizedCellType: CellType = validCellTypes.includes(cellType as CellType)
+  const normalizedCellType: CellType = allowedCellTypes.includes(cellType as CellType)
     ? (cellType as CellType)
-    : '10kv'; // Default fallback
+    : '10kv';
 
   const [selectedCellType, setSelectedCellType] = useState<CellType>(normalizedCellType);
+  const isBhaSelected = isBhaCellType(selectedCellType);
 
   // Initialize materials if they don't exist
   useEffect(() => {
@@ -364,24 +400,29 @@ export default function CellConfig({
   }, []);
 
   useEffect(() => {
-    // Sync selectedCellType with configuration.type
-    if (configuration.type && validCellTypes.includes(configuration.type as CellType)) {
+    if (configuration.type && allowedCellTypes.includes(configuration.type as CellType)) {
       setSelectedCellType(configuration.type as CellType);
+    } else if (isBhaCellType(configuration.type) && !isKsoA12CalculationGroup(groupSlug)) {
+      setSelectedCellType('10kv');
+      onConfigurationChange({
+        ...configuration,
+        type: '10kv',
+      });
     } else {
-      // If no type is set or invalid, use the normalized cell type
       setSelectedCellType(normalizedCellType);
       onConfigurationChange({
         ...configuration,
         type: normalizedCellType,
       });
     }
-  }, [configuration.type, normalizedCellType]);
+  }, [configuration.type, normalizedCellType, groupSlug]);
 
   const handleCellTypeChange = (type: CellType) => {
     setSelectedCellType(type);
     onConfigurationChange({
       ...configuration,
       type,
+      materials: isBhaCellType(type) ? {} : configuration.materials,
     });
   };
 
@@ -447,7 +488,7 @@ export default function CellConfig({
               onClick={() => setSelectedMaterialType(materialType)}
               type="button"
               value="Добавить материал"
-              className="px-4 py-2 bg-[#3A55DF] text-white rounded-lg hover:bg-[#2A45CF] transition-colors cursor-pointer"
+              className="px-3 py-1.5 bg-[#8eba1e] text-white rounded-lg hover:bg-[#7aa31a] transition-colors cursor-pointer text-xs"
             />
             {selectedMaterialType === materialType && (
               <MaterialSearch
@@ -466,7 +507,7 @@ export default function CellConfig({
             materials.map((material, index) => (
               <div
                 key={`${materialType}-${material.id}-${index}`}
-                className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg"
+                className="flex items-center justify-between bg-[#8eba1e]/5 px-3 py-2 rounded-lg border border-[#8eba1e]/15"
               >
                 <div className="flex-1">
                   <div className="text-sm font-medium text-gray-900">{material.name}</div>
@@ -491,23 +532,23 @@ export default function CellConfig({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
         <span className="text-sm font-medium text-gray-700 block mb-2">Тип ячейки:</span>
         <div className="flex flex-col md:flex-row md:space-x-8 space-y-4 md:space-y-0">
-          {CELL_TYPE_GROUPS.map((group) => (
+          {visibleCellTypeGroups.map((group) => (
             <div key={group.label} className="flex-1">
-              <div className="text-xs text-gray-400 mb-1 pl-1">{group.label}</div>
+              <div className="text-xs text-[#8eba1e] mb-1 pl-1 font-semibold">{group.label}</div>
               <div className="flex flex-wrap gap-2">
                 {group.types.map((type) => (
                   <button
                     key={type.value}
                     onClick={() => handleCellTypeChange(type.value as CellType)}
-                    className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium border transition-colors shadow-sm
+                    className={`flex items-center px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors shadow-sm
                       ${
                         selectedCellType === (type.value as CellType)
-                          ? 'bg-[#3A55DF] text-white border-[#3A55DF] shadow-md'
-                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+                          ? 'bg-[#8eba1e] text-white border-[#8eba1e] shadow-md'
+                          : 'bg-white text-gray-700 border-gray-200 hover:bg-[#8eba1e]/10'
                       }
                     `}
                   >
@@ -520,18 +561,22 @@ export default function CellConfig({
           ))}
         </div>
       </div>
-      <div className="text-sm text-gray-500 font-semibold mt-2">
-        Текущий тип ячейки:{' '}
-        {
-          CELL_TYPE_GROUPS.flatMap((g) => g.types).find((t) => t.value === selectedCellType)
-            ?.label || selectedCellType
-        }
-      </div>
-      <div className="space-y-6">
-        {CELL_MATERIALS[selectedCellType]?.map(({ type, label }) => (
-          <div key={type}>{renderMaterialInput(label, type, configuration.materials[type])}</div>
-        ))}
-      </div>
+      {!isBhaSelected && (
+        <div className="text-sm text-gray-600 font-semibold mt-1">
+          Текущий тип ячейки:{' '}
+          {
+            visibleCellTypeGroups.flatMap((g) => g.types).find((t) => t.value === selectedCellType)
+              ?.label || selectedCellType
+          }
+        </div>
+      )}
+      {!isBhaSelected && (
+        <div className="space-y-4">
+          {CELL_MATERIALS[selectedCellType]?.map(({ type, label }) => (
+            <div key={type}>{renderMaterialInput(label, type, configuration.materials[type])}</div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

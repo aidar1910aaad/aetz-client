@@ -48,9 +48,9 @@ export const SingleBusbarBridge: React.FC<SingleBusbarBridgeProps> = ({
   const totalPrice = bridgePrice * bridge.quantity;
 
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-md p-4 mb-4">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-medium text-gray-900">№{index + 1} Шинный мост</h4>
+    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <h4 className="text-sm font-semibold text-gray-900">Мост №{index + 1}</h4>
         {canRemove && (
           <button
             onClick={() => onRemove(bridge.id)}
@@ -75,7 +75,7 @@ export const SingleBusbarBridge: React.FC<SingleBusbarBridgeProps> = ({
             type="number"
             value={bridge.length}
             onChange={(e) => onUpdate(bridge.id, 'length', Number(e.target.value))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 transition-colors focus:border-[#8eba1e] focus:ring-2 focus:ring-[#8eba1e]/20"
             placeholder="Введите длину"
             min="0"
             step="0.1"
@@ -87,7 +87,7 @@ export const SingleBusbarBridge: React.FC<SingleBusbarBridgeProps> = ({
             type="number"
             value={bridge.quantity}
             onChange={(e) => onUpdate(bridge.id, 'quantity', Number(e.target.value))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 transition-colors focus:border-[#8eba1e] focus:ring-2 focus:ring-[#8eba1e]/20"
             placeholder="Количество"
             min="1"
             step="1"

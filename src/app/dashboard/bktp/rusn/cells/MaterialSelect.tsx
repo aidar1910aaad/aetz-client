@@ -1,7 +1,8 @@
 import { Material } from '@/api/material';
 import { RusnCell } from '@/store/useRusnStore';
-import { getMaterialArrayForField } from '@/utils/rusnMaterials';
-import { RusnMaterials } from '@/utils/rusnMaterials';
+import { getMaterialArrayForField, RusnMaterials } from '@/utils/rusnMaterials';
+import { CellFormField, inputClassName } from '@/components/bktp/shared/CellFormField';
+import { Select } from '@/components/ui/select';
 
 interface MaterialSelectProps {
   field: keyof RusnCell;
@@ -21,21 +22,22 @@ export default function MaterialSelect({
   onUpdate,
 }: MaterialSelectProps) {
   const materialList = getMaterialArrayForField(materials, field, cell.purpose);
+  const selectedMaterial = materialList.find((m) => m.id.toString() === selectedId);
 
   return (
-    <div className="flex flex-col gap-2">
-      <label className="text-sm font-medium text-gray-700">{label}</label>
-      <select
-        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-        value={selectedId || 'none'}
+    <CellFormField label={label}>
+      <Select
+        className={inputClassName}
+        value={selectedId || ''}
+        title={selectedMaterial?.name}
         onChange={(e) => {
-          if (e.target.value === 'none') {
-            // Убираем выбранный материал
+          if (!e.target.value) {
             onUpdate(cell.id, field, undefined);
-            
-            // Для секционных разъединителей КСО 366 также очищаем cellType
-            if (cell.purpose === 'Секционный разьединитель' && 
-                (cell.cellType === 'Камера КСО 366-13' || cell.cellType === 'Камера КСО 366 ШМР 14, 15')) {
+            if (
+              cell.purpose === 'Секционный разьединитель' &&
+              (cell.cellType === 'Камера КСО 366-13' ||
+                cell.cellType === 'Камера КСО 366 ШМР 14, 15')
+            ) {
               onUpdate(cell.id, 'cellType', '');
               onUpdate(cell.id, 'totalPrice', 0);
             }
@@ -51,14 +53,18 @@ export default function MaterialSelect({
           }
         }}
       >
-        <option value="">Выберите {label.toLowerCase()}</option>
-        <option value="none">Нет</option>
+        <option value="">— Не выбрано —</option>
         {materialList.map((material) => (
-          <option key={material.id} value={material.id.toString()}>
+          <option key={material.id} value={material.id.toString()} title={material.name}>
             {material.name}
           </option>
         ))}
-      </select>
-    </div>
+      </Select>
+      {selectedMaterial && (
+        <p className="mt-1 text-[10px] text-gray-500 line-clamp-2" title={selectedMaterial.name}>
+          {selectedMaterial.name}
+        </p>
+      )}
+    </CellFormField>
   );
 }

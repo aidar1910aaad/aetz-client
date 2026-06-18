@@ -1,20 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { getMaterialHistoryList, MaterialHistoryWithMaterial } from '@/api/material/exports';
+import { getAllUsers, User } from '@/api/users';
+import { buildUserLookup, resolveChangedByAuthor } from '@/utils/userDisplayName';
 
 export interface MaterialHistoryStats {
   recentChanges: MaterialHistoryWithMaterial[];
-  allChanges: MaterialHistoryWithMaterial[]; // Все изменения для фильтрации
+  allChanges: MaterialHistoryWithMaterial[];
   loading: boolean;
   error: string | null;
+  resolveAuthor: (changedBy: string) => { name: string; login: string | null };
 }
 
 export function useMaterialHistory() {
-  const [stats, setStats] = useState<MaterialHistoryStats>({
+  const [stats, setStats] = useState<Omit<MaterialHistoryStats, 'resolveAuthor'>>({
     recentChanges: [],
     allChanges: [],
     loading: true,
     error: null,
   });
+  const [users, setUsers] = useState<User[]>([]);
+
+  const userLookup = useMemo(() => buildUserLookup(users), [users]);
+
+  const resolveAuthor = useCallback(
+    (changedBy: string) => resolveChangedByAuthor(changedBy, userLookup),
+    [userLookup]
+  );
 
   useEffect(() => {
     const fetchMaterialHistory = async () => {
@@ -22,23 +33,26 @@ export function useMaterialHistory() {
         const token = localStorage.getItem('token');
         if (!token) return;
 
-        setStats(prev => ({ ...prev, loading: true, error: null }));
+        setStats((prev) => ({ ...prev, loading: true, error: null }));
 
-        // Получаем все изменения материалов через новый API
-        const historyResponse = await getMaterialHistoryList(token, { page: 1, limit: 100 });
-        
+        const [historyResponse, usersList] = await Promise.all([
+          getMaterialHistoryList(token, { page: 1, limit: 100 }),
+          getAllUsers(token).catch(() => []),
+        ]);
+
+        setUsers(usersList);
+
         const allChanges = historyResponse.data || [];
-        // Берем только первые 4 изменения для отображения по умолчанию
         const recentChanges = allChanges.slice(0, 4);
 
         setStats({
-          recentChanges: recentChanges,
-          allChanges: allChanges,
+          recentChanges,
+          allChanges,
           loading: false,
           error: null,
         });
       } catch (error) {
-        setStats(prev => ({
+        setStats((prev) => ({
           ...prev,
           loading: false,
           error: error instanceof Error ? error.message : 'Неизвестная ошибка',
@@ -49,6 +63,8 @@ export function useMaterialHistory() {
     fetchMaterialHistory();
   }, []);
 
-  return stats;
+  return {
+    ...stats,
+    resolveAuthor,
+  };
 }
-

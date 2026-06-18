@@ -61,6 +61,34 @@ export default function CellCalculationDetails({
 
   const currentCalc = calculations.cell.find((c: any) => c.name === currentCalculation);
 
+  if (cell.bhaMode) {
+    return (
+      <div className="bg-white rounded-lg shadow overflow-hidden mt-4">
+        <div className="p-4 border-b border-gray-100">
+          <p className="text-sm text-gray-600">
+            Режим BHA: используется калькуляция{' '}
+            <span className="font-medium text-gray-900">{currentCalculation || 'не найдена'}</span>
+          </p>
+        </div>
+        {currentCalc && (
+          <div className="p-4">
+            <BreakerCalculation
+              cell={cell}
+              materials={materials}
+              calculation={{
+                data: {
+                  categories: currentCalc.data.categories,
+                  calculation: currentCalc.data.calculation,
+                  cellConfig: currentCalc.data.cellConfig,
+                },
+              }}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // Определяем какие кнопки показывать на основе найденных калькуляций
   const hasBreakerCalculation = foundCalculations?.breakerCalculation;
   const hasRzaCalculation = foundCalculations?.rzaCalculation;
@@ -159,21 +187,7 @@ export default function CellCalculationDetails({
           calculation={{
             data: {
               categories: foundCalculations.breakerCalculation.data.categories,
-              calculation: {
-                manufacturingHours:
-                  foundCalculations.breakerCalculation.data.calculation?.manufacturingHours || 4,
-                hourlyRate:
-                  foundCalculations.breakerCalculation.data.calculation?.hourlyRate || 1000,
-                overheadPercentage:
-                  foundCalculations.breakerCalculation.data.calculation?.overheadPercentage || 15,
-                adminPercentage:
-                  foundCalculations.breakerCalculation.data.calculation?.adminPercentage || 10,
-                plannedProfitPercentage:
-                  foundCalculations.breakerCalculation.data.calculation?.plannedProfitPercentage ||
-                  20,
-                ndsPercentage:
-                  foundCalculations.breakerCalculation.data.calculation?.ndsPercentage || 12,
-              },
+              calculation: foundCalculations.breakerCalculation.data.calculation,
             },
             cellConfig: {
               type: 'switch',
@@ -190,19 +204,7 @@ export default function CellCalculationDetails({
           calculation={{
             data: {
               categories: foundCalculations.rzaCalculation.data.categories,
-              calculation: {
-                manufacturingHours:
-                  foundCalculations.rzaCalculation.data.calculation?.manufacturingHours || 4,
-                hourlyRate: foundCalculations.rzaCalculation.data.calculation?.hourlyRate || 1000,
-                overheadPercentage:
-                  foundCalculations.rzaCalculation.data.calculation?.overheadPercentage || 15,
-                adminPercentage:
-                  foundCalculations.rzaCalculation.data.calculation?.adminPercentage || 10,
-                plannedProfitPercentage:
-                  foundCalculations.rzaCalculation.data.calculation?.plannedProfitPercentage || 20,
-                ndsPercentage:
-                  foundCalculations.rzaCalculation.data.calculation?.ndsPercentage || 12,
-              },
+              calculation: foundCalculations.rzaCalculation.data.calculation,
             },
           }}
         />
@@ -216,23 +218,7 @@ export default function CellCalculationDetails({
           calculation={{
             data: {
               categories: foundCalculations.disconnectorCalculation.data.categories,
-              calculation: {
-                manufacturingHours:
-                  foundCalculations.disconnectorCalculation.data.calculation?.manufacturingHours ||
-                  4,
-                hourlyRate:
-                  foundCalculations.disconnectorCalculation.data.calculation?.hourlyRate || 1000,
-                overheadPercentage:
-                  foundCalculations.disconnectorCalculation.data.calculation?.overheadPercentage ||
-                  15,
-                adminPercentage:
-                  foundCalculations.disconnectorCalculation.data.calculation?.adminPercentage || 10,
-                plannedProfitPercentage:
-                  foundCalculations.disconnectorCalculation.data.calculation
-                    ?.plannedProfitPercentage || 20,
-                ndsPercentage:
-                  foundCalculations.disconnectorCalculation.data.calculation?.ndsPercentage || 12,
-              },
+              calculation: foundCalculations.disconnectorCalculation.data.calculation,
               cellConfig: {
                 type: 'disconnector',
               },
@@ -249,19 +235,7 @@ export default function CellCalculationDetails({
           calculation={{
             data: {
               categories: foundCalculations.puCalculation.data.categories,
-              calculation: {
-                manufacturingHours:
-                  foundCalculations.puCalculation.data.calculation?.manufacturingHours || 4,
-                hourlyRate: foundCalculations.puCalculation.data.calculation?.hourlyRate || 1000,
-                overheadPercentage:
-                  foundCalculations.puCalculation.data.calculation?.overheadPercentage || 15,
-                adminPercentage:
-                  foundCalculations.puCalculation.data.calculation?.adminPercentage || 10,
-                plannedProfitPercentage:
-                  foundCalculations.puCalculation.data.calculation?.plannedProfitPercentage || 20,
-                ndsPercentage:
-                  foundCalculations.puCalculation.data.calculation?.ndsPercentage || 12,
-              },
+              calculation: foundCalculations.puCalculation.data.calculation,
               cellConfig: {
                 type: 'pu',
               },
@@ -278,19 +252,7 @@ export default function CellCalculationDetails({
           calculation={{
             data: {
               categories: foundCalculations.tsnCalculation.data.categories,
-              calculation: {
-                manufacturingHours:
-                  foundCalculations.tsnCalculation.data.calculation?.manufacturingHours || 4,
-                hourlyRate: foundCalculations.tsnCalculation.data.calculation?.hourlyRate || 1000,
-                overheadPercentage:
-                  foundCalculations.tsnCalculation.data.calculation?.overheadPercentage || 15,
-                adminPercentage:
-                  foundCalculations.tsnCalculation.data.calculation?.adminPercentage || 10,
-                plannedProfitPercentage:
-                  foundCalculations.tsnCalculation.data.calculation?.plannedProfitPercentage || 20,
-                ndsPercentage:
-                  foundCalculations.tsnCalculation.data.calculation?.ndsPercentage || 12,
-              },
+              calculation: foundCalculations.tsnCalculation.data.calculation,
               cellConfig: {
                 type: 'tsn',
               },
@@ -307,19 +269,7 @@ export default function CellCalculationDetails({
           calculation={{
             data: {
               categories: foundCalculations.tnCalculation.data.categories,
-              calculation: {
-                manufacturingHours:
-                  foundCalculations.tnCalculation.data.calculation?.manufacturingHours || 4,
-                hourlyRate: foundCalculations.tnCalculation.data.calculation?.hourlyRate || 1000,
-                overheadPercentage:
-                  foundCalculations.tnCalculation.data.calculation?.overheadPercentage || 15,
-                adminPercentage:
-                  foundCalculations.tnCalculation.data.calculation?.adminPercentage || 10,
-                plannedProfitPercentage:
-                  foundCalculations.tnCalculation.data.calculation?.plannedProfitPercentage || 20,
-                ndsPercentage:
-                  foundCalculations.tnCalculation.data.calculation?.ndsPercentage || 12,
-              },
+              calculation: foundCalculations.tnCalculation.data.calculation,
               cellConfig: {
                 type: 'tn',
               },

@@ -21,7 +21,10 @@ export type CellType =
   | 'tsn'
   | 'input'
   | 'section_switch'
-  | 'outgoing';
+  | 'outgoing'
+  | 'bha_input'
+  | 'bha_transformer'
+  | 'bha_outgoing';
 export type MaterialType =
   | 'switch'
   | 'rza'

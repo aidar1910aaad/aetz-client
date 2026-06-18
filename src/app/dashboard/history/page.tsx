@@ -1,40 +1,63 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { getMaterialHistoryList, MaterialHistoryWithMaterial, GetMaterialHistoryParams } from '@/api/material/exports';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { getAuditLogs, AuditLogItem } from '@/api/auditLogs';
 import HistoryHeader from './components/HistoryHeader';
 import HistoryFilters, { HistoryFiltersState } from './components/HistoryFilters';
 import HistoryTable from './components/HistoryTable';
 import HistoryPagination from './components/HistoryPagination';
+import PageLoader from '@/shared/loader/PageLoader';
 
-export default function HistoryPage() {
+function HistoryPageContent() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
   const isInitialLoad = useRef<boolean>(true);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   
   const [filters, setFilters] = useState<HistoryFiltersState>({
-    search: '',
-    materialId: '',
-    fieldChanged: '',
-    changedBy: '',
-    dateFrom: '',
-    dateTo: '',
+    entityType: '',
+    action: '',
+    changedBy: searchParams.get('changedBy') || '',
   });
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
-  const [history, setHistory] = useState<MaterialHistoryWithMaterial[]>([]);
+  const [page, setPage] = useState(Number(searchParams.get('page') || 1));
+  const [limit, setLimit] = useState(Number(searchParams.get('limit') || 50));
+  const [history, setHistory] = useState<AuditLogItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Сохраняем предыдущие значения, чтобы они не пропадали во время загрузки
   const previousTotalRef = useRef<number>(0);
-  const previousHistoryRef = useRef<MaterialHistoryWithMaterial[]>([]);
+  const previousHistoryRef = useRef<AuditLogItem[]>([]);
 
-  // Функция загрузки истории изменений
+  useEffect(() => {
+    setFilters({
+      entityType: (searchParams.get('entityType') as HistoryFiltersState['entityType']) || '',
+      action: (searchParams.get('action') as HistoryFiltersState['action']) || '',
+      changedBy: searchParams.get('changedBy') || '',
+    });
+    setPage(Number(searchParams.get('page') || 1));
+    setLimit(Number(searchParams.get('limit') || 50));
+  }, [searchParams]);
+
+  const syncQueryParams = useCallback(
+    (nextFilters: HistoryFiltersState, nextPage: number, nextLimit: number) => {
+      const params = new URLSearchParams();
+      if (nextFilters.entityType) params.set('entityType', nextFilters.entityType);
+      if (nextFilters.action) params.set('action', nextFilters.action);
+      if (nextFilters.changedBy) params.set('changedBy', nextFilters.changedBy);
+      if (nextPage > 1) params.set('page', String(nextPage));
+      if (nextLimit !== 50) params.set('limit', String(nextLimit));
+      const queryString = params.toString();
+      router.replace(queryString ? `${pathname}?${queryString}` : pathname);
+    },
+    [router, pathname]
+  );
+
   const fetchHistory = useCallback(async () => {
     try {
-      // Сохраняем текущую позицию скролла перед загрузкой (только если это не первая загрузка)
       if (!isInitialLoad.current && scrollContainerRef.current) {
         scrollPositionRef.current = scrollContainerRef.current.scrollTop;
       }
@@ -47,51 +70,16 @@ export default function HistoryPage() {
         return;
       }
 
-      // Формируем параметры запроса
-      const params: GetMaterialHistoryParams = {
+      const data = await getAuditLogs(token, {
         page,
         limit,
-      };
-
-      if (filters.search) {
-        params.search = filters.search;
-      }
-      if (filters.materialId) {
-        params.materialId = parseInt(filters.materialId, 10);
-        if (isNaN(params.materialId)) {
-          params.materialId = undefined;
-        }
-      }
-      if (filters.fieldChanged) {
-        params.fieldChanged = filters.fieldChanged;
-      }
-      if (filters.changedBy) {
-        params.changedBy = filters.changedBy;
-      }
-      if (filters.dateFrom) {
-        params.dateFrom = filters.dateFrom;
-      }
-      if (filters.dateTo) {
-        params.dateTo = filters.dateTo;
-      }
-
-      const data = await getMaterialHistoryList(token, params);
-      console.log('📋 Загруженная история изменений:', data);
+        entityType: filters.entityType || undefined,
+        action: filters.action || undefined,
+        changedBy: filters.changedBy || undefined,
+      });
       const newHistory = data.data || [];
       const newTotal = data.total || 0;
-      
-      // Проверяем данные на наличие materialId
-      if (newHistory.length > 0) {
-        console.log('🔍 Проверка данных истории:', {
-          firstItem: newHistory[0],
-          hasMaterialId: newHistory[0].materialId !== undefined,
-          materialId: newHistory[0].materialId,
-          hasMaterial: !!newHistory[0].material,
-          materialObject: newHistory[0].material,
-        });
-      }
-      
-      // Всегда обновляем данные, если они получены
+
       setHistory(newHistory);
       setTotal(newTotal);
       
@@ -108,7 +96,6 @@ export default function HistoryPage() {
     } finally {
       setLoading(false);
       
-      // Восстанавливаем позицию скролла после загрузки (только если это не первая загрузка)
       if (!isInitialLoad.current) {
         requestAnimationFrame(() => {
           if (scrollContainerRef.current && scrollPositionRef.current > 0) {
@@ -126,12 +113,10 @@ export default function HistoryPage() {
     fetchHistory();
   }, [fetchHistory]);
 
-  // Сбрасываем страницу на 1 при изменении фильтров
   useEffect(() => {
-    setPage(1);
-  }, [filters.search, filters.materialId, filters.fieldChanged, filters.changedBy, filters.dateFrom, filters.dateTo]);
+    syncQueryParams(filters, page, limit);
+  }, [filters, page, limit, syncQueryParams]);
 
-  // Синхронизируем значения с ref для сохранения во время загрузки
   useEffect(() => {
     if (total > 0) {
       previousTotalRef.current = total;
@@ -147,36 +132,45 @@ export default function HistoryPage() {
   // Вычисляем общее количество страниц
   const totalPages = Math.ceil(total / limit);
 
+  const handleFiltersChange = (nextFilters: HistoryFiltersState) => {
+    setFilters(nextFilters);
+    setPage(1);
+  };
+
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setPage(newPage);
-      // Прокручиваем вверх при смене страницы
       if (scrollContainerRef.current) {
         scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
       }
     }
   };
 
-  return (
-    <div 
-      ref={scrollContainerRef}
-      className="h-[calc(100vh-64px)] bg-white overflow-y-auto"
-    >
-      <div className="p-6">
-        <HistoryHeader 
-          total={total || previousTotalRef.current} 
-          showing={history.length || previousHistoryRef.current.length} 
-          loading={loading} 
-        />
+  const handleLimitChange = (nextLimit: number) => {
+    setLimit(nextLimit);
+    setPage(1);
+  };
 
+  return (
+    <div
+      ref={scrollContainerRef}
+      className="h-[calc(100vh-64px)] overflow-y-auto bg-gray-50"
+    >
+      <HistoryHeader
+        total={total || previousTotalRef.current}
+        showing={history.length || previousHistoryRef.current.length}
+        loading={loading}
+      />
+
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
         <HistoryFilters
           filters={filters}
-          onFiltersChange={setFilters}
+          onFiltersChange={handleFiltersChange}
           onRefresh={fetchHistory}
           loading={loading}
         />
 
-        <HistoryTable history={history} loading={loading} error={error} />
+        <HistoryTable history={history} loading={loading} error={error} onRetry={fetchHistory} />
 
         {!loading && !error && history.length > 0 && (
           <HistoryPagination
@@ -185,9 +179,18 @@ export default function HistoryPage() {
             total={total}
             limit={limit}
             onPageChange={handlePageChange}
+            onLimitChange={handleLimitChange}
           />
         )}
       </div>
     </div>
+  );
+}
+
+export default function HistoryPage() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <HistoryPageContent />
+    </Suspense>
   );
 }

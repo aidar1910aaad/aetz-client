@@ -1,4 +1,5 @@
-import { Plus, X, Eye, EyeOff } from 'lucide-react';
+import { X, Eye, EyeOff } from 'lucide-react';
+import { Select } from '@/components/ui/select';
 
 interface Category {
   id: string;
@@ -90,16 +91,15 @@ export function RunnSettingsSection({
       {/* Add Category Dropdown */}
       {availableCategories.length > 0 && (
         <div className="relative">
-          <select
+          <Select
             onChange={(e) => {
               const categoryId = e.target.value;
               if (categoryId) {
                 onAddCategory(type, categoryId);
-                e.target.value = '';
               }
             }}
             className="w-full p-2 border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#3A55DF] focus:border-transparent"
-            defaultValue=""
+            value=""
           >
             <option value="" disabled>
               Выберите
@@ -112,10 +112,7 @@ export function RunnSettingsSection({
                 {category.name}
               </option>
             ))}
-          </select>
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-            <Plus className="w-4 h-4 text-gray-400" />
-          </div>
+          </Select>
         </div>
       )}
     </div>

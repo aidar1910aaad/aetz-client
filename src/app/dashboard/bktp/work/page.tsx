@@ -5,6 +5,7 @@ import Breadcrumbs from '@/components/Breadcrumbs/Breadcrumbs';
 import { useWorksStore } from '@/store/useWorksStore';
 import { useWorkVisibilityStore } from '@/store/useWorkVisibilityStore';
 import { useBmzStore } from '@/store/useBmzStore';
+import { useWorkPricesStore } from '@/store/useWorkPricesStore';
 import { useAutoWorksCalculation } from '@/hooks/useAutoWorksCalculation';
 import WorksTable from '@/components/FinalReview/WorksTable';
 import WorkTypesManager from './components/WorkTypesManager';
@@ -45,6 +46,7 @@ export default function WorkPage() {
   } = useWorkVisibilityStore();
 
   const bmzStore = useBmzStore();
+  const workPrices = useWorkPricesStore();
 
   // Ref для отслеживания предыдущих значений BMZ
   const prevBmzValues = useRef({ length: 0, width: 0 });
@@ -216,7 +218,7 @@ export default function WorkPage() {
     console.log('handleFoundationTabOpen: Площадь фундамента:', areaM2);
     
     const foundationWorkName = 'Монтаж фундамента (с материалами) за м²';
-    const workPricePerM2 = 50000;
+    const workPricePerM2 = workPrices.foundationPricePerM2;
     const totalWorkCost = areaM2 * workPricePerM2;
     
     // Получаем актуальное состояние из store
@@ -255,7 +257,7 @@ export default function WorkPage() {
       const currentState = useWorksStore.getState();
       console.log('handleFoundationTabOpen: Состояние после обновления:', currentState.selected[foundationWorkName]);
     }, 100);
-  }, [toggleWork, updateWorkCount, setWorksList]);
+  }, [toggleWork, updateWorkCount, setWorksList, workPrices.foundationPricePerM2]);
   
   const handleFoundationTabClose = useCallback(() => {
     setIsFoundationTabOpen(false);
@@ -273,10 +275,26 @@ export default function WorkPage() {
     console.log('handleCommissioningTabOpen: Открываем вкладку пусконаладочных работ');
     
     const commissioningWorkName = 'Пусконаладочные работы';
+    const commissioningTotal =
+      workPrices.labKtpTpRpSwitchOn +
+      workPrices.labRelaySettingsCalculation +
+      workPrices.labComprehensiveTestTwoTransformer;
     
     // Получаем актуальное состояние из store
     const currentState = useWorksStore.getState();
     const currentWork = currentState.selected[commissioningWorkName];
+    const updatedWorksList = currentState.worksList.map(work => {
+      if (work.name === commissioningWorkName) {
+        return {
+          ...work,
+          price: commissioningTotal,
+          unit: 'раб'
+        };
+      }
+      return work;
+    });
+    
+    setWorksList(updatedWorksList);
     
     console.log('handleCommissioningTabOpen: Текущее состояние selected:', currentWork);
     if (!currentWork?.checked) {
@@ -291,7 +309,13 @@ export default function WorkPage() {
       const currentState = useWorksStore.getState();
       console.log('handleCommissioningTabOpen: Состояние после обновления:', currentState.selected[commissioningWorkName]);
     }, 100);
-  }, [toggleWork]);
+  }, [
+    toggleWork,
+    setWorksList,
+    workPrices.labKtpTpRpSwitchOn,
+    workPrices.labRelaySettingsCalculation,
+    workPrices.labComprehensiveTestTwoTransformer
+  ]);
   
   const handleCommissioningTabClose = useCallback(() => {
     setIsCommissioningTabOpen(false);
@@ -350,7 +374,7 @@ export default function WorkPage() {
     
     console.log('handleFoundationWorkSelect: Площадь фундамента:', areaM2);
     
-    const workPricePerM2 = 50000;
+    const workPricePerM2 = workPrices.foundationPricePerM2;
     const totalWorkCost = areaM2 * workPricePerM2;
     
     // Обновляем цену работы в worksList на итоговую сумму
@@ -385,7 +409,7 @@ export default function WorkPage() {
       const currentState = useWorksStore.getState();
       console.log('handleFoundationWorkSelect: Состояние после обновления:', currentState.selected[foundationWorkName]);
     }, 100);
-  }, [selected, toggleWork, updateWorkCount, setWorksList]);
+  }, [selected, toggleWork, updateWorkCount, setWorksList, workPrices.foundationPricePerM2]);
 
   return (
     <div className="h-[calc(100vh-64px)] bg-white flex flex-col">

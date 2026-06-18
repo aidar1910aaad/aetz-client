@@ -13,6 +13,11 @@ import BmzAreaPriceModal from './components/modals/BmzAreaPriceModal';
 import BmzEquipmentModal from './components/modals/BmzEquipmentModal';
 import RoleGuard from '@/components/common/RoleGuard';
 import { UserRole } from '@/types/user';
+import PageLoader from '@/shared/loader/PageLoader';
+import {
+  areaPriceRangesOverlap,
+  isSameAreaPriceRange,
+} from '@/utils/bmzAreaPriceRange';
 
 export default function BmzSettingsPage() {
   const [settings, setSettings] = useState<BmzSettings | null>(null);
@@ -57,29 +62,19 @@ export default function BmzSettingsPage() {
         return;
       }
 
-      // Проверяем пересечение с существующими диапазонами
-      const hasOverlap = settings.areaPriceRanges.some((range) => {
-        // Пропускаем текущий диапазон при редактировании
-        if (
-          editingPrice &&
-          range.minArea === editingPrice.minArea &&
-          range.maxArea === editingPrice.maxArea &&
-          range.minWallThickness === editingPrice.minWallThickness
-        ) {
-          return false;
-        }
+      if ((data.minHeight ?? 0) >= (data.maxHeight ?? 0)) {
+        showToast('Минимальная высота должна быть меньше максимальной', 'error');
+        return;
+      }
 
-        // Проверяем пересечение по площади и толщине стен
-        return (
-          range.minWallThickness === data.minWallThickness &&
-          ((data.minArea < range.maxArea && data.maxArea > range.minArea) ||
-            (range.minArea < data.maxArea && range.maxArea > data.minArea))
-        );
+      const hasOverlap = settings.areaPriceRanges.some((range) => {
+        if (editingPrice && isSameAreaPriceRange(range, editingPrice)) return false;
+        return areaPriceRangesOverlap(data, range);
       });
 
       if (hasOverlap) {
         showToast(
-          'Диапазон пересекается с существующим диапазоном. Пожалуйста, сначала удалите существующий диапазон.',
+          'Диапазон пересекается с существующим. Сначала удалите конфликтующий диапазон.',
           'error'
         );
         return;
@@ -87,11 +82,7 @@ export default function BmzSettingsPage() {
 
       const updatedRanges = editingPrice
         ? settings.areaPriceRanges.map((range) =>
-            range.minArea === editingPrice.minArea &&
-            range.maxArea === editingPrice.maxArea &&
-            range.minWallThickness === editingPrice.minWallThickness
-              ? data
-              : range
+            isSameAreaPriceRange(range, editingPrice) ? data : range
           )
         : [...settings.areaPriceRanges, data];
 
@@ -164,7 +155,11 @@ export default function BmzSettingsPage() {
   };
 
   if (!settings) {
-    return <div>Загрузка...</div>;
+    return (
+      <div className="h-[calc(100vh-65px)]">
+        <PageLoader inline />
+      </div>
+    );
   }
 
   return (
@@ -197,7 +192,7 @@ export default function BmzSettingsPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                 </svg>
               </div>
-              <h2 className="text-lg font-semibold text-[#8eba1e]">Диапазоны цен по площади</h2>
+              <h2 className="text-lg font-semibold text-[#8eba1e]">Диапазоны цен по площади и высоте</h2>
             </div>
             <BmzAreaPriceTable
               areaPriceRanges={settings.areaPriceRanges}

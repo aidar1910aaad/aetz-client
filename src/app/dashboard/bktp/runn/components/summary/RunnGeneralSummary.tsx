@@ -2,10 +2,9 @@
 
 import React from 'react';
 import { useRunnStore } from '@/store/useRunnStore';
-import { useCellSummariesStore } from '@/store/useCellSummariesStore';
 import { formatCurrency } from '@/utils/calculationUtils';
 import { getPanelNameForBreaker } from '@/utils/panelNameUtils';
-import type { RunnCell } from '@/store/useRunnStore';
+import type { RunnCell, RunnCellSummary } from '@/store/useRunnStore';
 
 interface RunnGeneralSummaryProps {
   cellConfigs: RunnCell[];
@@ -24,8 +23,7 @@ export default function RunnGeneralSummary({
   outgoingCalculation,
   runnMaterials
 }: RunnGeneralSummaryProps) {
-  const { busbarSummary, busBridgeSummaries } = useRunnStore();
-  const { cellSummaries } = useCellSummariesStore();
+  const { cellSummaries, busbarSummary, busBridgeSummaries } = useRunnStore();
 
   if (!cellConfigs || cellConfigs.length === 0) {
     return null;

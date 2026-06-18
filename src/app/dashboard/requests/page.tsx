@@ -7,6 +7,7 @@ import { getAllApplications } from '@/api/requests';
 import { getAllUsers, User as UserType } from '@/api/users';
 import Pagination from '@/shared/components/Pagination';
 import { showToast } from '@/shared/modals/ToastProvider';
+import PageLoader from '@/shared/loader/PageLoader';
 
 interface Request {
   id: number;
@@ -24,6 +25,9 @@ interface Request {
   };
   createdAt: string;
   updatedAt: string;
+  data?: {
+    originalBidId?: number;
+  };
 }
 
 function RequestsPageContent() {
@@ -603,11 +607,8 @@ function RequestsPageContent() {
 
         {/* Table Section */}
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#8eba1e] mx-auto mb-4"></div>
-              <p className="text-gray-600">Загрузка заявок...</p>
-            </div>
+          <div className="flex min-h-[200px] items-center justify-center rounded-xl border border-gray-200 bg-white">
+            <PageLoader size="compact" message="Загрузка заявок..." />
           </div>
         ) : error ? (
           <div className="flex items-center justify-center h-64">
@@ -655,9 +656,20 @@ function RequestsPageContent() {
                         <td className="px-6 py-4 text-gray-700 text-right">{formatDate(req.date)}</td>
                         <td className="px-6 py-4 font-medium text-gray-900 text-right">{req.client}</td>
                         <td className="px-6 py-4 text-right">
-                          <span className="px-3 py-1 rounded-full text-xs bg-[#8eba1e]/10 text-[#8eba1e] font-medium">
-                            {req.type}
-                          </span>
+                          <div className="flex items-center justify-end gap-2">
+                            <span className="px-3 py-1 rounded-full text-xs bg-[#8eba1e]/10 text-[#8eba1e] font-medium">
+                              {req.type}
+                            </span>
+                            {req.data?.originalBidId ? (
+                              <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700 font-medium">
+                                Версия
+                              </span>
+                            ) : (
+                              <span className="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600 font-medium">
+                                База
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 font-semibold text-[#8eba1e] text-right">
                           {formatAmount(req.totalAmount)}
@@ -733,11 +745,8 @@ function RequestsPageContent() {
 export default function RequestsPage() {
   return (
     <Suspense fallback={
-      <div className="h-[calc(100vh-110px)] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#8eba1e] mx-auto mb-4"></div>
-          <p className="text-gray-600">Загрузка...</p>
-        </div>
+      <div className="h-[calc(100vh-110px)]">
+        <PageLoader inline />
       </div>
     }>
       <RequestsPageContent />

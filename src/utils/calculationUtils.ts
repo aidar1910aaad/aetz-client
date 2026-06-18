@@ -1,3 +1,5 @@
+import { calculateRollup } from './calculationRollup';
+
 export interface CalculationData {
   hourlyRate: number;
   manufacturingHours?: number;
@@ -26,29 +28,7 @@ export const calculateCost = (
   calculationData: CalculationData,
   additionalMaterialsTotal: number = 0
 ): CalculationResult => {
-  const totalMaterials = materialsTotal + additionalMaterialsTotal;
-  const salary = calculationData.hourlyRate * (calculationData.manufacturingHours || 4);
-  const overheadCost = (totalMaterials * calculationData.overheadPercentage) / 100;
-  const productionCost = totalMaterials + salary + overheadCost;
-  const adminCost = (totalMaterials * calculationData.adminPercentage) / 100;
-  const fullCost = productionCost + adminCost;
-  const plannedProfit = (fullCost * calculationData.plannedProfitPercentage) / 100;
-  const wholesalePrice = fullCost + plannedProfit;
-  const ndsAmount = (wholesalePrice * calculationData.ndsPercentage) / 100;
-  const finalPrice = wholesalePrice + ndsAmount;
-
-  return {
-    materialsTotal: totalMaterials,
-    salary,
-    overheadCost,
-    productionCost,
-    adminCost,
-    fullCost,
-    plannedProfit,
-    wholesalePrice,
-    ndsAmount,
-    finalPrice,
-  };
+  return calculateRollup(materialsTotal, calculationData, additionalMaterialsTotal);
 };
 
 // Форматирование валюты

@@ -18,9 +18,9 @@ const steps = [
 
 export default function Breadcrumbs() {
   const pathname = usePathname();
-  const { taskNumber, client, date, time } = useBktpStore();
+  const { taskNumber, client } = useBktpStore();
 
-  const isAllowedToNavigate = !!taskNumber && !!client && !!date && !!time;
+  const isAllowedToNavigate = Boolean(taskNumber.trim() && client.trim());
 
   return (
     <nav className="mb-6">

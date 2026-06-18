@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import PageLoader from '@/shared/loader/PageLoader';
 
 interface TokenAnalysis {
   createdAt: Date;
@@ -60,11 +61,8 @@ export default function TokenDebugPage() {
 
   if (!tokenAnalysis) {
     return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold mb-4">Отладка токена</h1>
-        <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
-          Загрузка...
-        </div>
+      <div className="h-[calc(100vh-64px)]">
+        <PageLoader inline />
       </div>
     );
   }

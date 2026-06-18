@@ -1,19 +1,26 @@
 'use client';
 
 import { useRunnStore } from '@/store/useRunnStore';
-import { useRunnSettings } from '@/hooks/useRunnSettings';
 import { Material } from '@/api/material';
+import PageLoader from '@/shared/loader/PageLoader';
+import type { useRunnSettings } from '@/hooks/useRunnSettings';
+import { Select } from '@/components/ui/select';
+
+type RunnSettingsResult = ReturnType<typeof useRunnSettings>;
 
 interface RunnGlobalConfigProps {
   materials?: Material[];
+  selectedCategories?: RunnSettingsResult['selectedCategories'];
+  settingsLoading?: boolean;
 }
 
 export default function RunnGlobalConfig({
   materials = [],
+  selectedCategories = null,
+  settingsLoading = false,
 }: RunnGlobalConfigProps = {}) {
-  
   const { global, setGlobal } = useRunnStore();
-  const { selectedCategories, loading } = useRunnSettings();
+  const loading = settingsLoading;
 
   // Получаем категории из настроек РУНН
   const withdrawableOptions = selectedCategories?.avtomatVyk?.map((cat) => cat.name) || [];
@@ -27,9 +34,8 @@ export default function RunnGlobalConfig({
 
   if (loading) {
     return (
-      <section className="flex flex-col gap-6 mb-4">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3A55DF] mx-auto"></div>
-        <p className="text-center text-gray-500">Загрузка настроек РУНН...</p>
+      <section className="mb-4 flex min-h-[120px] items-center justify-center rounded-xl border border-gray-100 bg-gray-50/50">
+        <PageLoader size="compact" message="Загрузка настроек РУНН..." />
       </section>
     );
   }
@@ -52,7 +58,7 @@ export default function RunnGlobalConfig({
     <section className="flex gap-4 mb-4">
       <div className="flex-1">
         <label className="block mb-1 font-medium">Автомат выкатной</label>
-        <select
+        <Select
           value={global.withdrawableBreaker || ''}
           onChange={(e) => setGlobal('withdrawableBreaker', e.target.value)}
           className="w-full border px-3 py-2 rounded"
@@ -63,12 +69,12 @@ export default function RunnGlobalConfig({
               {opt}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <div className="flex-1">
         <label className="block mb-1 font-medium">Автомат литой корпус</label>
-        <select
+        <Select
           value={global.moldedCaseBreaker || ''}
           onChange={(e) => setGlobal('moldedCaseBreaker', e.target.value)}
           className="w-full border px-3 py-2 rounded"
@@ -79,12 +85,12 @@ export default function RunnGlobalConfig({
               {opt}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <div className="flex-1">
         <label className="block mb-1 font-medium">Счетчик</label>
-        <select
+        <Select
           value={global.meterType || ''}
           onChange={(e) => setGlobal('meterType', e.target.value)}
           className="w-full border px-3 py-2 rounded"
@@ -95,7 +101,7 @@ export default function RunnGlobalConfig({
               {opt}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
     </section>
   );

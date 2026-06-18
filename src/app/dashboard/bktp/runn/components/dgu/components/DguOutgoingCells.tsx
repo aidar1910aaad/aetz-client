@@ -1,7 +1,10 @@
+import { useMemo } from 'react';
 import type { RunnCell } from '@/store/useRunnStore';
 import { Material } from '@/api/material';
 import TogglerWithInput from '../../../TogglerWithInput';
 import CellItem from '../../cells/CellItem';
+import { useCalculationResultsStore } from '@/store/useCalculationResultsStore';
+import { isDguOutgoingCell } from '../hooks/useDguOutgoingSummaries';
 
 interface DguOutgoingCellsProps {
   runnDguCells: RunnCell[];
@@ -15,6 +18,10 @@ interface DguOutgoingCellsProps {
   meterOptions: string[];
   switchingDeviceOptions: string[];
   rpsLeftMaterials?: Material[];
+  inputCell?: RunnCell;
+  fusesPnMaterials?: Material[];
+  avtomatLityMaterials?: Material[];
+  currentTransformerMaterials?: Material[];
 }
 
 export default function DguOutgoingCells({
@@ -29,9 +36,16 @@ export default function DguOutgoingCells({
   meterOptions,
   switchingDeviceOptions,
   rpsLeftMaterials,
+  inputCell,
+  fusesPnMaterials = [],
+  avtomatLityMaterials = [],
+  currentTransformerMaterials = [],
 }: DguOutgoingCellsProps) {
-  const outgoingCells = runnDguCells.filter(
-    c => c.purpose !== 'РУНН-ДГУ-Торцевая панель' && c.purpose !== 'РУНН-ДГУ-Узел ДГУ кабель'
+  const updateCellResult = useCalculationResultsStore((s) => s.updateCellResult);
+
+  const outgoingCells = useMemo(
+    () => runnDguCells.filter(isDguOutgoingCell),
+    [runnDguCells]
   );
 
   return (
@@ -50,15 +64,24 @@ export default function DguOutgoingCells({
           meterOptions={meterOptions}
           switchingDeviceOptions={switchingDeviceOptions}
           rpsLeftMaterials={rpsLeftMaterials}
+          fusesPnMaterials={fusesPnMaterials}
+          avtomatLityMaterials={avtomatLityMaterials}
+          currentTransformerMaterials={currentTransformerMaterials}
           cellPrefix="РУНН-ДГУ Отходящая"
+          inputCell={inputCell}
+          onCalculationResult={updateCellResult}
         />
       ))}
 
       <button
+        type="button"
         onClick={onAddCell}
-        className="mt-4 px-4 py-2 bg-[#3A55DF] hover:bg-[#2d48be] text-white rounded text-sm font-medium"
+        className="mt-5 flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-[#8eba1e]/35 bg-[#8eba1e]/5 px-5 py-4 text-sm font-semibold text-[#5f7f14] transition-all hover:border-[#8eba1e] hover:bg-[#8eba1e]/10 hover:shadow-sm"
       >
-        + Добавить ещё отходящую
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-lg font-bold text-[#8eba1e] shadow-sm">
+          +
+        </span>
+        <span>Добавить ещё отходящую</span>
       </button>
     </TogglerWithInput>
   );

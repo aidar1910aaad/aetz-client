@@ -27,7 +27,7 @@ export default function RusnHeader({ voltage, cellCount }: RusnHeaderProps) {
         </div>
 
         {/* Quick Actions */}
-        <RusnQuickActions voltage={voltage} />
+        <RusnQuickActions />
       </div>
     </div>
   );

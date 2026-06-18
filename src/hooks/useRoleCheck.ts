@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useUserStore } from '@/store/useUserStore';
 import { UserRole } from '@/types/user';
 import {
@@ -21,10 +21,31 @@ import {
  */
 export function useRoleCheck() {
   const { user } = useUserStore();
+  const [tokenUserRole, setTokenUserRole] = useState<UserRole | string | undefined>(undefined);
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        setTokenUserRole(undefined);
+        setIsReady(true);
+        return;
+      }
+
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      setTokenUserRole(payload?.role);
+    } catch {
+      setTokenUserRole(undefined);
+    } finally {
+      setIsReady(true);
+    }
+  }, []);
 
   const userRole = useMemo(() => {
-    return user?.role as UserRole | string | undefined;
-  }, [user?.role]);
+    return (user?.role || tokenUserRole) as UserRole | string | undefined;
+  }, [user?.role, tokenUserRole]);
 
   /**
    * Проверяет, имеет ли пользователь доступ к странице
@@ -60,7 +81,7 @@ export function useRoleCheck() {
   /**
    * Проверяет, является ли пользователь аутентифицированным
    */
-  const isAuthenticated = useMemo(() => !!user, [user]);
+  const isAuthenticated = useMemo(() => !!user || !!tokenUserRole, [user, tokenUserRole]);
 
   return {
     user,
@@ -71,6 +92,7 @@ export function useRoleCheck() {
     isPTOUser,
     isManagerUser,
     isAuthenticated,
+    isReady,
   };
 }
 

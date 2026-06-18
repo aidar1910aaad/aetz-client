@@ -10,17 +10,25 @@ export default function SwitchingDeviceSelector({
   switchingDeviceOptions 
 }: SwitchingDeviceSelectorProps) {
   return (
-    <div className="p-4 rounded bg-white border border-gray-100">
-      <h4 className="text-sm font-medium text-gray-800 mb-3">Коммутационный аппарат:</h4>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h4 className="text-sm font-semibold text-gray-900">Коммутационный аппарат</h4>
+        {cell.switchingDevice && (
+          <span className="rounded-full bg-[#8eba1e]/10 px-3 py-1 text-xs font-medium text-[#5f7f14]">
+            {cell.switchingDevice}
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         {switchingDeviceOptions.map((option) => (
           <button
             key={option}
+            type="button"
             onClick={() => cell.update('switchingDevice', option)}
-            className={`px-3 py-2 text-xs font-medium rounded border transition-colors ${
+            className={`rounded-lg border px-4 py-2.5 text-sm font-medium transition-all ${
               cell.switchingDevice === option
-                ? 'bg-[#3A55DF] text-white border-[#3A55DF]'
-                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+                ? 'border-[#8eba1e] bg-[#8eba1e] text-white shadow-sm'
+                : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-[#8eba1e]/60 hover:bg-[#8eba1e]/5'
             }`}
           >
             {option}

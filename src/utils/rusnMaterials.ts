@@ -1,5 +1,6 @@
 import { Material } from '@/api/material';
 import { RusnCell } from '@/store/useRusnStore';
+import { getKsoA12BhaCellDescription } from '@/domain/calculation/bhaPresets';
 
 export interface RusnMaterials {
   breaker: Material[];
@@ -134,22 +135,96 @@ export const getMaterialArrayForField = (
   return materialType ? materials[materialType] : [];
 };
 
-// Форматирование описания ячейки
-export const formatCellDescription = (cell: RusnCell, materials: RusnMaterials, cameraType?: string): string | string[] => {
-  // Используем переданный тип камеры или получаем из глобальных настроек
-  let cameraName = cameraType;
-  
-  // Если cameraType не передан, получаем из глобальных настроек
-  if (!cameraName) {
-    try {
-      const { useRusnStore } = require('@/store/useRusnStore');
-      const globalState = useRusnStore.getState();
-      cameraName = globalState.global.bodyType;
-    } catch (error) {
-      // Fallback к cell.cellType если не удалось получить глобальные настройки
-      cameraName = cell.cellType || 'КСО А12-10';
-    }
+const getSelectedMaterialName = (
+  materials: RusnMaterials,
+  materialType: keyof RusnMaterials,
+  selected?: { id: string; name: string }
+): string | null => {
+  if (!selected) return null;
+
+  return getRusnMaterialById(materials, materialType, selected.id)?.name || selected.name || null;
+};
+
+const cleanMeterName = (name: string): string =>
+  name
+    .replace(/^счетчик\s*(э\/э|э\.э\.|эл\.?\s*эн\.?|электрической\s+энергии)\s*/i, '')
+    .trim();
+
+const withPrefix = (prefix: string, name: string): string => {
+  const lowerName = name.toLowerCase();
+  const lowerPrefix = prefix.toLowerCase();
+
+  return lowerName.startsWith(lowerPrefix) ? name : `${prefix} ${name}`;
+};
+
+const KSO_A12_CELL_LABELS: Record<string, { code: string; purpose: string }> = {
+  Ввод: { code: '1ВК', purpose: 'вводная' },
+  'Секционный выключатель': { code: '3СВ', purpose: 'секционный выключатель' },
+  'Секционный разьединитель': { code: '4РСВ', purpose: 'секционный разъединитель' },
+  Трансформаторная: { code: '2ВК', purpose: 'трансформаторная' },
+  Отходящая: { code: 'ОТХ', purpose: 'отходящая' },
+  'Трансформатор напряжения': { code: 'ТН', purpose: 'трансформатор напряжения' },
+  'Трансформатор собственных нужд': { code: 'ТСН', purpose: 'трансформатор собственных нужд' },
+};
+
+const formatKsoA12Description = (cell: RusnCell, materials: RusnMaterials): string => {
+  const label = KSO_A12_CELL_LABELS[cell.purpose] || {
+    code: cell.purpose,
+    purpose: cell.purpose.toLowerCase(),
+  };
+  const parts = [`Камера КСО А12-10 ${label.code} (${label.purpose})`];
+  const materialParts: string[] = [];
+
+  const breakerName = getSelectedMaterialName(materials, 'breaker', cell.breaker);
+  if (breakerName && cell.purpose !== 'Секционный разьединитель') {
+    materialParts.push(withPrefix('Вакуумный выключатель', breakerName));
   }
+
+  const srName = getSelectedMaterialName(materials, 'sr', cell.sr);
+  if (srName && cell.purpose === 'Секционный разьединитель') {
+    materialParts.push(withPrefix('Разъединитель', srName));
+  }
+
+  const rzaName = getSelectedMaterialName(materials, 'rza', cell.rza);
+  if (rzaName) {
+    materialParts.push(withPrefix('Микропроцессорная защита', rzaName));
+  }
+
+  const transformerCurrentName = getSelectedMaterialName(materials, 'tt', cell.transformerCurrent);
+  if (transformerCurrentName) {
+    materialParts.push(withPrefix('Трансформатор тока', transformerCurrentName));
+  }
+
+  const transformerVoltageName = getSelectedMaterialName(materials, 'tn', cell.transformerVoltage);
+  if (transformerVoltageName) {
+    materialParts.push(withPrefix('Трансформатор напряжения', transformerVoltageName));
+  }
+
+  const transformerPowerName = getSelectedMaterialName(materials, 'tsn', cell.transformerPower);
+  if (transformerPowerName) {
+    materialParts.push(withPrefix('Силовой трансформатор', transformerPowerName));
+  }
+
+  const meterName = getSelectedMaterialName(materials, 'meter', cell.meterType);
+  if (meterName) {
+    materialParts.push(`учет эл.эн. ${cleanMeterName(meterName)}`);
+  }
+
+  if (materialParts.length > 0) {
+    parts.push(materialParts.join(', '));
+  }
+
+  return parts.join(' ');
+};
+
+// Форматирование описания ячейки
+export const formatCellDescription = (
+  cell: RusnCell,
+  materials: RusnMaterials,
+  cameraType?: string,
+  transformerVoltage?: string
+): string | string[] => {
+  let cameraName = cameraType || cell.cellType || 'КСО А12-10';
 
   // Для секционных разъединителей КСО 366 используем cell.cellType вместо глобального bodyType
   if (cell.purpose === 'Секционный разьединитель' && cameraName === 'Камера КСО 366' && cell.cellType) {
@@ -160,20 +235,11 @@ export const formatCellDescription = (cell: RusnCell, materials: RusnMaterials, 
   if (cameraName === 'Камера КСО 366' && cell.purpose === 'Ввод') {
     return 'Камера КСО 366-3H-630 (Вводная) Выключатель нагрузки ВНА-10\\630';
   }
-  if (cameraName === 'Камера КСО А12-10' && cell.purpose === 'Ввод') {
-    return 'Камера КСО А12-10 (Вводная)';
-  }
   if (cameraName === 'Камера КСО 366' && cell.purpose === 'Трансформаторная') {
     return 'Камера КСО 366-4H-630  (Трансформаторная)  Выключатель нагрузки ВНА-10\\630 с предохранителем';
   }
-  if (cameraName === 'Камера КСО А12-10' && cell.purpose === 'Трансформаторная') {
-    return 'Камера КСО А12-10 (Трансформаторная)';
-  }
   if (cameraName === 'Камера КСО 366' && cell.purpose === 'Отходящая') {
     return 'Камера  КСО 366-3H-630 (отходящая линия) Выключатель нагрузки ВНА-10\\630';
-  }
-  if (cameraName === 'Камера КСО А12-10' && cell.purpose === 'Отходящая') {
-    return 'Камера КСО А12-10 (Отходящая)';
   }
   if (cameraName === 'Камера КСО 366-13' && cell.purpose === 'Секционный разьединитель') {
     return 'Камера КСО 366-13 (Секционная с разъединителем) Разъединитель РВЗ- 10/ 630';
@@ -193,17 +259,14 @@ export const formatCellDescription = (cell: RusnCell, materials: RusnMaterials, 
   }
 
   // Правила для камеры КСО А12-10
-  if (cameraName === 'Камера КСО А12-10' && cell.purpose === 'Секционный выключатель') {
-    return 'Камера КСО А12-10 (Секционный выключатель)';
-  }
-  if (cameraName === 'Камера КСО А12-10' && cell.purpose === 'Секционный разьединитель') {
-    return 'Камера КСО А12-10 (Секционный разъединитель)';
-  }
-  if (cameraName === 'Камера КСО А12-10' && cell.purpose === 'Трансформатор напряжения') {
-    return 'Камера КСО А12-10 (Трансформатор напряжения)';
-  }
-  if (cameraName === 'Камера КСО А12-10' && cell.purpose === 'Трансформатор собственных нужд') {
-    return 'Камера КСО А12-10 (Трансформатор собственных нужд)';
+  if (cameraName === 'Камера КСО А12-10' || cameraName === 'КСО А12-10') {
+    if (cell.bhaMode) {
+      const bhaDescription = getKsoA12BhaCellDescription(cell.purpose);
+      if (bhaDescription) {
+        return bhaDescription;
+      }
+    }
+    return formatKsoA12Description(cell, materials);
   }
 
   // Начинаем с назначения ячейки и типа
@@ -232,13 +295,9 @@ export const formatCellDescription = (cell: RusnCell, materials: RusnMaterials, 
 
   // Для Кабельная перемычка возвращаем название на основе трансформатора
   if (cell.purpose === 'Кабельная перемычка') {
-    // Получаем трансформатор из store
-    const { useTransformerStore } = require('@/store/useTransformerStore');
-    const selectedTransformer = useTransformerStore.getState().selectedTransformer;
-    
-    if (selectedTransformer?.voltage === '10') {
+    if (transformerVoltage === '10') {
       return 'Кабельная перемычка 10кВ';
-    } else if (selectedTransformer?.voltage === '20') {
+    } else if (transformerVoltage === '20') {
       return 'Кабельная перемычка 20кВ';
     } else {
       return 'Кабельная перемычка';
@@ -247,13 +306,9 @@ export const formatCellDescription = (cell: RusnCell, materials: RusnMaterials, 
 
   // Для Изоляционный адаптер возвращаем название с напряжением
   if (cell.purpose === 'Изоляционный адаптер') {
-    // Получаем трансформатор из store
-    const { useTransformerStore } = require('@/store/useTransformerStore');
-    const selectedTransformer = useTransformerStore.getState().selectedTransformer;
-    
-    if (selectedTransformer?.voltage === '10') {
+    if (transformerVoltage === '10') {
       return 'Изоляционный адаптер 10кВ';
-    } else if (selectedTransformer?.voltage === '20') {
+    } else if (transformerVoltage === '20') {
       return 'Изоляционный адаптер 20кВ';
     } else {
       return 'Изоляционный адаптер';

@@ -1,48 +1,54 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { RunnCell } from '@/store/useRunnStore';
 import { useDguStore } from '@/store/useDguStore';
+import type { DguCell } from '@/store/useDguStore';
+
+function toDguCell(cell: RunnCell): DguCell {
+  return {
+    id: cell.id,
+    purpose: cell.purpose,
+    breaker: cell.breaker,
+    meterType: cell.meterType,
+    nominalPower: cell.nominalPower,
+    price: cell.price,
+    quantity: cell.quantity,
+    rza: cell.rza,
+    ctRatio: cell.ctRatio,
+    switchingDevice: cell.switchingDevice,
+    rubilniki: cell.rubilniki,
+    selectedCalculationName: cell.selectedCalculationName,
+    calculationName: cell.calculationName,
+  };
+}
 
 export function useDguCellsSync(
   runnDguCells: RunnCell[],
   runnDguInputCell: RunnCell
 ) {
-  const dgu = useDguStore();
+  const setCells = useDguStore((s) => s.setCells);
+  const lastSerializedRef = useRef<string>('');
 
   useEffect(() => {
-    // Обновляем ячейку ввода в store
-    if (runnDguInputCell.breaker || runnDguInputCell.meterType) {
-      dgu.addCell({
-        id: runnDguInputCell.id,
-        purpose: runnDguInputCell.purpose,
-        breaker: runnDguInputCell.breaker,
-        meterType: runnDguInputCell.meterType,
-        nominalPower: runnDguInputCell.nominalPower,
-        price: runnDguInputCell.price,
-        quantity: runnDguInputCell.quantity,
-        rza: runnDguInputCell.rza,
-        ctRatio: runnDguInputCell.ctRatio,
-        switchingDevice: runnDguInputCell.switchingDevice,
-        rubilniki: runnDguInputCell.rubilniki,
-      });
-    }
-    
-    // Обновляем остальные ячейки в store
-    runnDguCells.forEach(cell => {
-      dgu.addCell({
-        id: cell.id,
-        purpose: cell.purpose,
-        breaker: cell.breaker,
-        meterType: cell.meterType,
-        nominalPower: cell.nominalPower,
-        price: cell.price,
-        quantity: cell.quantity,
-        rza: cell.rza,
-        ctRatio: cell.ctRatio,
-        switchingDevice: cell.switchingDevice,
-        rubilniki: cell.rubilniki,
-      });
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runnDguCells, runnDguInputCell]);
-}
+    const nextCells: DguCell[] = [];
 
+    if (runnDguInputCell.breaker || runnDguInputCell.meterType) {
+      nextCells.push(toDguCell(runnDguInputCell));
+    }
+
+    runnDguCells.forEach((cell) => {
+      nextCells.push(toDguCell(cell));
+    });
+
+    const storeCells = useDguStore.getState().cells;
+    if (nextCells.length === 0 && storeCells.length > 0) {
+      return;
+    }
+
+    const serialized = JSON.stringify(nextCells);
+    if (serialized === lastSerializedRef.current) {
+      return;
+    }
+    lastSerializedRef.current = serialized;
+    setCells(nextCells);
+  }, [runnDguCells, runnDguInputCell, setCells]);
+}

@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { RusnSettings } from '@/utils/rusnSettings';
+import { Select } from '@/components/ui/select';
 
 // Компонент SelectWithLabel
 interface Option {
@@ -34,7 +35,7 @@ function SelectWithLabel({ label, value, onChange, options }: SelectWithLabelPro
         </div>
       </div>
       <div className="px-4 py-3">
-        <select
+        <Select
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className={`w-full border rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 focus:outline-none ${
@@ -49,7 +50,7 @@ function SelectWithLabel({ label, value, onChange, options }: SelectWithLabelPro
               {opt.label}
             </option>
           ))}
-        </select>
+        </Select>
         {isSelected && (
           <div className="mt-2 text-xs text-[#8eba1e] font-medium">
             ✓ Выбрано

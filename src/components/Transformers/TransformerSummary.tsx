@@ -1,6 +1,7 @@
 import React from 'react';
 import { Calculation } from '@/api/calculations';
 import { useMaterialPrices } from '@/hooks/useMaterialPrices';
+import { calculateBusbarUstCost, isUst04CalculationName } from '@/utils/busbarUstCost';
 
 interface TransformerSummaryProps {
   model: string;
@@ -14,11 +15,25 @@ interface TransformerSummaryProps {
     zeroUstWeight: number;
     material: string;
   } | null; // Данные о УСТ из конфигурации шин
+  onlineRows?: Array<{ name: string; unit: string; quantity: number; price: number; total: number }> | null;
+  onlineTotal?: number | null;
+  isOnlineCalculating?: boolean;
 }
 
 const formattedPrice = (num?: number) => (num ? num.toLocaleString('ru-RU') + ' тг' : '—');
 
-export function TransformerSummary({ model, price, quantity, busbars, ustCalculation, ustCalculations, busbarUstData }: TransformerSummaryProps) {
+export function TransformerSummary({
+  model,
+  price,
+  quantity,
+  busbars,
+  ustCalculation,
+  ustCalculations,
+  busbarUstData,
+  onlineRows,
+  onlineTotal,
+  isOnlineCalculating,
+}: TransformerSummaryProps) {
   const { aluminum: aluminumPrice, copper: copperPrice } = useMaterialPrices();
   
   // Вычисляем цену УСТ из калькуляции
@@ -56,36 +71,34 @@ export function TransformerSummary({ model, price, quantity, busbars, ustCalcula
   const calculationsToShow = ustCalculations && ustCalculations.length > 0 ? ustCalculations : (ustCalculation ? [ustCalculation] : []);
   
   
-  // Функция для расчета стоимости УСТ из конфигурации шин
-  const calculateUstCostFromBusbars = (ustWeightKg: number, material: string) => {
-    // Стоимость за кг материала (динамически из API)
-    const pricePerKg = material === 'Алюминий' ? aluminumPrice : copperPrice;
-    
-    const totalCost = ustWeightKg * pricePerKg;
-    
-    return totalCost;
-  };
-  
-  // Используем реальные данные о шинах, если они переданы
   const busbarData = busbarUstData || {
     mainUstWeight: 0,
     zeroUstWeight: 0,
-    material: busbars === 'Алюминий' ? 'Алюминий' : 'Медь'
+    material: busbars === 'Алюминий' ? 'Алюминий' : 'Медь',
   };
-  
-  const totalUstWeight = busbarData.mainUstWeight + busbarData.zeroUstWeight;
-  const busbarUstCost = calculateUstCostFromBusbars(totalUstWeight, busbarData.material);
-  
-  
+  const busbarMaterialPrices = { aluminum: aluminumPrice, copper: copperPrice };
+  const busbarUstCost = calculateBusbarUstCost(busbarData, busbarMaterialPrices);
+
   const totalUstPrice = calculationsToShow.reduce((total, calc) => {
-    // Добавляем стоимость шин только для УСТ-0.4кВ
-    const shouldAddBusbarCost = calc.name.includes('0.4кВ') || calc.name.includes('УСТ-0.4кВ');
+    const shouldAddBusbarCost = isUst04CalculationName(calc.name);
     const additionalCost = shouldAddBusbarCost ? busbarUstCost : 0;
     
     
     return total + calculateUstPrice(calc, additionalCost);
   }, 0);
   const totalPrice = (price * quantity) + (totalUstPrice * quantity);
+  const effectiveRows = Array.isArray(onlineRows) && onlineRows.length > 0
+    ? onlineRows
+    : [
+        { name: model, unit: 'шт', quantity, price, total: price * quantity },
+        ...calculationsToShow.map((calc) => {
+          const shouldAddBusbarCost = isUst04CalculationName(calc.name);
+          const additionalCost = shouldAddBusbarCost ? busbarUstCost : 0;
+          const calcPrice = calculateUstPrice(calc, additionalCost);
+          return { name: calc.name, unit: 'шт', quantity, price: calcPrice, total: calcPrice * quantity };
+        }),
+      ];
+  const effectiveTotal = typeof onlineTotal === 'number' && onlineTotal > 0 ? onlineTotal : totalPrice;
   return (
     <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-lg">
       <div className="flex items-center gap-3 mb-6">
@@ -95,6 +108,9 @@ export function TransformerSummary({ model, price, quantity, busbars, ustCalcula
           </svg>
         </div>
         <h3 className="text-xl font-bold text-gray-900">Трансформатор</h3>
+        <span className={`ml-auto text-xs font-semibold ${isOnlineCalculating ? 'text-amber-600' : 'text-green-600'}`}>
+          {isOnlineCalculating ? 'Онлайн пересчет...' : 'Онлайн расчет актуален'}
+        </span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full table-auto border border-gray-200 rounded-lg overflow-hidden">
@@ -104,32 +120,20 @@ export function TransformerSummary({ model, price, quantity, busbars, ustCalcula
               <th className="p-4 text-left font-semibold">Наименование</th>
               <th className="p-4 text-center font-semibold">Ед. изм.</th>
               <th className="p-4 text-center font-semibold">Кол-во</th>
-              <th className="p-4 text-center font-semibold">Цена</th>
-              <th className="p-4 text-center font-semibold">Сумма</th>
+              <th className="p-4 text-right font-semibold">Цена</th>
+              <th className="p-4 text-right font-semibold">Сумма</th>
             </tr>
           </thead>
           <tbody className="bg-white">
-            <tr className="border-b border-gray-100 hover:bg-gray-50">
-              <td className="p-4 text-center font-semibold">1</td>
-              <td className="p-4 text-left font-medium">{model}</td>
-              <td className="p-4 text-center text-gray-600">шт</td>
-              <td className="p-4 text-center font-semibold">{quantity}</td>
-              <td className="p-4 text-center text-gray-900 font-semibold">{formattedPrice(price)}</td>
-              <td className="p-4 text-center text-gray-900 font-bold">{formattedPrice(price * quantity)}</td>
-            </tr>
-            {calculationsToShow.map((calc, index) => {
-              const shouldAddBusbarCost = calc.name.includes('0.4кВ') || calc.name.includes('УСТ-0.4кВ');
-              const additionalCost = shouldAddBusbarCost ? busbarUstCost : 0;
-              const calcPrice = calculateUstPrice(calc, additionalCost);
-              
+            {effectiveRows.map((row, index) => {
               return (
-                <tr key={calc.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="p-4 text-center font-semibold">{index + 2}</td>
-                  <td className="p-4 text-left font-medium">{calc.name}</td>
-                  <td className="p-4 text-center text-gray-600">шт</td>
-                  <td className="p-4 text-center font-semibold">{quantity}</td>
-                  <td className="p-4 text-center text-gray-900 font-semibold">{formattedPrice(calcPrice)}</td>
-                  <td className="p-4 text-center text-gray-900 font-bold">{formattedPrice(calcPrice * quantity)}</td>
+                <tr key={`${row.name}-${index}`} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="p-4 text-center font-semibold">{index + 1}</td>
+                  <td className="p-4 text-left font-medium">{row.name}</td>
+                  <td className="p-4 text-center text-gray-600">{row.unit || 'шт'}</td>
+                  <td className="p-4 text-center font-semibold">{row.quantity}</td>
+                  <td className="p-4 text-right text-gray-900 font-semibold">{formattedPrice(row.price)}</td>
+                  <td className="p-4 text-right text-gray-900 font-bold">{formattedPrice(row.total)}</td>
                 </tr>
               );
             })}
@@ -137,7 +141,7 @@ export function TransformerSummary({ model, price, quantity, busbars, ustCalcula
               <td colSpan={5} className="text-right pr-2 p-4 text-lg">
                 ВСЕГО:
               </td>
-              <td className="text-right pl-2 p-4 text-lg text-gray-900">{formattedPrice(totalPrice)}</td>
+              <td className="text-right pl-2 p-4 text-lg text-gray-900">{formattedPrice(effectiveTotal)}</td>
             </tr>
           </tbody>
         </table>

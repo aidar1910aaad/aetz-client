@@ -51,6 +51,7 @@ const defaultPriceFormatter = (value: any) => formattedPrice(value);
 
 const defaultTotalFormatter = (rows: TableRow[]) => {
   return rows.reduce((sum, row) => {
+    if ((row as TableRow).isSectionHeader) return sum;
     // Используем total если есть, иначе вычисляем из price * quantity
     if (typeof row.total === 'number') {
       return sum + row.total;
@@ -59,6 +60,12 @@ const defaultTotalFormatter = (rows: TableRow[]) => {
     const quantity = typeof row.quantity === 'number' ? row.quantity : 1;
     return sum + (price * quantity);
   }, 0);
+};
+
+const getColumnAlignClass = (column: TableColumn) => {
+  if (column.align === 'left') return 'text-left';
+  if (column.align === 'right') return 'text-right';
+  return 'text-center';
 };
 
 export default function UniversalTable({ 
@@ -240,7 +247,7 @@ export default function UniversalTable({
             {config.columns.map((column) => (
               <th 
                 key={column.key}
-                className={`p-2 ${column.align === 'left' ? 'text-left' : 'text-center'}`}
+                className={`p-2 ${getColumnAlignClass(column)}`}
               >
                 {column.title}
               </th>
@@ -258,7 +265,13 @@ export default function UniversalTable({
               </td>
             </tr>
           ) : (
-            rows.map((row, idx) => {
+            (() => {
+              let dataRowNumber = 0;
+              return rows.map((row) => {
+              const isSectionHeader = (row as TableRow).isSectionHeader === true;
+              if (!isSectionHeader) {
+                dataRowNumber += 1;
+              }
               const isCustomRow = (row as any).isCustom === true;
               const isEditingThisRow = editingRowId === row.id;
               
@@ -266,12 +279,12 @@ export default function UniversalTable({
               if (isEditingThisRow && isCustomRow) {
                 return (
                   <tr key={row.id} className="bg-yellow-50">
-                    <td className="p-2">{idx + 1}</td>
+                    <td className="p-2">{isSectionHeader ? '' : dataRowNumber}</td>
                     {config.columns.map((column) => {
                       // Для колонки "Сумма" показываем только вычисленное значение
                       if (column.key === 'total') {
                         return (
-                          <td key={column.key} className="p-2">
+                          <td key={column.key} className="p-2 text-right">
                             {formattedPrice(editingRowData.total || 0)}
                           </td>
                         );
@@ -282,7 +295,7 @@ export default function UniversalTable({
                         return (
                           <td 
                             key={column.key} 
-                            className={`p-2 ${column.align === 'left' ? 'text-left' : 'text-center'}`}
+                            className={`p-2 ${getColumnAlignClass(column)}`}
                           >
                             {column.key === 'name' && isEditing && !isReadOnly ? (
                               <input
@@ -316,7 +329,7 @@ export default function UniversalTable({
                         return (
                           <td 
                             key={column.key} 
-                            className={`p-2 ${column.align === 'left' ? 'text-left' : 'text-center'}`}
+                            className={`p-2 ${getColumnAlignClass(column)}`}
                           >
                             <input
                               type="number"
@@ -337,7 +350,9 @@ export default function UniversalTable({
                                 });
                               }}
                               placeholder={column.title}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                              className={`w-full px-2 py-1 border border-gray-300 rounded text-sm ${
+                                column.align === 'right' ? 'text-right' : ''
+                              }`}
                               min="0"
                               step="1"
                             />
@@ -350,7 +365,7 @@ export default function UniversalTable({
                       return (
                         <td 
                           key={column.key} 
-                          className={`p-2 ${column.align === 'left' ? 'text-left' : 'text-center'}`}
+                          className={`p-2 ${getColumnAlignClass(column)}`}
                         >
                           {cellValue !== undefined && cellValue !== null ? String(cellValue) : ''}
                         </td>
@@ -386,26 +401,27 @@ export default function UniversalTable({
               const displayRow = { ...row };
               delete (displayRow as any).indent;
               delete (displayRow as any).isCustom;
+              delete (displayRow as any).isSectionHeader;
               
               return (
                 <tr 
                   key={row.id}
-                  className={isCustomRow ? 'bg-blue-50 hover:bg-blue-100' : ''}
+                  className={isCustomRow ? 'bg-blue-50 hover:bg-blue-100' : isSectionHeader ? 'bg-gray-50/50' : ''}
                   onClick={() => isEditing && isCustomRow && handleEditRow(row)}
                   style={isEditing && isCustomRow ? { cursor: 'pointer' } : {}}
                 >
-                  <td className="p-2">{idx + 1}</td>
+                  <td className="p-2">{isSectionHeader ? '' : dataRowNumber}</td>
                   {config.columns.map((column) => {
                     // Берем значение только из ключей колонок, игнорируя служебные поля
                     const value = displayRow[column.key];
                     const formattedValue = column.formatter 
-                      ? column.formatter(value, displayRow)
-                      : (value !== undefined && value !== null ? value : '');
+                      ? column.formatter(value, row)
+                      : (value !== undefined && value !== null && value !== '' ? value : '');
                     
                     return (
                       <td 
                         key={column.key}
-                        className={`p-2 ${column.align === 'left' ? 'text-left' : 'text-center'} ${
+                        className={`p-2 ${getColumnAlignClass(column)} ${
                           column.key === 'name' ? 'break-words' : ''
                         }`}
                         style={column.key === 'name' && indentLevel > 0 ? { paddingLeft: `${8 + indentPadding}px` } : {}}
@@ -437,7 +453,8 @@ export default function UniversalTable({
                   )}
                 </tr>
               );
-            })
+            });
+            })()
           )}
           {/* Показываем строки "ВСЕГО" и "ВСЕГО + %:" если showTotal=true, даже для пустых таблиц */}
           {config.showTotal && (

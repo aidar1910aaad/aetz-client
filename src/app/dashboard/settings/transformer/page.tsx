@@ -6,6 +6,8 @@ import { showToast } from '@/shared/modals/ToastProvider';
 import { showConfirm } from '@/components/ui/confirm';
 import RoleGuard from '@/components/common/RoleGuard';
 import { UserRole } from '@/types/user';
+import PageLoader from '@/shared/loader/PageLoader';
+import { Select } from '@/components/ui/select';
 
 export default function TransformerSettingsPage() {
   const [transformers, setTransformers] = useState<Transformer[]>([]);
@@ -148,6 +150,14 @@ export default function TransformerSettingsPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="h-[calc(100vh-65px)]">
+        <PageLoader inline />
+      </div>
+    );
+  }
+
   return (
     <RoleGuard
       allowedRoles={[UserRole.ADMIN, UserRole.PTO]}
@@ -187,7 +197,7 @@ export default function TransformerSettingsPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8eba1e]/30 focus:border-[#8eba1e] transition-all"
             />
-            <select
+            <Select
               value={filterVoltage}
               onChange={(e) => setFilterVoltage(e.target.value)}
               className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8eba1e]/30 focus:border-[#8eba1e] transition-all"
@@ -198,8 +208,8 @@ export default function TransformerSettingsPage() {
                   {voltage}
                 </option>
               ))}
-            </select>
-            <select
+            </Select>
+            <Select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
               className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8eba1e]/30 focus:border-[#8eba1e] transition-all"
@@ -210,8 +220,8 @@ export default function TransformerSettingsPage() {
                   {type}
                 </option>
               ))}
-            </select>
-            <select
+            </Select>
+            <Select
               value={filterManufacturer}
               onChange={(e) => setFilterManufacturer(e.target.value)}
               className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#8eba1e]/30 focus:border-[#8eba1e] transition-all"
@@ -222,7 +232,7 @@ export default function TransformerSettingsPage() {
                   {manufacturer}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
 
@@ -275,13 +285,7 @@ export default function TransformerSettingsPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-4 text-center">
-                    Загрузка...
-                  </td>
-                </tr>
-              ) : filteredTransformers.length === 0 ? (
+              {filteredTransformers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-4 text-center">
                     Трансформаторы не найдены

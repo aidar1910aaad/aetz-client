@@ -80,8 +80,8 @@ export default function WorksTable({ selected, worksList, businessTravelTotal = 
                 <th className="p-4 text-left font-semibold">Наименование</th>
                 <th className="p-4 text-center font-semibold">Ед. изм.</th>
                 <th className="p-4 text-center font-semibold">Кол-во</th>
-                <th className="p-4 text-center font-semibold">Цена</th>
-                <th className="p-4 text-center font-semibold">Сумма</th>
+                <th className="p-4 text-right font-semibold">Цена</th>
+                <th className="p-4 text-right font-semibold">Сумма</th>
               </tr>
             </thead>
             <tbody className="bg-white">
@@ -90,8 +90,8 @@ export default function WorksTable({ selected, worksList, businessTravelTotal = 
                 <td className="p-4 text-left font-medium">Работы не выбраны</td>
                 <td className="p-4 text-center text-gray-600">—</td>
                 <td className="p-4 text-center font-semibold">—</td>
-                <td className="p-4 text-center text-gray-900 font-semibold">—</td>
-                <td className="p-4 text-center text-gray-900 font-bold">—</td>
+                <td className="p-4 text-right text-gray-900 font-semibold">—</td>
+                <td className="p-4 text-right text-gray-900 font-bold">—</td>
               </tr>
             </tbody>
           </table>
@@ -126,8 +126,8 @@ export default function WorksTable({ selected, worksList, businessTravelTotal = 
               <th className="p-4 text-left font-semibold">Наименование</th>
               <th className="p-4 text-center font-semibold">Ед. изм.</th>
               <th className="p-4 text-center font-semibold">Кол-во</th>
-              <th className="p-4 text-center font-semibold">Цена</th>
-              <th className="p-4 text-center font-semibold">Сумма</th>
+              <th className="p-4 text-right font-semibold">Цена</th>
+              <th className="p-4 text-right font-semibold">Сумма</th>
             </tr>
           </thead>
           <tbody className="bg-white">
@@ -142,8 +142,8 @@ export default function WorksTable({ selected, worksList, businessTravelTotal = 
                   <td className="p-4 text-left font-medium break-words">{work.name}</td>
                   <td className="p-4 text-center text-gray-600">{`${work.unit || 'раб'}.`}</td>
                   <td className="p-4 text-center font-semibold">{count}</td>
-                  <td className="p-4 text-center text-gray-900 font-semibold">{formattedPrice(work.price)}</td>
-                  <td className="p-4 text-center text-gray-900 font-bold">
+                  <td className="p-4 text-right text-gray-900 font-semibold">{formattedPrice(work.price)}</td>
+                  <td className="p-4 text-right text-gray-900 font-bold">
                     {formattedPrice(totalPrice)}
                   </td>
                 </tr>

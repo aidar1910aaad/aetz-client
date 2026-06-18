@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { RunnCell } from '@/store/useRunnStore';
 import { Material } from '@/api/material';
 import DguGeneralSummary from './summary/DguGeneralSummary';
@@ -13,13 +13,21 @@ import DguInputCell from './dgu/components/DguInputCell';
 import DguOutgoingCells from './dgu/components/DguOutgoingCells';
 import DguTorcevaiaSection from './dgu/components/DguTorcevaiaSection';
 import DguCableNodeSection from './dgu/components/DguCableNodeSection';
+import DguBusbarSystemContainer from './dgu/DguBusbarSystemContainer';
 import { useDguStore } from '@/store/useDguStore';
+import { useDguInputSummary } from './dgu/hooks/useDguInputSummary';
+import { useDguOutgoingSummaries, isDguOutgoingCell } from './dgu/hooks/useDguOutgoingSummaries';
+import { useDguSummaryCleanup } from './dgu/hooks/useDguSummaryCleanup';
+import { useDguUiHydration } from './dgu/hooks/useDguUiHydration';
+import { useCalculationResultsStore } from '@/store/useCalculationResultsStore';
+import type { RunnMaterials } from '@/hooks/useRunnMaterials';
 
 interface RunnDguSectionProps {
   categoryMaterials?: Material[];
   meterMaterials?: Material[];
   meterMaterialsLoading?: boolean;
   rpsLeftMaterials?: Material[];
+  runnMaterials?: RunnMaterials;
 }
 
 export default function RunnDguSection({
@@ -27,6 +35,7 @@ export default function RunnDguSection({
   meterMaterials = [],
   meterMaterialsLoading = false,
   rpsLeftMaterials = [],
+  runnMaterials,
 }: RunnDguSectionProps) {
   const dgu = useDguStore();
   
@@ -42,8 +51,30 @@ export default function RunnDguSection({
     price: 0,
   });
 
+  // Восстановление из persist/store при возврате на вкладку
+  useDguUiHydration(setRunnDguCells, setRunnDguInputCell);
+
   // Синхронизация с store
   useDguCellsSync(runnDguCells, runnDguInputCell);
+
+  const outgoingCellsForSummary = useMemo(
+    () => runnDguCells.filter(isDguOutgoingCell),
+    [runnDguCells]
+  );
+
+  const allDguCellsForCleanup = useMemo(
+    () => [runnDguInputCell, ...runnDguCells],
+    [runnDguInputCell, runnDguCells]
+  );
+
+  useDguInputSummary(
+    runnDguInputCell,
+    runnMaterials?.currentTransformer ?? []
+  );
+  useDguOutgoingSummaries(outgoingCellsForSummary);
+  useDguSummaryCleanup(runnDguInputCell.id, allDguCellsForCleanup);
+
+  const removeCellResult = useCalculationResultsStore((s) => s.removeCellResult);
 
   // Автоматический выбор материала
   const { autoSelectedMaterial, nominalCurrent } = useDguAutoMaterial(categoryMaterials);
@@ -108,6 +139,12 @@ export default function RunnDguSection({
           case 'rubilniki':
             cell.rubilniki = value as string[];
             break;
+          case 'selectedCalculationName':
+            cell.selectedCalculationName = value as string;
+            break;
+          case 'calculationName':
+            cell.calculationName = value as string;
+            break;
         }
       }
     }
@@ -117,6 +154,8 @@ export default function RunnDguSection({
   const handleRemoveCell = (id: string) => {
     const updated = runnDguCells.filter(c => c.id !== id);
     setRunnDguCells(updated);
+    removeCellResult(id);
+    dgu.removeCell(id);
   };
 
   const handleAddOutgoingCell = () => {
@@ -210,6 +249,7 @@ export default function RunnDguSection({
               categoryMaterials={categoryMaterials}
               meterMaterials={meterMaterials}
               autoSelectedMaterial={autoSelectedMaterial}
+              currentTransformerMaterials={runnMaterials?.currentTransformer}
             />
 
             <DguOutgoingCells
@@ -224,7 +264,13 @@ export default function RunnDguSection({
               meterOptions={meterOptions}
               switchingDeviceOptions={SWITCHING_DEVICE_OPTIONS}
               rpsLeftMaterials={rpsLeftMaterials}
+              inputCell={runnDguInputCell}
+              fusesPnMaterials={runnMaterials?.fusesPn}
+              avtomatLityMaterials={runnMaterials?.avtomatLity}
+              currentTransformerMaterials={runnMaterials?.currentTransformer}
             />
+
+            <DguBusbarSystemContainer />
 
             <DguTorcevaiaSection
               torcevaiaCell={torcevaiaCell}

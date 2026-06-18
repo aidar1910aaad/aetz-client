@@ -7,11 +7,20 @@ import { deleteCalculation } from '@/api/calculations';
 import { FileText, Plus, Trash2, Calculator, ArrowLeft } from 'lucide-react';
 import RoleGuard from '@/components/common/RoleGuard';
 import { UserRole } from '@/types/user';
+import PageLoader from '@/shared/loader/PageLoader';
 
 export default function GroupCalculationsPage() {
   const router = useRouter();
   const { groupSlug } = useParams() as { groupSlug: string };
-  const { selectedGroup, setSelectedGroup, groups, calculations, loading } = useCalculations();
+  const {
+    selectedGroup,
+    setSelectedGroup,
+    groups,
+    calculations,
+    groupsLoading,
+    calculationsLoading,
+    loadedGroupSlug,
+  } = useCalculations();
   const [deletingCalc, setDeletingCalc] = useState<string | null>(null); // ID калькуляции, которая удаляется
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -72,6 +81,9 @@ export default function GroupCalculationsPage() {
   };
 
   const decodedGroupName = selectedGroup?.name || decodeURIComponent(groupSlug);
+  const decodedSlug = decodeURIComponent(groupSlug);
+  const groupExists = groups.some((g) => g.slug === decodedSlug);
+  const isInitialLoading = groupsLoading || !groupExists || calculationsLoading || loadedGroupSlug !== decodedSlug;
 
   return (
     <RoleGuard
@@ -79,6 +91,9 @@ export default function GroupCalculationsPage() {
       redirectTo="/dashboard"
       pagePath={`/dashboard/calc/${groupSlug}`}
     >
+      {isInitialLoading ? (
+        <PageLoader />
+      ) : (
       <div className="h-[calc(100vh-64px)] bg-white overflow-y-auto">
       <div className="p-6">
         {/* Header Section */}
@@ -116,14 +131,7 @@ export default function GroupCalculationsPage() {
           </div>
         </div>
 
-        {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#8eba1e] mx-auto mb-4"></div>
-              <p className="text-gray-600">Загрузка расчетов...</p>
-            </div>
-          </div>
-        ) : calculations.length === 0 ? (
+        {calculations.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <Calculator className="w-12 h-12 text-gray-400" />
@@ -216,6 +224,7 @@ export default function GroupCalculationsPage() {
         )}
     </div>
     </div>
+      )}
     </RoleGuard>
   );
 }

@@ -9,7 +9,6 @@ import {
   runnTableConfig,
   additionalEquipmentTableConfig,
   worksTableConfig,
-  dguTableConfig,
 } from '@/components/FinalReview/tableConfigs';
 
 interface TableManagerProps {
@@ -35,7 +34,6 @@ const tableNames: Record<string, string> = {
   [runnTableConfig.id]: 'РУ-0.4кВ',
   [additionalEquipmentTableConfig.id]: 'Доп. оборудование',
   [worksTableConfig.id]: 'Работы и транспортные расходы',
-  [dguTableConfig.id]: 'ДГУ',
 };
 
 // Все доступные таблицы
@@ -46,7 +44,6 @@ const allTables = [
   runnTableConfig.id,
   additionalEquipmentTableConfig.id,
   worksTableConfig.id,
-  dguTableConfig.id,
 ];
 
 export default function TableManager({

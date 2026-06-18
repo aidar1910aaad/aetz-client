@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { Download } from 'lucide-react';
 import { PDFDocument } from './PDFDocument';
+import type { PdfHeaderMeta } from './PdfCommercialHeader';
+import { getPdfWhiteLogoSrc } from './PdfCommercialHeader';
 import type { BmzData } from '@/utils/bmzCalculations';
 import type { Transformer } from '@/api/transformers';
 import type { RusnState } from '@/store/useRusnStore';
@@ -23,6 +25,7 @@ interface Props {
   filename: string;
   fullName: string;
   user: any;
+  pdfHeader?: PdfHeaderMeta;
   bmzStore: BmzData;
   selectedTransformer: Transformer | null;
   rusnStore: RusnState;
@@ -233,6 +236,8 @@ function PDFWrapper(props: Props) {
             filename={props.filename}
             fullName={props.fullName}
             user={props.user}
+            pdfHeader={props.pdfHeader}
+            pdfLogoSrc={getPdfWhiteLogoSrc()}
             bmzStore={props.bmzStore}
             selectedTransformer={props.selectedTransformer}
             rusnStore={props.rusnStore}
@@ -289,6 +294,7 @@ export default React.memo(PDFWrapper, (prevProps, nextProps) => {
     prevProps.filename === nextProps.filename &&
     prevProps.fullName === nextProps.fullName &&
     prevProps.user === nextProps.user &&
+    prevProps.pdfHeader === nextProps.pdfHeader &&
     prevProps.bmzStore === nextProps.bmzStore &&
     prevProps.selectedTransformer === nextProps.selectedTransformer &&
     prevProps.rusnStore === nextProps.rusnStore &&

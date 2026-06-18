@@ -2,6 +2,13 @@ import type { RunnCell } from '@/store/useRunnStore';
 import { Material } from '@/api/material';
 import TogglerWithInput from '../../../TogglerWithInput';
 import MaterialSummaryTable from '../../common/MaterialSummaryTable';
+import { Select } from '@/components/ui/select';
+import {
+  useRunnBreakerCalculation,
+  useRunnCounterCalculation,
+} from '@/hooks/useRunnInputCalculation';
+import CalculationDisplay from '../../calculations/CalculationDisplay';
+import { extractCurrentFromBreakerName } from '@/utils/panelNameUtils';
 
 interface DguInputCellProps {
   cell: RunnCell;
@@ -11,6 +18,7 @@ interface DguInputCellProps {
   categoryMaterials: Material[];
   meterMaterials: Material[];
   autoSelectedMaterial: Material | null;
+  currentTransformerMaterials?: Material[];
 }
 
 export default function DguInputCell({
@@ -21,7 +29,38 @@ export default function DguInputCell({
   categoryMaterials,
   meterMaterials,
   autoSelectedMaterial,
+  currentTransformerMaterials = [],
 }: DguInputCellProps) {
+  const {
+    calculation: breakerCalculation,
+    loading: breakerCalculationLoading,
+    error: breakerCalculationError,
+  } = useRunnBreakerCalculation(cell);
+  const {
+    calculation: counterCalculation,
+    loading: counterCalculationLoading,
+    error: counterCalculationError,
+  } = useRunnCounterCalculation(cell);
+
+  let currentTransformer: { name: string; price: number; quantity: number } | null = null;
+  if (cell.breaker && currentTransformerMaterials.length > 0) {
+    const breakerCurrent = extractCurrentFromBreakerName(cell.breaker);
+    if (breakerCurrent) {
+      for (const material of currentTransformerMaterials) {
+        const match = material.name.match(/(\d+)\/5\b/i);
+        const materialCurrent = match ? parseInt(match[1], 10) : null;
+        if (materialCurrent && materialCurrent >= breakerCurrent) {
+          currentTransformer = {
+            name: material.name,
+            price: parseFloat(material.price.toString()),
+            quantity: cell.meterType ? 6 : 3,
+          };
+          break;
+        }
+      }
+    }
+  }
+
   const renderSelectBlock = (
     label: string,
     value: string,
@@ -42,7 +81,7 @@ export default function DguInputCell({
           {value || "—"}
         </div>
       ) : (
-        <select
+        <Select
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className={`border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF] ${
@@ -57,7 +96,7 @@ export default function DguInputCell({
               {opt}
             </option>
           ))}
-        </select>
+        </Select>
       )}
     </div>
   );
@@ -99,6 +138,43 @@ export default function DguInputCell({
         categoryMaterials={categoryMaterials}
         meterMaterials={meterMaterials}
       />
+
+      {breakerCalculation && (
+        <CalculationDisplay
+          cell={cell}
+          calculation={breakerCalculation}
+          materialType="withdrawable_breaker"
+          currentTransformer={currentTransformer}
+        />
+      )}
+      {breakerCalculationLoading && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mt-3">
+          <p className="text-xs text-gray-600">Загрузка калькуляции автомата...</p>
+        </div>
+      )}
+      {breakerCalculationError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-3">
+          <p className="text-xs text-red-600">{breakerCalculationError}</p>
+        </div>
+      )}
+
+      {counterCalculation && cell.meterType && (
+        <CalculationDisplay
+          cell={cell}
+          calculation={counterCalculation}
+          materialType="counter"
+        />
+      )}
+      {counterCalculationLoading && cell.meterType && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mt-3">
+          <p className="text-xs text-gray-600">Загрузка калькуляции ПУ...</p>
+        </div>
+      )}
+      {counterCalculationError && cell.meterType && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-3">
+          <p className="text-xs text-red-600">{counterCalculationError}</p>
+        </div>
+      )}
     </TogglerWithInput>
   );
 }

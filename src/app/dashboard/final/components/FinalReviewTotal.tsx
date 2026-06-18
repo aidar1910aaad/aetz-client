@@ -9,9 +9,10 @@ import { useBmzStore } from '@/store/useBmzStore';
 import { useBktpStore } from '@/store/useBktpStore';
 import { useRusnStore } from '@/store/useRusnStore';
 import { useRunnStore } from '@/store/useRunnStore';
-import { useCellSummariesStore } from '@/store/useCellSummariesStore';
+import { useDguStore } from '@/store/useDguStore';
 import { useAdditionalEquipmentStore } from '@/store/useAdditionalEquipmentStore';
 import { useWorksStore } from '@/store/useWorksStore';
+import { buildDguSnapshotFromStore } from '@/utils/dguSnapshot';
 import { bmzTableConfig, transformerTableConfig, rusnTableConfig, worksTableConfig, runnTableConfig, additionalEquipmentTableConfig } from '@/components/FinalReview/tableConfigs';
 import { useUserStore } from '@/store/useUserStore';
 import { createApplication, type ApplicationData } from '@/api/requests';
@@ -24,9 +25,12 @@ import dynamic from 'next/dynamic';
 import { formatAmount } from '@/utils/formatAmount';
 import { showConfirm } from '@/shared/modals/ConfirmModal';
 import { showToast } from '@/shared/modals/ToastProvider';
+import { buildPdfHeaderMeta } from './buildPdfHeaderMeta';
+import type { PdfHeaderMeta } from './PdfCommercialHeader';
 
 const PDFDownloadButton = dynamic(() => import('./PDFDownloadButton'), { ssr: false });
 const KPDownloadButton = dynamic(() => import('./KPDownloadButton'), { ssr: false });
+const ExcelDownloadButton = dynamic(() => import('./ExcelDownloadButton'), { ssr: false });
 // removed unused WorksState import
 
 // Компонент для заметок, изолированный от остального компонента
@@ -120,6 +124,7 @@ const PDFButtons = function PDFButtons({
   filename,
   fullName,
   user,
+  pdfHeader,
   bmzStore,
   selectedTransformer,
   rusnStore,
@@ -136,6 +141,7 @@ const PDFButtons = function PDFButtons({
   filename: string;
   fullName: string;
   user: any;
+  pdfHeader: PdfHeaderMeta;
   bmzStore: BmzData;
   selectedTransformer: Transformer | null;
   rusnStore: RusnState;
@@ -253,6 +259,7 @@ const PDFButtons = function PDFButtons({
         filename={filename}
         fullName={fullName}
         user={user}
+        pdfHeader={pdfHeader}
         bmzStore={bmzStore}
         selectedTransformer={selectedTransformer}
         rusnStore={rusnStore}
@@ -270,6 +277,7 @@ const PDFButtons = function PDFButtons({
         filename={filename}
         fullName={fullName}
         user={user}
+        pdfHeader={pdfHeader}
         bmzStore={bmzStore}
         selectedTransformer={selectedTransformer}
         rusnStore={rusnStore}
@@ -323,6 +331,7 @@ interface FinalReviewTotalProps {
   onSave?: () => void | Promise<void>; // Функция сохранения (для страницы просмотра заявки)
   isSavingExternal?: boolean; // Внешнее состояние сохранения (для страницы просмотра заявки)
   originalBidId?: number; // ID исходной заявки (если создается новая на основе существующей)
+  bidNumber?: string; // Номер заявки в системе (для PDF шапки)
   initialNotes?: string; // Начальные заметки (для страницы просмотра заявки)
   onNotesChange?: (notes: string) => void; // Обработчик изменения заметок (для страницы просмотра заявки)
   customRowsByTable?: Record<string, any[]>; // Пользовательские строки для каждой таблицы
@@ -354,11 +363,24 @@ export default function FinalReviewTotal({
   onSave,
   isSavingExternal,
   originalBidId,
+  bidNumber,
   initialNotes = '',
   onNotesChange,
   customRowsByTable = {},
 }: FinalReviewTotalProps) {
   const router = useRouter();
+
+  const pdfHeader = useMemo(
+    () =>
+      buildPdfHeaderMeta({
+        taskNumber,
+        client,
+        date,
+        bidNumber,
+      }),
+    [taskNumber, client, date, bidNumber],
+  );
+
   const [isResetting, setIsResetting] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const [showNotes, setShowNotes] = React.useState(false);
@@ -392,7 +414,7 @@ export default function FinalReviewTotal({
   const resetBktp = useBktpStore((s) => s.reset);
   const resetRusn = useRusnStore((s) => s.reset);
   const resetRunn = useRunnStore((s) => s.reset);
-  const clearCellSummaries = useCellSummariesStore((s) => s.clearCellSummaries);
+  const resetDgu = useDguStore((s) => s.reset);
   const resetAdditionalEquipment = useAdditionalEquipmentStore((s) => s.reset);
   const resetWorks = useWorksStore((s) => s.reset);
 
@@ -401,58 +423,38 @@ export default function FinalReviewTotal({
 
   // Расчет наценки менеджера как сумма разниц между итогами с наценкой и базовыми суммами для всех таблиц
   const managerMarkupAmount = React.useMemo(() => {
-    let totalMarkup = 0;
-    
-    // БМЗ
-    if (bmzTotal > 0) {
-      const bmzMarkupTotal = tableMarkupTotals[bmzTableConfig.id];
-      if (bmzMarkupTotal !== null && bmzMarkupTotal !== undefined) {
-        totalMarkup += bmzMarkupTotal - bmzTotal;
+    const getSectionMarkupAmount = (tableId: string, baseTotal: number) => {
+      if (baseTotal <= 0) return 0;
+
+      const explicitTotal = tableMarkupTotals[tableId];
+      if (explicitTotal !== null && explicitTotal !== undefined) {
+        return Number(explicitTotal) - baseTotal;
       }
-    }
-    
-    // Трансформатор
-    if (transformerTotal > 0) {
-      const transformerMarkupTotal = tableMarkupTotals[transformerTableConfig.id];
-      if (transformerMarkupTotal !== null && transformerMarkupTotal !== undefined) {
-        totalMarkup += transformerMarkupTotal - transformerTotal;
-      }
-    }
-    
-    // РУСН
-    if (rusnTotal > 0) {
-      const rusnMarkupTotal = tableMarkupTotals[rusnTableConfig.id];
-      if (rusnMarkupTotal !== null && rusnMarkupTotal !== undefined) {
-        totalMarkup += rusnMarkupTotal - rusnTotal;
-      }
-    }
-    
-    // РУНН
-    if (runnTotal > 0) {
-      const runnMarkupTotal = tableMarkupTotals[runnTableConfig.id];
-      if (runnMarkupTotal !== null && runnMarkupTotal !== undefined) {
-        totalMarkup += runnMarkupTotal - runnTotal;
-      }
-    }
-    
-    // Дополнительное оборудование
-    if (additionalEquipmentTotal > 0) {
-      const equipmentMarkupTotal = tableMarkupTotals[additionalEquipmentTableConfig.id];
-      if (equipmentMarkupTotal !== null && equipmentMarkupTotal !== undefined) {
-        totalMarkup += equipmentMarkupTotal - additionalEquipmentTotal;
-      }
-    }
-    
-    // Работы
-    if (worksTotal > 0) {
-      const worksMarkupTotal = tableMarkupTotals[worksTableConfig.id];
-      if (worksMarkupTotal !== null && worksMarkupTotal !== undefined) {
-        totalMarkup += worksMarkupTotal - worksTotal;
-      }
-    }
-    
+
+      const percent = tableMarkupPercents[tableId] ?? managerMarkupPercent;
+      return baseTotal * (Number(percent) || 0) / 100;
+    };
+
+    const totalMarkup =
+      getSectionMarkupAmount(bmzTableConfig.id, bmzTotal) +
+      getSectionMarkupAmount(transformerTableConfig.id, transformerTotal) +
+      getSectionMarkupAmount(rusnTableConfig.id, rusnTotal) +
+      getSectionMarkupAmount(runnTableConfig.id, runnTotal) +
+      getSectionMarkupAmount(additionalEquipmentTableConfig.id, additionalEquipmentTotal) +
+      getSectionMarkupAmount(worksTableConfig.id, worksTotal);
+
     return Math.round(totalMarkup);
-  }, [tableMarkupTotals, bmzTotal, transformerTotal, rusnTotal, runnTotal, additionalEquipmentTotal, worksTotal]);
+  }, [
+    tableMarkupTotals,
+    tableMarkupPercents,
+    managerMarkupPercent,
+    bmzTotal,
+    transformerTotal,
+    rusnTotal,
+    runnTotal,
+    additionalEquipmentTotal,
+    worksTotal,
+  ]);
 
   // Итоговая сумма с наценкой
   const finalTotal = React.useMemo(() => {
@@ -493,7 +495,7 @@ export default function FinalReviewTotal({
       resetBktp();
       resetRusn();
       resetRunn();
-      clearCellSummaries();
+      resetDgu();
       resetAdditionalEquipment();
       resetWorks();
       if (setManagerMarkupPercent) {
@@ -518,11 +520,13 @@ export default function FinalReviewTotal({
         throw new Error('Токен авторизации не найден');
       }
 
+      const { date: savedDate } = useBktpStore.getState().stampDateTime();
+
       // Формируем данные заявки
       const applicationData: ApplicationData = {
         // Метаданные заявки
         taskNumber,
-        date,
+        date: savedDate,
         client,
         type: 'БКТП',
         user: user ? {
@@ -546,7 +550,7 @@ export default function FinalReviewTotal({
           // Пользовательские строки для каждой таблицы
           ...(Object.keys(customRowsByTable).length > 0 && { customRowsByTable }),
           bmz: {
-            buildingType: bmzStore.buildingType,
+            buildingType: bmzStore.buildingType ?? 'none',
             length: bmzStore.length,
             width: bmzStore.width,
             height: bmzStore.height,
@@ -578,6 +582,7 @@ export default function FinalReviewTotal({
             busBridges: runnStore.busBridges || [],
             total: runnTotal,
           },
+          dgu: buildDguSnapshotFromStore(),
           additionalEquipment: {
             selected: selectedEquipment,
             equipmentList: equipmentList,
@@ -595,7 +600,7 @@ export default function FinalReviewTotal({
       console.log('=== ДАННЫЕ ЗАЯВКИ ДЛЯ ОТПРАВКИ ===');
       console.log('📋 Метаданные заявки:', {
         taskNumber,
-        date,
+        date: savedDate,
         client,
         type: 'БКТП',
         user: user ? `${user.lastName} ${user.firstName} (${user.username})` : 'Не авторизован',
@@ -604,7 +609,7 @@ export default function FinalReviewTotal({
       
       console.log('📦 Данные конфигурации:');
       console.log('  🏢 БМЗ:', {
-        buildingType: bmzStore.buildingType,
+        buildingType: bmzStore.buildingType ?? 'none',
         dimensions: `${bmzStore.length}x${bmzStore.width}x${bmzStore.height}мм`,
         thickness: `${bmzStore.thickness}мм`,
         blockCount: bmzStore.blockCount,
@@ -683,7 +688,7 @@ export default function FinalReviewTotal({
         resetBktp();
         resetRusn();
         resetRunn();
-        clearCellSummaries();
+        resetDgu();
         resetAdditionalEquipment();
         resetWorks();
         if (setManagerMarkupPercent) {
@@ -739,6 +744,12 @@ export default function FinalReviewTotal({
             {managerMarkupAmount > 0 && (
               <div className="ml-auto flex items-center gap-4">
                 <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Сумма без наценки:</span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {formatAmount(grandTotal)} тг
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-600">Сумма наценки:</span>
                   <span className="text-sm font-semibold text-[#8eba1e]">
                     {formatAmount(managerMarkupAmount)} тг
@@ -747,7 +758,7 @@ export default function FinalReviewTotal({
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-600">Сумма с наценкой:</span>
                   <span className="text-sm font-semibold text-gray-900">
-                    {formatAmount(grandTotal + managerMarkupAmount)} тг
+                    {formatAmount(finalTotal)} тг
                   </span>
                 </div>
               </div>
@@ -788,34 +799,51 @@ export default function FinalReviewTotal({
             </>
           )}
           {/* Скрываем PDF кнопки во время сохранения и если данные не валидны, чтобы избежать ошибок */}
-          {!isSavingState && 
-           filename && 
-           fullName && 
-           bmzStore?.buildingType === 'bmz' && 
-           bmzStore?.length > 0 && 
+          {!isSavingState &&
+           filename &&
+           fullName &&
+           bmzStore?.buildingType === 'bmz' &&
+           bmzStore?.length > 0 &&
            bmzStore?.width > 0 &&
            !filename.match(/^-БКТП--\d{4}-\d{2}-\d{2}$/) && (
-            <PDFButtons
-              filename={filename}
-              fullName={fullName}
-              user={user}
-              bmzStore={bmzStore}
-              selectedTransformer={selectedTransformer}
-              rusnStore={rusnStore}
-              selectedWorks={selectedWorks}
-              worksList={worksList}
-              runnStore={runnStore}
-              selectedEquipment={selectedEquipment}
-              equipmentList={equipmentList}
-              totals={totals}
-              tableMarkupTotals={tableMarkupTotals}
-              tableMarkupPercents={tableMarkupPercents}
-              customRowsByTable={customRowsByTable}
-            />
+            <>
+              <ExcelDownloadButton
+                filename={filename}
+                pdfHeader={pdfHeader}
+                bmzStore={bmzStore}
+                selectedTransformer={selectedTransformer}
+                rusnStore={rusnStore}
+                selectedWorks={selectedWorks}
+                worksList={worksList}
+                runnStore={runnStore}
+                selectedEquipment={selectedEquipment}
+                equipmentList={equipmentList}
+                totals={totals}
+                customRowsByTable={customRowsByTable}
+              />
+              <PDFButtons
+                filename={filename}
+                fullName={fullName}
+                user={user}
+                pdfHeader={pdfHeader}
+                bmzStore={bmzStore}
+                selectedTransformer={selectedTransformer}
+                rusnStore={rusnStore}
+                selectedWorks={selectedWorks}
+                worksList={worksList}
+                runnStore={runnStore}
+                selectedEquipment={selectedEquipment}
+                equipmentList={equipmentList}
+                totals={totals}
+                tableMarkupTotals={tableMarkupTotals}
+                tableMarkupPercents={tableMarkupPercents}
+                customRowsByTable={customRowsByTable}
+              />
+            </>
           )}
         </div>
         <div className="bg-[#90bd20] text-white font-bold text-lg px-8 py-3 rounded-lg shadow">
-          Сумма: {formatAmount(grandTotal)} тг
+          Сумма: {formatAmount(finalTotal)} тг
         </div>
       </div>
     </div>

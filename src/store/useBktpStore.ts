@@ -1,9 +1,7 @@
 // store/useBktpStore.ts
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-
-const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-const currentTime = new Date().toTimeString().slice(0, 5); // HH:mm
+import { getBktpNow } from '@/utils/bktpDateTime';
 
 interface BktpFormState {
   executor: string;
@@ -12,29 +10,40 @@ interface BktpFormState {
   taskNumber: string;
   client: string;
   setField: <K extends keyof BktpFormState>(key: K, value: BktpFormState[K]) => void;
+  /** Проставить текущие дату и время (при старте и при сохранении заявки) */
+  stampDateTime: () => { date: string; time: string };
   reset: () => void;
 }
+
+const initialMeta = getBktpNow();
 
 export const useBktpStore = create<BktpFormState>()(
   persist(
     (set) => ({
       executor: '',
-      date: today,
-      time: currentTime,
+      date: initialMeta.date,
+      time: initialMeta.time,
       taskNumber: '',
       client: '',
       setField: (key, value) => set({ [key]: value }),
-      reset: () =>
+      stampDateTime: () => {
+        const { date, time } = getBktpNow();
+        set({ date, time });
+        return { date, time };
+      },
+      reset: () => {
+        const { date, time } = getBktpNow();
         set({
           executor: '',
-          date: today,
-          time: currentTime,
+          date,
+          time,
           taskNumber: '',
           client: '',
-        }),
+        });
+      },
     }),
     {
-      name: 'bktp-storage', // ключ в localStorage
+      name: 'bktp-storage',
     }
   )
 );

@@ -6,8 +6,15 @@ import type { RusnState } from '@/store/useRusnStore';
 import type { AdditionalEquipmentState, AdditionalEquipmentItem } from '@/store/useAdditionalEquipmentStore';
 import type { WorkItem } from '@/store/useWorksStore';
 import { useRunnStore } from '@/store/useRunnStore';
-import { useCellSummariesStore } from '@/store/useCellSummariesStore';
+import { useDguStore } from '@/store/useDguStore';
 import { formatAmount } from '@/utils/formatAmount';
+import { mapDguRowsForRunnTable } from '@/utils/dguSnapshot';
+import type { DguSnapshot } from '@/utils/dguSnapshot';
+import {
+  calculateBusbarUstCost,
+  isUst04CalculationName,
+  type BusbarMaterialPrices,
+} from '@/utils/busbarUstCost';
 
 // Общие колонки для всех таблиц
 // Ширины: Номер (5%) + Наименование (60%) + Ед. изм. (5%) + Кол-во (5%) + Цена (12.5%) + Сумма (12.5%) = 100%
@@ -34,14 +41,14 @@ const commonColumns = [
     key: 'price',
     title: 'Цена',
     width: '12.5%',
-    align: 'center' as const,
+    align: 'right' as const,
     formatter: (value: any) => typeof value === 'number' ? formatAmount(value) + ' ₸' : '—',
   },
   {
     key: 'total',
     title: 'Сумма',
     width: '12.5%',
-    align: 'center' as const,
+    align: 'right' as const,
     formatter: (value: any, row: any) => {
       // Используем value если оно есть, иначе вычисляем из price * quantity
       const total = typeof value === 'number' ? value : (
@@ -70,7 +77,7 @@ export const bmzTableConfig: TableConfig = {
     // Используем импортированные функции для расчетов
     
     const unitPrice = bmzData.buildingType === 'bmz' 
-      ? calculateBasePrice(bmzData.settings, bmzData.thickness, area) 
+      ? calculateBasePrice(bmzData.settings, bmzData.thickness, area, bmzData.height)
       : 0;
     
     const activeEquipment = getActiveEquipment(bmzData);
@@ -122,7 +129,7 @@ export const transformerTableConfig: TableConfig = {
   id: 'transformer',
   title: 'Трансформатор',
   columns: commonColumns,
-  dataMapper: (transformer: any) => {
+  dataMapper: (transformer: any, additionalData?: { busbarMaterialPrices?: BusbarMaterialPrices }) => {
     if (!transformer) {
       return [];
     }
@@ -169,16 +176,14 @@ export const transformerTableConfig: TableConfig = {
         return finalPrice;
       };
 
-      // Получаем данные о шинах из transformer
+      const busbarMaterialPrices = additionalData?.busbarMaterialPrices;
       const busbarUstData = transformer.busbarUstData;
-      const busbarUstCost = busbarUstData ? 
-        (busbarUstData.mainUstWeight + busbarUstData.zeroUstWeight) * 
-        (busbarUstData.material === 'Алюминий' ? 2800 : 5600) : 0;
 
       transformer.ustCalculations.forEach((calc: any, index: number) => {
-        // Добавляем стоимость шин только для УСТ-0.4кВ
-        const shouldAddBusbarCost = calc.name.includes('0.4кВ') || calc.name.includes('УСТ-0.4кВ');
-        const additionalCost = shouldAddBusbarCost ? busbarUstCost : 0;
+        const shouldAddBusbarCost = isUst04CalculationName(calc.name);
+        const additionalCost = shouldAddBusbarCost
+          ? calculateBusbarUstCost(busbarUstData, busbarMaterialPrices)
+          : 0;
         const ustPrice = calculateUstPrice(calc, additionalCost);
         
         rows.push({
@@ -443,46 +448,33 @@ export const runnTableConfig: TableConfig = {
       key: 'price',
       title: 'Цена',
       width: '12.5%',
-      align: 'center' as const,
-      formatter: (value: any) => typeof value === 'number' && value > 0 ? formatAmount(value) : '—',
+      align: 'right' as const,
+      formatter: (value: any, row: any) => {
+        if (row?.isSectionHeader || row?.hidePrice) return '';
+        return typeof value === 'number' && value > 0 ? formatAmount(value) + ' ₸' : '—';
+      },
     },
     {
       key: 'total',
       title: 'Сумма',
       width: '12.5%',
-      align: 'center' as const,
+      align: 'right' as const,
       formatter: (value: any, row: any) => {
+        if (row?.isSectionHeader || row?.hidePrice) return '';
         const total = typeof value === 'number' ? value : (
           (typeof row.price === 'number' ? row.price : 0) * 
           (typeof row.quantity === 'number' ? row.quantity : 1)
         );
-        return typeof total === 'number' && total > 0 ? formatAmount(total) : '—';
+        return typeof total === 'number' && total > 0 ? formatAmount(total) + ' ₸' : '—';
       },
     },
   ],
-  dataMapper: (data?: ReturnType<typeof useRunnStore.getState>) => {
+  dataMapper: (data?: ReturnType<typeof useRunnStore.getState> & { dgu?: DguSnapshot | null }) => {
     // Приоритет: использовать переданные данные (реактивно), иначе текущее состояние стора
     const runnStoreState = (data as any) || useRunnStore.getState();
     
-    // Логирование для отладки (только в development)
-    if (process.env.NODE_ENV === 'development' && data) {
-      console.log('🔍 runnTableConfig.dataMapper - полученные данные:', {
-        hasCellSummaries: !!(runnStoreState.cellSummaries && runnStoreState.cellSummaries.length > 0),
-        cellSummariesCount: runnStoreState.cellSummaries?.length || 0,
-        hasCellConfigs: !!(runnStoreState.cellConfigs && runnStoreState.cellConfigs.length > 0),
-        cellConfigsCount: runnStoreState.cellConfigs?.length || 0,
-        hasBusbarSummary: !!runnStoreState.busbarSummary,
-        hasBusBridgeSummary: !!runnStoreState.busBridgeSummary,
-        busBridgeSummariesCount: runnStoreState.busBridgeSummaries?.length || 0,
-      });
-    }
-    
-    // Если данные переданы через пропсы (из API), используем их напрямую
-    // Иначе проверяем Zustand store и внешний store сводок
-    const externalCellSummaries = useCellSummariesStore.getState().cellSummaries || [];
-    const cellSummaries = (runnStoreState.cellSummaries && runnStoreState.cellSummaries.length > 0)
-      ? runnStoreState.cellSummaries
-      : externalCellSummaries;
+    // Если данные переданы через пропсы (из API), используем их напрямую.
+    const cellSummaries = runnStoreState.cellSummaries || [];
     const cellConfigs = runnStoreState.cellConfigs || [];
     const busbarSummary = runnStoreState.busbarSummary;
     const busBridgeSummary = runnStoreState.busBridgeSummary;
@@ -551,20 +543,89 @@ export const runnTableConfig: TableConfig = {
       })),
     ];
 
-    return allItems;
+    const dguFromApi = (runnStoreState as { dgu?: DguSnapshot | null }).dgu;
+    const dguLive = useDguStore.getState();
+    const dguSource = dguFromApi ?? {
+      enabled: dguLive.enabled,
+      settings: dguLive.settings,
+      cellSummaries: dguLive.cellSummaries,
+      busbarSummary: dguLive.busbarSummary,
+      busBridgeSummaries: dguLive.busBridgeSummaries,
+    };
+
+    const dguItems = mapDguRowsForRunnTable(dguSource, allItems.length);
+
+    return [...allItems, ...dguItems];
   },
   emptyMessage: 'Нет данных РУНН',
   showTotal: true,
 };
 
-// Конфигурация для ДГУ (Дизельный генератор)
+// Конфигурация для ДГУ (РУНН-ДГУ)
 export const dguTableConfig: TableConfig = {
   id: 'dgu',
   title: 'ДГУ',
   columns: commonColumns,
-  dataMapper: () => {
-    // Заглушка - в будущем здесь будет логика для ДГУ
-    return [];
+  dataMapper: (data?: ReturnType<typeof useDguStore.getState>) => {
+    const dguState = (data as ReturnType<typeof useDguStore.getState>) || useDguStore.getState();
+
+    if (!dguState.enabled) return [];
+
+    const cellItems = (dguState.cellSummaries || []).map((summary: any, index: number) => ({
+      id: `dgu-cell-${summary.cellId}`,
+      name: summary.name,
+      unit: 'шт.',
+      quantity: summary.quantity,
+      price: summary.pricePerUnit,
+      total: summary.totalPrice,
+      order: index + 1,
+    }));
+
+    const busbarSummary = dguState.busbarSummary;
+    const busBridgeSummaries = dguState.busBridgeSummaries || [];
+    const settingsPrice = dguState.settings?.price || 0;
+
+    const allItems = [
+      ...cellItems,
+      ...busBridgeSummaries.map((bbs: any, i: number) => ({
+        id: `dgu-busbridge-${i}`,
+        name: bbs.name,
+        unit: 'шт.',
+        quantity: bbs.quantity,
+        price: bbs.pricePerUnit,
+        total: bbs.totalPrice,
+        order: cellItems.length + i + 1,
+      })),
+      ...(busbarSummary
+        ? [
+            {
+              id: 'dgu-busbar',
+              name: busbarSummary.name,
+              unit: 'шт.',
+              quantity: busbarSummary.quantity,
+              price: busbarSummary.pricePerUnit,
+              total: busbarSummary.totalPrice,
+              order: cellItems.length + busBridgeSummaries.length + 1,
+            },
+          ]
+        : []),
+      ...(settingsPrice > 0
+        ? [
+            {
+              id: 'dgu-generator',
+              name: `ДГУ (${dguState.settings?.nominalPowerKva || 0} кВА)`,
+              unit: 'шт.',
+              quantity: 1,
+              price: settingsPrice,
+              total: settingsPrice,
+              order:
+                cellItems.length + busBridgeSummaries.length + (busbarSummary ? 1 : 0) + 1,
+            },
+          ]
+        : []),
+    ];
+
+    return allItems;
   },
   emptyMessage: 'Нет данных ДГУ',
   showTotal: true,

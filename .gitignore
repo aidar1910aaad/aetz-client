@@ -44,3 +44,5 @@ next-env.d.ts
 
 # tree-maker (temporary files)
 tree-maker/
+.vercel
+.env*.local

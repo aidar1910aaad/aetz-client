@@ -1,22 +1,23 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useWorkPricesStore } from '@/store/useWorkPricesStore';
 
 interface CommissioningWorksTabProps {
   isVisible: boolean;
 }
 
 export default function CommissioningWorksTab({ isVisible }: CommissioningWorksTabProps) {
+  const workPrices = useWorkPricesStore();
   // Фиксированные значения
   const relaySettingsQuantity = 1; // Расчёт уставок РЗ всегда 1
-  const relaySettingsPrice = 150000; // Цена за расчёт уставок РЗ
+  const relaySettingsPrice = workPrices.labRelaySettingsCalculation;
   
   const complexTestingQuantity = 1; // Комплексное испытание всегда 1
-  const complexTestingPrice = 195905; // Цена за комплексное испытание
+  const complexTestingPrice = workPrices.labComprehensiveTestTwoTransformer;
   
   // Значения из проекта (пока заглушки)
   const ru04kvQuantity = 1; // РУ-0,4кВ (АВР) - из проекта
-  const ru04kvPrice = 200000; // Цена за РУ-0,4кВ (АВР)
+  const ru04kvPrice = workPrices.labKtpTpRpSwitchOn;
   
   const ru1020kvQuantity = 0; // Ячейка РУ-10/20кВ - из проекта (пока 0)
   const ru1020kvPrice = 80000; // Цена за ячейку РУ-10/20кВ
@@ -45,8 +46,8 @@ export default function CommissioningWorksTab({ isVisible }: CommissioningWorksT
               <tr>
                 <th className="px-4 py-2 text-left font-medium text-gray-700">Описание</th>
                 <th className="px-4 py-2 text-center font-medium text-gray-700">Количество</th>
-                <th className="px-4 py-2 text-center font-medium text-gray-700">Цена за единицу</th>
-                <th className="px-4 py-2 text-center font-medium text-gray-700">Сумма</th>
+                <th className="px-4 py-2 text-right font-medium text-gray-700">Цена за единицу</th>
+                <th className="px-4 py-2 text-right font-medium text-gray-700">Сумма</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -65,10 +66,10 @@ export default function CommissioningWorksTab({ isVisible }: CommissioningWorksT
                   Ячейка РУ-10/20кВ (уточнить кол-во)
                 </td>
                 <td className="px-4 py-3 text-center text-gray-900">{ru1020kvQuantity}</td>
-                <td className="px-4 py-3 text-center text-gray-900">
+                <td className="px-4 py-3 text-right text-gray-900">
                   {ru1020kvPrice.toLocaleString()} ₸
                 </td>
-                <td className="px-4 py-3 text-center font-medium text-gray-900">
+                <td className="px-4 py-3 text-right font-medium text-gray-900">
                   {ru1020kvTotal.toLocaleString()} ₸
                 </td>
               </tr>
@@ -78,10 +79,10 @@ export default function CommissioningWorksTab({ isVisible }: CommissioningWorksT
                   РУ-0,4кВ (АВР)
                 </td>
                 <td className="px-4 py-3 text-center text-gray-900">{ru04kvQuantity}</td>
-                <td className="px-4 py-3 text-center text-gray-900">
+                <td className="px-4 py-3 text-right text-gray-900">
                   {ru04kvPrice.toLocaleString()} ₸
                 </td>
-                <td className="px-4 py-3 text-center font-medium text-gray-900">
+                <td className="px-4 py-3 text-right font-medium text-gray-900">
                   {ru04kvTotal.toLocaleString()} ₸
                 </td>
               </tr>
@@ -91,10 +92,10 @@ export default function CommissioningWorksTab({ isVisible }: CommissioningWorksT
                   Расчёт уставок РЗ
                 </td>
                 <td className="px-4 py-3 text-center text-gray-900">{relaySettingsQuantity}</td>
-                <td className="px-4 py-3 text-center text-gray-900">
+                <td className="px-4 py-3 text-right text-gray-900">
                   {relaySettingsPrice.toLocaleString()} ₸
                 </td>
-                <td className="px-4 py-3 text-center font-medium text-gray-900">
+                <td className="px-4 py-3 text-right font-medium text-gray-900">
                   {relaySettingsTotal.toLocaleString()} ₸
                 </td>
               </tr>
@@ -114,10 +115,10 @@ export default function CommissioningWorksTab({ isVisible }: CommissioningWorksT
                   Комплексное испытание (двухтрансформаторное)
                 </td>
                 <td className="px-4 py-3 text-center text-gray-900">{complexTestingQuantity}</td>
-                <td className="px-4 py-3 text-center text-gray-900">
+                <td className="px-4 py-3 text-right text-gray-900">
                   {complexTestingPrice.toLocaleString()} ₸
                 </td>
-                <td className="px-4 py-3 text-center font-medium text-gray-900">
+                <td className="px-4 py-3 text-right font-medium text-gray-900">
                   {complexTestingTotal.toLocaleString()} ₸
                 </td>
               </tr>
@@ -127,7 +128,7 @@ export default function CommissioningWorksTab({ isVisible }: CommissioningWorksT
                 <td colSpan={3} className="px-4 py-3 text-right font-medium text-gray-900">
                   Итого:
                 </td>
-                <td className="px-4 py-3 text-center font-bold text-gray-900">
+                <td className="px-4 py-3 text-right font-bold text-gray-900">
                   {totalCost.toLocaleString()} ₸
                 </td>
               </tr>

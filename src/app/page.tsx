@@ -1,20 +1,45 @@
 'use client';
 
-import { BackgroundImage } from '../components/common/BackgroundImage';
-import { Logo } from '../components/common/Logo';
-import { PageContainer } from '../components/layout/PageContainer';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import LoginForm from '../components/Auth/LoginForm';
+import { LoginHero } from '../components/Auth/LoginHero';
 
 export default function LoginPage() {
-  return (
-    <PageContainer className="relative flex items-center justify-center">
-      <BackgroundImage src="/login/bglogin.png" />
+  const router = useRouter();
 
-      {/* Контент */}
-      <div className="relative z-20 flex flex-col items-center gap-4 max-w-md w-full text-white">
-        <Logo />
-        <LoginForm />
-      </div>
-    </PageContainer>
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const expiresAt = payload.exp ? payload.exp * 1000 : 0;
+      if (!expiresAt || Date.now() < expiresAt) {
+        router.replace('/dashboard');
+      }
+    } catch {
+      localStorage.removeItem('token');
+    }
+  }, [router]);
+
+  return (
+    <div className="min-h-screen flex bg-[#f6f8f4]">
+      <LoginHero />
+
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-10 sm:px-10 lg:px-16 relative border-l border-[#8EBA1E]/10">
+        <div
+          className="absolute inset-0 lg:hidden opacity-50"
+          style={{
+            background:
+              'radial-gradient(ellipse at top, rgba(142, 186, 30, 0.1) 0%, transparent 65%)',
+          }}
+        />
+
+        <div className="relative z-10 w-full flex justify-center">
+          <LoginForm />
+        </div>
+      </main>
+    </div>
   );
 }

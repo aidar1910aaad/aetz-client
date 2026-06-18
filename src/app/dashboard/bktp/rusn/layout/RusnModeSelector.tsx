@@ -1,10 +1,10 @@
 import React from 'react';
 
-type RusnMode = 'configured' | 'not-configured';
+export type RusnMode = 'configured' | 'not-configured' | null;
 
 interface RusnModeSelectorProps {
   mode: RusnMode;
-  onModeChange: (mode: RusnMode) => void;
+  onModeChange: (mode: Exclude<RusnMode, null>) => void;
 }
 
 export default function RusnModeSelector({ mode, onModeChange }: RusnModeSelectorProps) {

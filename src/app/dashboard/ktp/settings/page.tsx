@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { Select } from '@/components/ui/select';
 
 export default function KtpSettings() {
   const router = useRouter();
@@ -65,12 +66,12 @@ export default function KtpSettings() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Тип КТП
                 </label>
-                <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <Select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="">Выберите тип</option>
                   <option value="type1">Тип 1</option>
                   <option value="type2">Тип 2</option>
                   <option value="type3">Тип 3</option>
-                </select>
+                </Select>
               </div>
             </div>
           </div>

@@ -32,11 +32,10 @@ export const RusnBusbarSystem = () => {
   };
 
   return (
-    <div className="bg-white border border-gray-300 shadow-sm">
-      {/* Заголовок секции */}
+    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
       <BusbarHeader matchingConfigId={matchingConfig?.id?.toString()} />
 
-      <div className="p-6 space-y-6">
+      <div className="space-y-5 p-5">
         {/* Информация о выключателе */}
         <BreakerInfo selectedBreaker={selectedBreaker} getBreakerCurrent={getBreakerCurrent} />
 

@@ -54,7 +54,13 @@ interface RunnMaterials {
   moldedCaseSwitch: Material[];
 }
 
-export function useRunnSettings() {
+interface UseRunnSettingsOptions {
+  /** На странице конфигуратора достаточно useRunnMaterials — не дублировать запросы */
+  skipMaterialsLoad?: boolean;
+}
+
+export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
+  const { skipMaterialsLoad = false } = options;
   const [allCategories, setAllCategories] = useState<AllCategories>({
     avtomatVyk: [],
     avtomatLity: [],
@@ -331,16 +337,17 @@ export function useRunnSettings() {
       setSelectedCategories(transformedSettings);
       setOriginalSettings(JSON.parse(JSON.stringify(transformedSettings)));
       
-      // Загружаем материалы для всех категорий
-      const token = localStorage.getItem('token');
-      if (token) {
-        await loadMaterialsForCategories(transformedSettings, token);
+      if (!skipMaterialsLoad) {
+        const token = localStorage.getItem('token');
+        if (token) {
+          await loadMaterialsForCategories(transformedSettings, token);
+        }
       }
     };
 
-
+    if (apiCategories.length === 0) return;
     fetchSettings();
-  }, [apiCategories, allCategories]);
+  }, [apiCategories.length, skipMaterialsLoad]);
 
   // Проверка изменений
   useEffect(() => {
@@ -350,8 +357,8 @@ export function useRunnSettings() {
     }
   }, [selectedCategories, originalSettings]);
 
-  // Перезагрузка материалов при изменении видимости категорий
   useEffect(() => {
+    if (skipMaterialsLoad) return;
     if (selectedCategories) {
       const token = localStorage.getItem('token');
       if (token) {

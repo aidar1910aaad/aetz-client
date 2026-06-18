@@ -3,6 +3,8 @@ import { api } from '../baseUrl';
 export interface AreaPriceRange {
   minArea: number;
   maxArea: number;
+  minHeight?: number;
+  maxHeight?: number;
   minWallThickness: number;
   maxWallThickness: number;
   pricePerSquareMeter: number;

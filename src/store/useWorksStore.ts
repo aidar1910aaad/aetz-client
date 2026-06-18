@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { defaultWorkPrices } from './useWorkPricesStore';
 
 interface WorkItem {
   name: string;
@@ -14,6 +15,7 @@ interface WorksState {
   selected: Record<string, { checked: boolean; count: number }>;
   worksList: WorkItem[];
   isEnabled: boolean;
+  // UI-only derived value. Never use as source of truth for backend totals.
   totalPrice: number;
   setSelected: (selected: Record<string, { checked: boolean; count: number }>) => void;
   setWorksList: (list: WorkItem[]) => void;
@@ -33,14 +35,17 @@ export const useWorksStore = create<WorksState>()(
       const initialWorksList = [
         {
           name: 'Монтаж фундамента (с материалами) за м²',
-          price: 50000,
+          price: defaultWorkPrices.foundationPricePerM2,
           unit: 'раб',
           category: 'Фундамент',
           description: 'Монтаж фундамента с материалами'
         },
         {
           name: 'Пусконаладочные работы',
-          price: 545905,
+          price:
+            defaultWorkPrices.labKtpTpRpSwitchOn +
+            defaultWorkPrices.labRelaySettingsCalculation +
+            defaultWorkPrices.labComprehensiveTestTwoTransformer,
           unit: 'раб',
           category: 'Пусконаладочные',
           description: 'Комплексные пусконаладочные работы'
@@ -171,6 +176,12 @@ export const useWorksStore = create<WorksState>()(
     },
     {
       name: 'works-storage',
+      partialize: (state) => ({
+        // Persist only draft selection/config; totals are recalculated and server-authoritative.
+        selected: state.selected,
+        worksList: state.worksList,
+        isEnabled: state.isEnabled,
+      }),
       onRehydrateStorage: () => (state) => {
         console.log('useWorksStore: Rehydrating from localStorage');
         if (state) {
@@ -188,6 +199,13 @@ export const useWorksStore = create<WorksState>()(
               unit: 'раб'
             }));
           }
+          // Recalculate UI-only total after rehydration.
+          state.totalPrice = state.worksList
+            .filter((work) => state.selected[work.name]?.checked)
+            .reduce((sum, work) => {
+              const count = state.selected[work.name]?.count || 1;
+              return sum + work.price * count;
+            }, 0);
         }
       },
     }

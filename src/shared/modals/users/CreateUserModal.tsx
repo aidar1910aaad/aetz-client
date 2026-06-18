@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { CreateUserRequest } from '@/api/users';
 import { showToast } from '@/shared/modals/ToastProvider';
 import { UserRole, UserRoleLabels } from '@/types/user';
+import { Select } from '@/components/ui/select';
 
 interface Props {
   onClose: () => void;
@@ -66,15 +67,15 @@ export default function CreateUserModal({ onClose, onCreate }: Props) {
             />
           ))}
 
-        <select
+        <Select
           value={form.role}
-          onChange={(e) => setForm({ ...form, role: e.target.value })}
+          onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
           className="border p-2 rounded w-full mb-4 text-sm"
         >
           <option value={UserRole.PTO}>{UserRoleLabels[UserRole.PTO]}</option>
           <option value={UserRole.ADMIN}>{UserRoleLabels[UserRole.ADMIN]}</option>
           <option value={UserRole.MANAGER}>{UserRoleLabels[UserRole.MANAGER]}</option>
-        </select>
+        </Select>
 
         <div className="flex justify-end gap-2">
           <button

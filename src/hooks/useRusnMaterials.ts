@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getSettings } from '@/api/settings';
 import { getMaterialsByCategoryId } from '@/api/material';
 import { Material } from '@/api/material';
 import { useRusnStore } from '@/store/useRusnStore';
+import { fetchWithDedup } from '@/lib/materialsFetchCache';
 
 interface RusnSetting {
   type: 'switch' | 'rza' | 'counter' | 'sr' | 'tsn' | 'tn' | 'tt';
@@ -10,44 +11,80 @@ interface RusnSetting {
   categoryId: number;
 }
 
+type RusnMaterialsState = {
+  breaker: Material[];
+  rza: Material[];
+  meter: Material[];
+  transformer: Material[];
+  sr: Material[];
+  tsn: Material[];
+  tn: Material[];
+  tt: Material[];
+};
+
+const EMPTY: RusnMaterialsState = {
+  breaker: [],
+  rza: [],
+  meter: [],
+  transformer: [],
+  sr: [],
+  tsn: [],
+  tn: [],
+  tt: [],
+};
+
+const rusnMaterialsSlot: {
+  key: string;
+  data: RusnMaterialsState | null;
+  promise: Promise<RusnMaterialsState> | null;
+  updatedAt: number;
+} = { key: '', data: null, promise: null, updatedAt: 0 };
+
 export function useRusnMaterials() {
   const { global } = useRusnStore();
-  const [materials, setMaterials] = useState<{
-    breaker: Material[];
-    rza: Material[];
-    meter: Material[];
-    transformer: Material[];
-    sr: Material[];
-    tsn: Material[];
-    tn: Material[];
-    tt: Material[];
-  }>({
-    breaker: [],
-    rza: [],
-    meter: [],
-    transformer: [],
-    sr: [],
-    tsn: [],
-    tn: [],
-    tt: [],
-  });
+  const [materials, setMaterials] = useState<RusnMaterialsState>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const categoryKey = useMemo(
+    () =>
+      [
+        global.breaker?.id,
+        global.rza?.id,
+        global.meterType?.id,
+        global.sr?.id,
+        global.tsn?.id,
+        global.tn?.id,
+        global.tt?.id,
+      ].join(':'),
+    [
+      global.breaker?.id,
+      global.rza?.id,
+      global.meterType?.id,
+      global.sr?.id,
+      global.tsn?.id,
+      global.tn?.id,
+      global.tt?.id,
+    ]
+  );
+
   useEffect(() => {
+    let cancelled = false;
+
     const fetchMaterials = async () => {
       try {
         setLoading(true);
         setError(null);
 
         const token = localStorage.getItem('token') || '';
-
         const settingsResponse = await getSettings(token);
-
         const rusnSettings = settingsResponse.settings.rusn as RusnSetting[];
 
-        if (!rusnSettings || rusnSettings.length === 0) {
-          setLoading(false);
+        if (!rusnSettings?.length) {
+          if (!cancelled) {
+            setMaterials(EMPTY);
+            setLoading(false);
+          }
           return;
         }
 
@@ -73,11 +110,20 @@ export function useRusnMaterials() {
         };
 
         if (!switchSettings.length || !rzaSetting || !counterSetting) {
-          setLoading(false);
+          if (!cancelled) {
+            setMaterials(EMPTY);
+            setLoading(false);
+          }
           return;
         }
 
-        try {
+        const ids = Object.values(validCategoryIds)
+          .filter(Boolean)
+          .sort((a, b) => Number(a) - Number(b))
+          .join(',');
+        const cacheKey = `rusn:${categoryKey}:${ids}`;
+
+        const result = await fetchWithDedup(rusnMaterialsSlot, cacheKey, async () => {
           const [
             breakerMaterials,
             rzaMaterials,
@@ -114,7 +160,7 @@ export function useRusnMaterials() {
               : Promise.resolve([]),
           ]);
 
-          setMaterials({
+          return {
             breaker: breakerMaterials,
             rza: rzaMaterials,
             meter: meterMaterials,
@@ -123,29 +169,29 @@ export function useRusnMaterials() {
             tsn: tsnMaterials,
             tn: tnMaterials,
             tt: ttMaterials,
-          });
-        } catch (err) {
-          console.error('Error fetching materials:', err);
-          throw err;
+          };
+        });
+
+        if (!cancelled) {
+          setMaterials(result);
         }
       } catch (err) {
-        console.error('Error in useRusnMaterials:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch materials');
+        if (!cancelled) {
+          console.error('Error in useRusnMaterials:', err);
+          setError(err instanceof Error ? err.message : 'Failed to fetch materials');
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchMaterials();
-  }, [
-    global.breaker?.id,
-    global.rza?.id,
-    global.meterType?.id,
-    global.sr?.id,
-    global.tsn?.id,
-    global.tn?.id,
-    global.tt?.id,
-  ]);
+    return () => {
+      cancelled = true;
+    };
+  }, [categoryKey]);
 
   return { materials, loading, error };
 }

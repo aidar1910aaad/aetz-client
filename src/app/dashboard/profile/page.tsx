@@ -1,13 +1,55 @@
 'use client';
 
-import { useState } from 'react';
-import { Pencil, User, Mail, Phone, MapPin, Calendar, Shield, Building } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 import { useUserStore } from '@/store/useUserStore';
 import { updateMyProfile, UpdateProfileRequest } from '@/api/users';
 import { showToast } from '@/shared/modals/ToastProvider';
 import EditProfileModal from '@/shared/modals/profile/EditProfileModal';
 import ChangePasswordModal from '@/shared/modals/profile/ChangePasswordModal';
 import { getRoleDisplayName } from '@/types/user';
+import { formatUserFullName } from '@/utils/userDisplayName';
+import PageLoader from '@/shared/loader/PageLoader';
+
+function displayValue(value?: string | null) {
+  const trimmed = value?.trim();
+  return trimmed || '—';
+}
+
+function getInitials(firstName?: string, lastName?: string, username?: string) {
+  if (lastName?.trim() && firstName?.trim()) {
+    return `${lastName[0]}${firstName[0]}`.toUpperCase();
+  }
+  if (firstName?.trim()) return firstName.slice(0, 2).toUpperCase();
+  return username?.slice(0, 2).toUpperCase() || '?';
+}
+
+function getRoleBadgeClass(role: string | undefined | null) {
+  const normalized = role?.toLowerCase().trim();
+  if (normalized === 'admin') return 'bg-red-50 text-red-700 ring-red-200/60';
+  if (normalized === 'manager') return 'bg-amber-50 text-amber-800 ring-amber-200/60';
+  if (normalized === 'pto') return 'bg-[#8eba1e]/10 text-[#6b8f16] ring-[#8eba1e]/25';
+  return 'bg-gray-50 text-gray-600 ring-gray-200';
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border-b border-gray-100 py-3 last:border-0 last:pb-0 first:pt-0">
+      <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</dt>
+      <dd className="mt-1 text-sm font-medium text-gray-900">{value}</dd>
+    </div>
+  );
+}
+
+function InfoCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white">
+      <div className="border-b border-gray-100 px-5 py-4">
+        <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
+      </div>
+      <dl className="px-5 py-4">{children}</dl>
+    </section>
+  );
+}
 
 export default function ProfilePage() {
   const { user, setUser } = useUserStore();
@@ -16,32 +58,29 @@ export default function ProfilePage() {
 
   if (!user) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Загрузка профиля...</p>
-        </div>
+      <div className="h-[calc(100vh-64px)]">
+        <PageLoader inline />
       </div>
     );
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('ru-RU', {
+  const fullName = formatUserFullName(user);
+  const initials = getInitials(user.firstName, user.lastName, user.username);
+  const roleLabel = getRoleDisplayName(user.role);
+  const locationParts = [user.city, user.country].filter((part) => part?.trim());
+
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString('ru-RU', {
       year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
     });
-  };
 
   const handleUpdateProfile = async (data: UpdateProfileRequest) => {
-    try {
-      const token = localStorage.getItem('token') || '';
-      const updatedUser = await updateMyProfile(data, token);
-      setUser(updatedUser);
-      showToast('Профиль успешно обновлен!', 'success');
-    } catch (error: any) {
-      throw error;
-    }
+    const token = localStorage.getItem('token') || '';
+    const updatedUser = await updateMyProfile(data, token);
+    setUser(updatedUser);
+    showToast('Профиль успешно обновлён', 'success');
   };
 
   const handleChangePassword = async (newPassword: string) => {
@@ -49,213 +88,123 @@ export default function ProfilePage() {
       const token = localStorage.getItem('token') || '';
       const updatedUser = await updateMyProfile({ password: newPassword }, token);
       setUser(updatedUser);
-      showToast('Пароль успешно изменен!', 'success');
-    } catch (error: any) {
-      showToast(error.message || 'Ошибка при изменении пароля', 'error');
+      showToast('Пароль успешно изменён', 'success');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Ошибка при изменении пароля';
+      showToast(message, 'error');
       throw error;
     }
   };
 
   return (
-    <div className="h-[calc(100vh-64px)] bg-white overflow-y-auto">
-      <main className="p-6 space-y-6 max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-gray-100 rounded-xl">
-              <User className="w-6 h-6 text-[#8eba1e]" />
-            </div>
-            <h1 className="text-4xl font-bold text-gray-900">Мой профиль</h1>
+    <div className="h-[calc(100vh-64px)] overflow-y-auto bg-gray-50">
+      <div className="border-b border-[#7aa31a]/30 bg-gradient-to-r from-[#7aa31a] to-[#8eba1e] px-6 py-5">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-white">Мой профиль</h1>
+            <p className="mt-1 text-sm text-white/85">Личные данные и настройки аккаунта</p>
           </div>
           <button
+            type="button"
             onClick={() => setIsEditModalOpen(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-[#8eba1e] text-white rounded-xl hover:bg-[#7aa31a] transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+            className="inline-flex shrink-0 items-center justify-center rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-[#7aa31a] transition-colors hover:bg-white/90"
           >
-            <Pencil size={18} />
             Редактировать
           </button>
         </div>
+      </div>
 
-        {/* Profile Header Card */}
-        <div className="bg-[#8eba1e] p-8 rounded-3xl shadow-2xl text-white relative overflow-hidden">
-          <div className="absolute inset-0 bg-black/10"></div>
-          <div className="relative flex items-center gap-6">
-            <div className="w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-              <User size={48} />
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+        <div className="mb-6 rounded-xl border border-[#8eba1e]/20 bg-white p-5 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#8eba1e]/15 text-lg font-semibold text-[#6b8f16]">
+                {initials}
+              </span>
+              <div className="min-w-0">
+                <h2 className="truncate text-xl font-semibold text-gray-900">{fullName}</h2>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${getRoleBadgeClass(user.role)}`}
+                  >
+                    {roleLabel}
+                  </span>
+                  {user.position?.trim() && (
+                    <span className="text-sm text-gray-500">{user.position.trim()}</span>
+                  )}
+                </div>
+                {locationParts.length > 0 && (
+                  <p className="mt-1 text-sm text-gray-500">{locationParts.join(', ')}</p>
+                )}
+              </div>
             </div>
-            <div className="flex-1">
-              <h2 className="text-3xl font-bold mb-2">
-                {user.lastName} {user.firstName}
-              </h2>
-              <p className="text-white/90 text-xl mb-1">{user.position}</p>
-              <p className="text-white/90 text-lg">
-                {user.city}, {user.country}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-white/90 text-sm mb-1">ID пользователя</p>
-              <p className="text-2xl font-bold">#{user.id}</p>
+            <div className="shrink-0 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-right">
+              <p className="text-xs text-gray-500">ID пользователя</p>
+              <p className="text-lg font-semibold text-gray-900">#{user.id}</p>
             </div>
           </div>
         </div>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Personal Information */}
-          <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200 hover:shadow-2xl transition-all duration-300">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="p-3 bg-gray-100 rounded-xl">
-                <User className="w-6 h-6 text-[#8eba1e]" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900">Личная информация</h3>
-            </div>
-            
-            <div className="space-y-6">
-              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                <div className="p-2 bg-gray-200 rounded-lg">
-                  <User className="w-5 h-5 text-[#8eba1e]" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 font-medium">Полное имя</p>
-                  <p className="font-semibold text-gray-900 text-lg">{user.lastName} {user.firstName}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                <div className="p-2 bg-gray-200 rounded-lg">
-                  <Mail className="w-5 h-5 text-[#8eba1e]" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 font-medium">Email</p>
-                  <p className="font-semibold text-gray-900 text-lg">{user.email}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                <div className="p-2 bg-gray-200 rounded-lg">
-                  <Phone className="w-5 h-5 text-[#8eba1e]" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 font-medium">Телефон</p>
-                  <p className="font-semibold text-gray-900 text-lg">{user.phone}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                <div className="p-2 bg-gray-200 rounded-lg">
-                  <Building className="w-5 h-5 text-[#8eba1e]" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 font-medium">Должность</p>
-                  <p className="font-semibold text-gray-900 text-lg">{user.position}</p>
-                </div>
-              </div>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+            <InfoCard title="Личная информация">
+              <InfoRow label="Полное имя" value={fullName} />
+              <InfoRow label="Email" value={displayValue(user.email)} />
+              <InfoRow label="Телефон" value={displayValue(user.phone)} />
+              <InfoRow label="Должность" value={displayValue(user.position)} />
+            </InfoCard>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <InfoCard title="Аккаунт">
+                <InfoRow label="Имя пользователя" value={displayValue(user.username)} />
+                <InfoRow label="Роль" value={roleLabel} />
+                <InfoRow
+                  label="Дата регистрации"
+                  value={user.createdAt ? formatDate(user.createdAt) : '—'}
+                />
+              </InfoCard>
+
+              <InfoCard title="Местоположение">
+                <InfoRow label="Страна" value={displayValue(user.country)} />
+                <InfoRow label="Город" value={displayValue(user.city)} />
+                <InfoRow label="Почтовый индекс" value={displayValue(user.postalCode)} />
+              </InfoCard>
             </div>
           </div>
 
-          {/* Account Information */}
-          <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200 hover:shadow-2xl transition-all duration-300">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="p-3 bg-gray-100 rounded-xl">
-                <Shield className="w-6 h-6 text-[#8eba1e]" />
+          <aside className="space-y-6">
+            <section className="rounded-xl border border-gray-200 bg-white">
+              <div className="border-b border-gray-100 px-5 py-4">
+                <h2 className="text-sm font-semibold text-gray-900">Действия</h2>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900">Аккаунт</h3>
-            </div>
-            
-            <div className="space-y-6">
-              <div className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                <p className="text-sm text-gray-600 font-medium mb-1">Имя пользователя</p>
-                <p className="font-semibold text-gray-900 text-lg">{user.username}</p>
+              <div className="space-y-1 p-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(true)}
+                  className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-[#8eba1e]/5 hover:text-[#6b8f16]"
+                >
+                  Редактировать профиль
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsChangePasswordModalOpen(true)}
+                  className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-[#8eba1e]/5 hover:text-[#6b8f16]"
+                >
+                  Изменить пароль
+                </button>
+                <button
+                  type="button"
+                  disabled
+                  className="w-full cursor-not-allowed rounded-lg px-3 py-2.5 text-left text-sm text-gray-400"
+                >
+                  Настройки уведомлений (скоро)
+                </button>
               </div>
-              
-              <div className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                <p className="text-sm text-gray-600 font-medium mb-1">Роль</p>
-                <p className="font-semibold text-gray-900 text-lg">{getRoleDisplayName(user.role)}</p>
-              </div>
-              
-              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                <div className="p-2 bg-gray-200 rounded-lg">
-                  <Calendar className="w-5 h-5 text-[#8eba1e]" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 font-medium">Дата регистрации</p>
-                  <p className="font-semibold text-gray-900 text-lg">
-                    {user.createdAt ? formatDate(user.createdAt) : 'Не указано'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Location Information */}
-          <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200 hover:shadow-2xl transition-all duration-300">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="p-3 bg-gray-100 rounded-xl">
-                <MapPin className="w-6 h-6 text-[#8eba1e]" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900">Местоположение</h3>
-            </div>
-            
-            <div className="space-y-6">
-              <div className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                <p className="text-sm text-gray-600 font-medium mb-1">Страна</p>
-                <p className="font-semibold text-gray-900 text-lg">{user.country}</p>
-              </div>
-              
-              <div className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                <p className="text-sm text-gray-600 font-medium mb-1">Город</p>
-                <p className="font-semibold text-gray-900 text-lg">{user.city}</p>
-              </div>
-              
-              <div className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                <p className="text-sm text-gray-600 font-medium mb-1">Почтовый индекс</p>
-                <p className="font-semibold text-gray-900 text-lg">{user.postalCode}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200 hover:shadow-2xl transition-all duration-300">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="p-3 bg-gray-100 rounded-xl">
-                <Pencil className="w-6 h-6 text-[#8eba1e]" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900">Быстрые действия</h3>
-            </div>
-            
-            <div className="space-y-4">
-              <button
-                onClick={() => setIsEditModalOpen(true)}
-                className="w-full flex items-center gap-4 p-4 text-left hover:bg-gray-50 rounded-xl transition-all duration-200 hover:scale-105 group"
-              >
-                <div className="p-2 bg-gray-100 group-hover:bg-[#8eba1e] rounded-lg transition-colors">
-                  <Pencil className="w-5 h-5 text-[#8eba1e] group-hover:text-white" />
-                </div>
-                <span className="font-medium text-gray-700 group-hover:text-[#8eba1e]">Редактировать профиль</span>
-              </button>
-              
-              <button
-                onClick={() => setIsChangePasswordModalOpen(true)}
-                className="w-full flex items-center gap-4 p-4 text-left hover:bg-gray-50 rounded-xl transition-all duration-200 hover:scale-105 group"
-              >
-                <div className="p-2 bg-gray-100 group-hover:bg-[#8eba1e] rounded-lg transition-colors">
-                  <Shield className="w-5 h-5 text-[#8eba1e] group-hover:text-white" />
-                </div>
-                <span className="font-medium text-gray-700 group-hover:text-[#8eba1e]">Изменить пароль</span>
-              </button>
-              
-              <button className="w-full flex items-center gap-4 p-4 text-left hover:bg-gray-50 rounded-xl transition-all duration-200 hover:scale-105 group opacity-50 cursor-not-allowed">
-                <div className="p-2 bg-gray-100 rounded-lg transition-colors">
-                  <Mail className="w-5 h-5 text-gray-400" />
-                </div>
-                <span className="font-medium text-gray-500">Настройки уведомлений (скоро)</span>
-              </button>
-            </div>
-          </div>
+            </section>
+          </aside>
         </div>
-      </main>
+      </div>
 
-      {/* Edit Profile Modal */}
       {isEditModalOpen && (
         <EditProfileModal
           user={{
@@ -273,7 +222,6 @@ export default function ProfilePage() {
         />
       )}
 
-      {/* Change Password Modal */}
       {isChangePasswordModalOpen && (
         <ChangePasswordModal
           onClose={() => setIsChangePasswordModalOpen(false)}

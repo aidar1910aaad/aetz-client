@@ -1,53 +1,89 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { currencyApi } from '@/api/currency';
+
+export interface CalculationValues {
+  manufacturingHours: number;
+  hourlyRate: number;
+  overheadPercentage: number;
+  adminPercentage: number;
+  plannedProfitPercentage: number;
+  ndsPercentage: number;
+}
 
 interface CalculationSummaryProps {
   totalMaterialsCost: number;
-  onValuesChange: (values: {
-    manufacturingHours: number;
-    hourlyRate: number;
-    overheadPercentage: number;
-    adminPercentage: number;
-    plannedProfitPercentage: number;
-    ndsPercentage: number;
-  }) => void;
+  onValuesChange: (values: CalculationValues) => void;
   isReadOnly?: boolean;
-  initialValues?: {
-    manufacturingHours: number;
-    hourlyRate: number;
-    overheadPercentage: number;
-    adminPercentage: number;
-    plannedProfitPercentage: number;
-    ndsPercentage: number;
-  };
+  initialValues?: Partial<CalculationValues>;
 }
 
-export function CalculationSummary({ 
-  totalMaterialsCost, 
+export function CalculationSummary({
+  totalMaterialsCost,
   onValuesChange,
   isReadOnly = false,
-  initialValues
+  initialValues,
 }: CalculationSummaryProps) {
-  const [manufacturingHours, setManufacturingHours] = useState<number>(initialValues?.manufacturingHours || 1);
-  const [hourlyRate, setHourlyRate] = useState<number>(initialValues?.hourlyRate || 2000);
-  const [overheadPercentage, setOverheadPercentage] = useState<number>(initialValues?.overheadPercentage || 10);
-  const [adminPercentage, setAdminPercentage] = useState<number>(initialValues?.adminPercentage || 15);
-  const [plannedProfitPercentage, setPlannedProfitPercentage] = useState<number>(initialValues?.plannedProfitPercentage || 10);
-  const [ndsPercentage, setNdsPercentage] = useState<number>(initialValues?.ndsPercentage || 12);
+  const [manufacturingHours, setManufacturingHours] = useState(initialValues?.manufacturingHours ?? 0);
+  const [hourlyRate, setHourlyRate] = useState(initialValues?.hourlyRate ?? 2000);
+  const [overheadPercentage, setOverheadPercentage] = useState(initialValues?.overheadPercentage ?? 10);
+  const [adminPercentage, setAdminPercentage] = useState(initialValues?.adminPercentage ?? 15);
+  const [plannedProfitPercentage, setPlannedProfitPercentage] = useState(
+    initialValues?.plannedProfitPercentage ?? 10
+  );
+  const [ndsPercentage, setNdsPercentage] = useState(initialValues?.ndsPercentage ?? 12);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  // Синхронизация с родителем (например, после импорта Excel)
+  useEffect(() => {
+    if (initialValues?.manufacturingHours !== undefined) {
+      setManufacturingHours(initialValues.manufacturingHours);
+    }
+  }, [initialValues?.manufacturingHours]);
 
   useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settings = await currencyApi.getSettings();
+        setHourlyRate(parseFloat(String(settings.hourlyWage)) || 2000);
+        setOverheadPercentage(parseFloat(String(settings.productionExpenses)) || 10);
+        setAdminPercentage(parseFloat(String(settings.administrativeExpenses)) || 15);
+        setPlannedProfitPercentage(parseFloat(String(settings.plannedSavings)) || 10);
+        setNdsPercentage(parseFloat(String(settings.vatRate)) || 12);
+      } catch {
+        setHourlyRate(2000);
+        setOverheadPercentage(10);
+        setAdminPercentage(15);
+        setPlannedProfitPercentage(10);
+        setNdsPercentage(12);
+      } finally {
+        setSettingsLoaded(true);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  useEffect(() => {
+    if (!settingsLoaded) return;
     onValuesChange({
       manufacturingHours,
       hourlyRate,
       overheadPercentage,
       adminPercentage,
       plannedProfitPercentage,
-      ndsPercentage
+      ndsPercentage,
     });
-  }, [manufacturingHours, hourlyRate, overheadPercentage, adminPercentage, plannedProfitPercentage, ndsPercentage]);
+  }, [
+    settingsLoaded,
+    manufacturingHours,
+    hourlyRate,
+    overheadPercentage,
+    adminPercentage,
+    plannedProfitPercentage,
+    ndsPercentage,
+  ]);
 
-  // Расчеты
   const totalSalary = manufacturingHours * hourlyRate;
   const overheadCost = (totalMaterialsCost * overheadPercentage) / 100;
   const productionCost = totalMaterialsCost + totalSalary + overheadCost;
@@ -58,126 +94,164 @@ export function CalculationSummary({
   const ndsAmount = (wholesalePrice * ndsPercentage) / 100;
   const finalPrice = wholesalePrice + ndsAmount;
 
-  const renderInput = (label: string, value: number, onChange: (value: number) => void, suffix?: string) => {
-    if (isReadOnly) {
-      return (
-        <div className="flex items-center">
-          <span className="text-gray-700">{value}</span>
-          {suffix && <span className="ml-1 text-gray-500">{suffix}</span>}
-        </div>
-      );
-    }
+  const fmt = (n: number) => n.toLocaleString('ru-RU', { maximumFractionDigits: 3 });
 
-    return (
-      <div className="flex items-center">
-        <input
-          type="number"
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="w-20 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-        />
-        {suffix && <span className="ml-1 text-gray-500">{suffix}</span>}
-      </div>
-    );
-  };
+  const Row = ({
+    label,
+    value,
+    bold = false,
+    accent = false,
+    separator = false,
+  }: {
+    label: string;
+    value: string;
+    bold?: boolean;
+    accent?: boolean;
+    separator?: boolean;
+  }) => (
+    <div className={`grid grid-cols-[1fr_auto] items-center gap-3 py-1.5 ${separator ? 'mt-1 pt-2 border-t border-gray-100' : ''}`}>
+      <span className={`text-xs leading-tight ${bold ? 'font-semibold text-gray-800' : 'text-gray-500'}`}>{label}</span>
+      <span className={`text-xs font-semibold tabular-nums text-right whitespace-nowrap ${accent ? 'text-[#8eba1e]' : bold ? 'text-gray-900' : 'text-gray-700'}`}>{value}</span>
+    </div>
+  );
 
-  return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-      <h3 className="text-xl font-semibold text-gray-900 mb-4">Расчет стоимости</h3>
-      
-      {/* Итого по материалам */}
-      <div className="flex justify-between items-center py-2 border-b">
-        <span className="text-gray-700">Итого по материалам:</span>
-        <span className="font-medium">{totalMaterialsCost.toLocaleString()} ₸</span>
-      </div>
-
-      {/* Изготовление */}
-      <div className="space-y-4">
-        <h4 className="font-medium text-gray-900">Изготовление</h4>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            {renderInput('Количество часов', manufacturingHours, setManufacturingHours)}
-          </div>
-          <div>
-            {renderInput('Часовая ставка (₸)', hourlyRate, setHourlyRate)}
-          </div>
-        </div>
-        <div className="flex justify-between items-center py-2 border-b">
-          <span className="text-gray-700">Зарплата на изделие:</span>
-          <span className="font-medium">{totalSalary.toLocaleString()} ₸</span>
+  const GlobalSettingRow = ({
+    label,
+    paramValue,
+    resultLabel,
+    resultValue,
+    separator = false,
+  }: {
+    label: string;
+    paramValue: string;
+    resultLabel: string;
+    resultValue: string;
+    separator?: boolean;
+  }) => (
+    <div className={`space-y-0.5 ${separator ? 'mt-1 pt-2 border-t border-gray-100' : ''}`}>
+      <div className="grid grid-cols-[1fr_auto] items-center gap-3">
+        <span className="text-xs text-gray-500 leading-tight">{label}</span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-xs font-medium text-gray-700 tabular-nums">{paramValue}</span>
+          <span className="text-[9px] text-gray-400 bg-gray-100 px-1 py-0.5 rounded">из настроек</span>
         </div>
       </div>
-
-      {/* Общепроизводственные расходы */}
-      <div className="space-y-2">
-        <div className="flex justify-between items-center">
-          <span className="text-gray-700">Общепроизводственные расходы:</span>
-          {renderInput('Общепроизводственные расходы:', overheadPercentage, setOverheadPercentage, '%')}
-        </div>
-        <div className="flex justify-between items-center py-2 border-b">
-          <span className="text-gray-700">Сумма:</span>
-          <span className="font-medium">{overheadCost.toLocaleString()} ₸</span>
-        </div>
-      </div>
-
-      <div className="flex justify-between items-center py-2 border-b">
-        <span className="text-gray-700">Производственная себестоимость:</span>
-        <span className="font-medium">{productionCost.toLocaleString()} ₸</span>
-      </div>
-
-      {/* Административные расходы */}
-      <div className="space-y-2">
-        <div className="flex justify-between items-center">
-          <span className="text-gray-700">Административные расходы:</span>
-          {renderInput('Административные расходы:', adminPercentage, setAdminPercentage, '%')}
-        </div>
-        <div className="flex justify-between items-center py-2 border-b">
-          <span className="text-gray-700">Сумма:</span>
-          <span className="font-medium">{adminCost.toLocaleString()} ₸</span>
-        </div>
-      </div>
-
-      {/* Полная себестоимость */}
-      <div className="flex justify-between items-center py-2 border-b">
-        <span className="text-gray-700">Полная себестоимость:</span>
-        <span className="font-medium">{fullCost.toLocaleString()} ₸</span>
-      </div>
-
-      {/* Плановые накопления */}
-      <div className="space-y-2">
-        <div className="flex justify-between items-center">
-          <span className="text-gray-700">Плановые накопления:</span>
-          {renderInput('Плановые накопления:', plannedProfitPercentage, setPlannedProfitPercentage, '%')}
-        </div>
-        <div className="flex justify-between items-center py-2 border-b">
-          <span className="text-gray-700">Сумма:</span>
-          <span className="font-medium">{plannedProfit.toLocaleString()} ₸</span>
-        </div>
-      </div>
-
-      {/* Оптовая цена */}
-      <div className="flex justify-between items-center py-2 border-b">
-        <span className="text-gray-700">Оптовая цена:</span>
-        <span className="font-medium">{wholesalePrice.toLocaleString()} ₸</span>
-      </div>
-
-      {/* НДС */}
-      <div className="space-y-2">
-        <div className="flex justify-between items-center">
-          <span className="text-gray-700">НДС:</span>
-          {renderInput('НДС:', ndsPercentage, setNdsPercentage, '%')}
-        </div>
-        <div className="flex justify-between items-center py-2 border-b">
-          <span className="text-gray-700">Сумма:</span>
-          <span className="font-medium">{ndsAmount.toLocaleString()} ₸</span>
-        </div>
-      </div>
-
-      {/* Итоговая цена */}
-      <div className="flex justify-between items-center py-2 bg-gray-50 -mx-6 -mb-6 px-6 py-4 rounded-b-lg">
-        <span className="text-lg font-semibold text-gray-900">Отпускная расчетная цена:</span>
-        <span className="text-lg font-bold text-[#3A55DF]">{finalPrice.toLocaleString()} ₸</span>
+      <div className="grid grid-cols-[1fr_auto] items-center gap-3">
+        <span className="text-xs text-gray-400 leading-tight">{resultLabel}</span>
+        <span className="text-xs font-semibold tabular-nums text-right whitespace-nowrap text-gray-600">{resultValue}</span>
       </div>
     </div>
   );
-} 
+
+  return (
+    <div className="bg-white rounded-xl border border-[#8eba1e]/20 overflow-hidden">
+      <div className="px-4 py-3 border-b border-[#8eba1e]/20 bg-[#8eba1e]/5">
+        <h3 className="text-sm font-semibold text-gray-900 border-l-4 border-[#8eba1e] pl-2">
+          Расчет стоимости
+        </h3>
+      </div>
+
+      <div className="px-4 py-3 space-y-0.5">
+
+        {/* Материалы */}
+        <Row label="Итого по материалам" value={`${fmt(totalMaterialsCost)} ₸`} bold />
+
+        {/* Изготовление */}
+        {isReadOnly ? (
+          <Row
+            label={`Изготовление (${manufacturingHours} ч × ${fmt(hourlyRate)} ₸)`}
+            value={`${fmt(totalSalary)} ₸`}
+            separator
+          />
+        ) : (
+          <div className="mt-1 pt-2 border-t border-gray-100 space-y-1.5">
+            <div className="grid grid-cols-[1fr_auto] items-center gap-3">
+              <span className="text-xs font-semibold text-gray-700">Изготовление</span>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-gray-400">ч</span>
+                  <input
+                    type="number"
+                    value={manufacturingHours}
+                    onChange={(e) => setManufacturingHours(Number(e.target.value))}
+                    className="w-14 px-2 py-1 text-xs text-right border border-gray-200 rounded focus:ring-1 focus:ring-[#8eba1e]/40 focus:border-[#8eba1e] transition-colors"
+                  />
+                </div>
+                <span className="text-[10px] text-gray-300">×</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-medium text-gray-700 tabular-nums">{fmt(hourlyRate)}</span>
+                  <span className="text-[10px] text-gray-400">₸</span>
+                  <span className="text-[9px] text-gray-400 bg-gray-100 px-1 py-0.5 rounded">из настроек</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-500">Зарплата</span>
+              <span className="text-xs font-semibold tabular-nums text-gray-700">{fmt(totalSalary)} ₸</span>
+            </div>
+          </div>
+        )}
+
+        {/* Общепроизводственные */}
+        {isReadOnly ? (
+          <Row label={`Общепроизв. расходы (${overheadPercentage}%)`} value={`${fmt(overheadCost)} ₸`} />
+        ) : (
+          <GlobalSettingRow
+            label="Общепроизв. расходы"
+            paramValue={`${overheadPercentage}%`}
+            resultLabel="Сумма"
+            resultValue={`${fmt(overheadCost)} ₸`}
+          />
+        )}
+
+        <Row label="Произв. себестоимость" value={`${fmt(productionCost)} ₸`} bold separator />
+
+        {/* Административные */}
+        {isReadOnly ? (
+          <Row label={`Адм. расходы (${adminPercentage}%)`} value={`${fmt(adminCost)} ₸`} />
+        ) : (
+          <GlobalSettingRow
+            label="Адм. расходы"
+            paramValue={`${adminPercentage}%`}
+            resultLabel="Сумма"
+            resultValue={`${fmt(adminCost)} ₸`}
+          />
+        )}
+
+        <Row label="Полная себестоимость" value={`${fmt(fullCost)} ₸`} bold separator />
+
+        {/* Плановые накопления */}
+        {isReadOnly ? (
+          <Row label={`Плановые накопления (${plannedProfitPercentage}%)`} value={`${fmt(plannedProfit)} ₸`} />
+        ) : (
+          <GlobalSettingRow
+            label="Плановые накопл."
+            paramValue={`${plannedProfitPercentage}%`}
+            resultLabel="Сумма"
+            resultValue={`${fmt(plannedProfit)} ₸`}
+          />
+        )}
+
+        <Row label="Оптовая цена" value={`${fmt(wholesalePrice)} ₸`} bold separator />
+
+        {/* НДС */}
+        {isReadOnly ? (
+          <Row label={`НДС (${ndsPercentage}%)`} value={`${fmt(ndsAmount)} ₸`} />
+        ) : (
+          <GlobalSettingRow
+            label="НДС"
+            paramValue={`${ndsPercentage}%`}
+            resultLabel="Сумма НДС"
+            resultValue={`${fmt(ndsAmount)} ₸`}
+          />
+        )}
+      </div>
+
+      {/* Итог */}
+      <div className="flex items-center justify-between px-4 py-3 bg-[#8eba1e]/10 border-t border-[#8eba1e]/20">
+        <span className="text-sm font-semibold text-gray-900">Отпускная цена:</span>
+        <span className="text-base font-bold text-[#8eba1e] tabular-nums">{fmt(finalPrice)} ₸</span>
+      </div>
+    </div>
+  );
+}

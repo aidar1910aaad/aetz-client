@@ -62,11 +62,15 @@ export default function RoleGuard({
 }: RoleGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { userRole, canAccess, isAuthenticated } = useRoleCheck();
+  const { userRole, canAccess, isAuthenticated, isReady } = useRoleCheck();
 
   const currentPath = pagePath || pathname;
 
   useEffect(() => {
+    if (!isReady) {
+      return;
+    }
+
     // Если пользователь не аутентифицирован, редиректим на главную
     if (!isAuthenticated) {
       router.push('/');
@@ -98,10 +102,10 @@ export default function RoleGuard({
         return;
       }
     }
-  }, [userRole, allowedRoles, currentPath, canAccess, isAuthenticated, router, redirectTo, showError, errorMessage]);
+  }, [userRole, allowedRoles, currentPath, canAccess, isAuthenticated, isReady, router, redirectTo, showError, errorMessage]);
 
   // Показываем загрузку, пока проверяем доступ
-  if (!isAuthenticated || !userRole) {
+  if (!isReady || !isAuthenticated || !userRole) {
     return <PageLoader />;
   }
 

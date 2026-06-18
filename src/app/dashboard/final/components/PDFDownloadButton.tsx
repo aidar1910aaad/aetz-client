@@ -8,6 +8,7 @@ import type { Transformer } from '@/api/transformers';
 import type { RusnState } from '@/store/useRusnStore';
 import type { WorkItem } from '@/store/useWorksStore';
 import type { AdditionalEquipmentState, AdditionalEquipmentItem } from '@/store/useAdditionalEquipmentStore';
+import type { PdfHeaderMeta } from './PdfCommercialHeader';
 
 // Динамический импорт PDF функционала для избежания ошибок SSR
 const PDFWrapper = dynamic(
@@ -40,6 +41,7 @@ interface Props {
   filename: string;
   fullName: string;
   user: any;
+  pdfHeader?: PdfHeaderMeta;
   bmzStore: BmzData;
   selectedTransformer: Transformer | null;
   rusnStore: RusnState;
@@ -59,6 +61,7 @@ const PDFDownloadButton = React.memo(function PDFDownloadButton(props: Props) {
       filename={props.filename}
       fullName={props.fullName}
       user={props.user}
+      pdfHeader={props.pdfHeader}
       bmzStore={props.bmzStore}
       selectedTransformer={props.selectedTransformer}
       rusnStore={props.rusnStore}

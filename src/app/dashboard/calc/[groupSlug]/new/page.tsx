@@ -7,6 +7,7 @@ import { createCalculation } from '@/api/calculations';
 import { useCalculations } from '@/hooks/useCalculations';
 import RoleGuard from '@/components/common/RoleGuard';
 import { UserRole } from '@/types/user';
+import { normalizeCellType } from '@/domain/calculation/cellTypes';
 
 export default function CreateCalculationPage() {
   const router = useRouter();
@@ -62,16 +63,13 @@ export default function CreateCalculationPage() {
       // Теперь можно создавать калькуляцию без материалов
       // Если материалы есть - они будут добавлены, если нет - калькуляция создастся пустой
 
-      // Создаем slug из названия
-      const slug = calculation.name
-        .toLowerCase()
-        .replace(/[^a-z0-9а-яё]/gi, '-') // Заменяем все не-буквы и не-цифры на дефис
-        .replace(/-+/g, '-') // Заменяем множественные дефисы на один
-        .replace(/^-|-$/g, ''); // Убираем дефисы в начале и конце
+      if (!calculation.slug || calculation.slug.trim().length < 3) {
+        throw new Error('Slug калькуляции должен содержать минимум 3 символа.');
+      }
 
       const payload = {
         name: calculation.name,
-        slug: slug,
+        slug: calculation.slug.trim(),
         groupId: selectedGroup.id,
         data: {
           categories: calculation.data.categories
@@ -95,7 +93,7 @@ export default function CreateCalculationPage() {
             ndsPercentage: Number(calculation.data.calculation.ndsPercentage),
           },
           cellConfig: calculation.data.cellConfig ? {
-            type: calculation.data.cellConfig.type || '10kv',
+            type: normalizeCellType(calculation.data.cellConfig.type),
             materials: calculation.data.cellConfig.materials && typeof calculation.data.cellConfig.materials === 'object' && !Array.isArray(calculation.data.cellConfig.materials)
               ? calculation.data.cellConfig.materials
               : {},
@@ -128,7 +126,7 @@ export default function CreateCalculationPage() {
     data: {
       categories: [],
       calculation: {
-        manufacturingHours: 1,
+        manufacturingHours: 0,
         hourlyRate: 2000,
         overheadPercentage: 10,
         adminPercentage: 15,
@@ -155,6 +153,7 @@ export default function CreateCalculationPage() {
 
           <CalculationEditForm
             calculation={initialCalculation}
+            groupSlug={decodeURIComponent(groupSlug)}
             onSave={handleSave}
             onCancel={handleCancel}
           />

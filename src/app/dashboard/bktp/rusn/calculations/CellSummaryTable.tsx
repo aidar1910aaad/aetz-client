@@ -1,6 +1,8 @@
 import { RusnCell } from '@/store/useRusnStore';
 import { useTransformerStore } from '@/store/useTransformerStore';
 import { RusnMaterials, formatCellDescription } from '@/utils/rusnMaterials';
+import CellPriceSummary from '@/components/bktp/shared/CellPriceSummary';
+import { formatKzt } from '@/utils/formatCurrency';
 
 interface CellSummaryTableProps {
   cell: RusnCell;
@@ -75,9 +77,9 @@ export default function CellSummaryTable({
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
                 <div className="flex flex-col items-end">
-                  <span>{cell.calculationBreakdown.main.price.toLocaleString('ru-RU')} ₸</span>
+                  <span>{formatKzt(cell.calculationBreakdown.main.price)} ₸</span>
                   <span className="text-xs text-gray-500">
-                    Итого: {(cell.calculationBreakdown.main.price * 2).toLocaleString('ru-RU')} ₸
+                    Итого: {formatKzt(cell.calculationBreakdown.main.price * 2)} ₸
                   </span>
                 </div>
               </td>
@@ -90,9 +92,9 @@ export default function CellSummaryTable({
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
                 <div className="flex flex-col items-end">
-                  <span>{cell.calculationBreakdown.additional.price.toLocaleString('ru-RU')} ₸</span>
+                  <span>{formatKzt(cell.calculationBreakdown.additional.price)} ₸</span>
                   <span className="text-xs text-gray-500">
-                    Итого: {(cell.calculationBreakdown.additional.price * (cell.count || 1)).toLocaleString('ru-RU')} ₸
+                    Итого: {formatKzt(cell.calculationBreakdown.additional.price * (cell.count || 1))} ₸
                   </span>
                 </div>
               </td>
@@ -318,51 +320,33 @@ export default function CellSummaryTable({
     );
   }
 
-  // Обычная логика для остальных случаев
+  const pricePerUnit = (total || 0) / (cell.count || 1);
+  const summaryName = Array.isArray(description) ? description.join(' · ') : String(description);
+
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden animate-fade-in">
-      {/* Заголовок с кнопкой Нет для секционных разъединителей КСО 366 */}
-      {cell.purpose === 'Секционный разьединитель' && selectedGroupName === 'Камера КСО 366' && cell.cellType && cell.cellType !== '' && cell.cellType !== 'Камера КСО 366 ШМР 14, 15' && (
-        <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-          <span className="text-sm font-medium text-gray-900">Ячейка: Секционный разьединитель</span>
-          <button
-            onClick={onClearCell}
-            className="px-3 py-1 text-sm font-medium text-red-600 border border-red-300 rounded hover:bg-red-50 hover:border-red-400 transition-all duration-200"
-          >
-            Нет
-          </button>
-        </div>
-      )}
-      <table className="min-w-full divide-y divide-gray-200">
-        <tbody className="bg-white divide-y divide-gray-200">
-          <tr>
-            <td className="px-6 py-4 text-sm text-gray-900">{description}</td>
-            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-              {cell.count || 1} шт.
-            </td>
-            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-              <div className="flex flex-col items-end">
-                <span>{((total || 0) / (cell.count || 1)).toLocaleString('ru-RU')} ₸</span>
-                {isCalculating ? (
-                  <div className="flex flex-col items-end mt-1">
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 bg-gray-200 rounded-full h-1">
-                        <div className="bg-[#8eba1e] h-1 rounded-full animate-pulse" style={{ width: '60%' }}></div>
-                      </div>
-                      <span className="text-xs text-[#8eba1e]">Загрузка...</span>
-                    </div>
-                    <span className="text-xs text-gray-500 mt-1">Итого: Загрузка...</span>
-                  </div>
-                ) : (
-                  <span className="text-xs text-gray-500">
-                    Итого: {(total || 0).toLocaleString('ru-RU')} ₸
-                  </span>
-                )}
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div className="space-y-2 animate-fade-in">
+      {cell.purpose === 'Секционный разьединитель' &&
+        selectedGroupName === 'Камера КСО 366' &&
+        cell.cellType &&
+        cell.cellType !== '' &&
+        cell.cellType !== 'Камера КСО 366 ШМР 14, 15' && (
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={onClearCell}
+              className="text-xs font-medium text-red-600 px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 transition-colors"
+            >
+              Сбросить тип
+            </button>
+          </div>
+        )}
+      <CellPriceSummary
+        name={summaryName}
+        quantity={cell.count || 1}
+        pricePerUnit={pricePerUnit}
+        total={total || 0}
+        isCalculating={isCalculating}
+      />
     </div>
   );
 }

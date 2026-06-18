@@ -13,8 +13,11 @@ export const BackgroundImage = ({
 }: BackgroundImageProps) => {
   return (
     <>
-      <Image src={src} alt={alt} fill className="object-cover z-0" />
-      <div className={`absolute inset-0 bg-black/${overlayOpacity} z-10`} />
+      <Image src={src} alt={alt} fill className="object-cover z-0" priority />
+      <div
+        className="absolute inset-0 z-10"
+        style={{ backgroundColor: `rgba(0, 0, 0, ${overlayOpacity})` }}
+      />
     </>
   );
 };

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getAllApplications } from '@/api/requests';
 import { getAllUsers } from '@/api/users';
-import { getAllMaterials } from '@/api/material';
+import { getAllMaterials } from '@/api/material/index';
 
 export interface DashboardStats {
   totalApplications: number;
@@ -45,10 +45,10 @@ export function useDashboardStats() {
         setStats(prev => ({ ...prev, loading: true, error: null }));
 
         // Получаем данные параллельно
-        const [applications, users, materials] = await Promise.all([
+        const [applications, users, materialsResult] = await Promise.all([
           getAllApplications(token).catch(() => []),
           getAllUsers(token).catch(() => []),
-          getAllMaterials(token).catch(() => []),
+          getAllMaterials(token, { page: 1, limit: 1 }).catch(() => ({ data: [], total: 0 })),
         ]);
 
         // Анализируем заявки
@@ -112,7 +112,7 @@ export function useDashboardStats() {
           activeApplications: applications.filter((app: any) => !app.completed).length,
           completedCalculations: applications.filter((app: any) => app.completed).length,
           totalUsers: users.length,
-          totalMaterials: materials.length,
+          totalMaterials: materialsResult.total ?? materialsResult.data?.length ?? 0,
           recentApplications,
           monthlyApplications,
           averageApplicationValue: averageValue,

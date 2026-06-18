@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
 import { RusnCell as RusnCellType, useRusnStore } from '@/store/useRusnStore';
 import { useTransformerStore } from '@/store/useTransformerStore';
-import { useRusnMaterials } from '@/hooks/useRusnMaterials';
-import { getCellFieldConfig, RusnMaterials, formatCellDescription } from '@/utils/rusnMaterials';
+import { getCellFieldConfig, RusnMaterials } from '@/utils/rusnMaterials';
 import { useCellCalculation } from '@/hooks/useCellCalculation';
 import MaterialSelect from './MaterialSelect';
 import DisconnectorTypeSelector from './DisconnectorTypeSelector';
+import CellFormGrid from '@/components/bktp/shared/CellFormGrid';
+import { CellFormField, inputClassName } from '@/components/bktp/shared/CellFormField';
+import { buildRusnCellSummaries, getRusnCellSummaryIds } from '@/domain/rusn/cellSummary';
+import { isKsoA12BhaEligible } from '@/domain/rusn/rusnConstants';
+import { getKsoA12BhaCellDescription } from '@/domain/calculation/bhaPresets';
+import { useDebugPanelsEnabled } from '@/components/common/DebugToggle';
 
 // Компонент QuantityInput
 interface QuantityInputProps {
@@ -15,16 +20,15 @@ interface QuantityInputProps {
 
 function QuantityInput({ cell, onUpdate }: QuantityInputProps) {
   return (
-    <div className="flex flex-col gap-1 min-w-[100px]">
-      <span className="text-xs font-medium text-[#3A55DF]">Кол-во</span>
+    <CellFormField label="Кол-во" className="sm:max-w-[120px]">
       <input
         type="number"
         min={1}
         value={cell.count || 1}
-        onChange={(e) => onUpdate(cell.id, 'count', Number(e.target.value))}
-        className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
+        onChange={(e) => onUpdate(cell.id, 'count', Math.max(1, Number(e.target.value) || 1))}
+        className={inputClassName}
       />
-    </div>
+    </CellFormField>
   );
 }
 
@@ -35,19 +39,56 @@ interface CellActionButtonsProps {
 }
 
 function CellActionButtons({ cell, onRemove }: CellActionButtonsProps) {
+  if (cell.purpose !== 'Отходящая') return null;
   return (
-    <div className="flex gap-2 ml-auto">
-      {cell.purpose === 'Отходящая' && (
-        <button
-          onClick={() => onRemove(cell.id)}
-          className="flex items-center justify-center w-10 h-10 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all duration-200 shadow-sm hover:shadow-md"
-          title="Удалить ячейку"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      )}
+    <button
+      type="button"
+      onClick={() => onRemove(cell.id)}
+      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+      title="Удалить ячейку"
+    >
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+      </svg>
+      Удалить
+    </button>
+  );
+}
+
+interface BhaModeToggleProps {
+  cell: RusnCellType;
+  bodyType: string;
+  onUpdate: (id: string, field: keyof RusnCellType, value: RusnCellType[keyof RusnCellType]) => void;
+}
+
+function BhaModeToggle({ cell, bodyType, onUpdate }: BhaModeToggleProps) {
+  if (!isKsoA12BhaEligible(bodyType, cell.purpose)) {
+    return null;
+  }
+
+  const isActive = Boolean(cell.bhaMode);
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-indigo-900">Режим BHA</p>
+        <p className="text-xs text-indigo-700 mt-0.5">
+          {isActive
+            ? 'Используется фиксированная BHA-калькуляция для этой ячейки'
+            : 'Стандартный расчёт по выбранным материалам'}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={() => onUpdate(cell.id, 'bhaMode', !isActive)}
+        className={`shrink-0 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+          isActive
+            ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+            : 'bg-white text-indigo-700 border border-indigo-300 hover:bg-indigo-100'
+        }`}
+      >
+        {isActive ? 'Выключить BHA' : 'Режим BHA'}
+      </button>
     </div>
   );
 }
@@ -115,8 +156,9 @@ export default function RusnCell({
     return null;
   }
 
-  const { materials: rusnMaterials, loading: materialsLoading } = useRusnMaterials();
   const { global } = useRusnStore();
+  const selectedTransformer = useTransformerStore((state) => state.selectedTransformer);
+  const { enabled: debugPanelsEnabled } = useDebugPanelsEnabled();
   
   // Обертываем onUpdate для логирования
   const handleUpdate = (id: string, field: keyof RusnCellType, value: RusnCellType[keyof RusnCellType]) => {
@@ -162,7 +204,7 @@ export default function RusnCell({
 
 
 
-  const { setCellSummary, removeCellSummary, cellSummaries } = useRusnStore();
+  const { setCellSummary, removeCellSummary } = useRusnStore();
 
   // Обновляем totalPrice ячейки при изменении total
   React.useEffect(() => {
@@ -174,66 +216,15 @@ export default function RusnCell({
 
   // Сохраняем summary данные ячейки в store
   React.useEffect(() => {
-    // Для секционных разъединителей КСО 366 добавляем в сводку только если есть cellType
-    const shouldAddToSummary = total > 0 && 
-      (cell.purpose !== 'Секционный разьединитель' || 
-       selectedGroupName !== 'Камера КСО 366' || 
-       cell.cellType);
-    
-    if (shouldAddToSummary) {
-      const cellDescription = formatCellDescription(cell, materials, global.bodyType);
-      
-      // Для КСО 366 ШМР создаем отдельные записи
-      if (cell.cellType === 'Камера КСО 366 ШМР 14, 15' && cell.calculationBreakdown && Array.isArray(cellDescription)) {
-        // Создаем отдельные записи для каждой части
-        const mainSummary = {
-          cellId: `${cell.id}_main`,
-          name: cellDescription[0],
-          quantity: 2, // Фиксированно 2 шт для основной части
-          pricePerUnit: cell.calculationBreakdown.main.price,
-          totalPrice: cell.calculationBreakdown.main.price * 2,
-        };
-        
-        const additionalSummary = {
-          cellId: `${cell.id}_additional`,
-          name: cellDescription[1],
-          quantity: cell.count || 1,
-          pricePerUnit: cell.calculationBreakdown.additional.price,
-          totalPrice: cell.calculationBreakdown.additional.price * (cell.count || 1),
-        };
-        
-        // Удаляем старые записи и создаем новые
-        removeCellSummary(cell.id);
-        removeCellSummary(`${cell.id}_main`);
-        removeCellSummary(`${cell.id}_additional`);
-        
-        setCellSummary(mainSummary);
-        setCellSummary(additionalSummary);
-      } else if (cell.cellType !== 'Камера КСО 366 ШМР 14, 15') {
-        // Обычная логика для одной записи (кроме КСО 366 ШМР)
-        const pricePerUnit = total / (cell.count || 1);
-        const newSummary = {
-          cellId: cell.id,
-          name: Array.isArray(cellDescription) ? cellDescription.join('\n') : cellDescription,
-          quantity: cell.count || 1,
-          pricePerUnit: pricePerUnit,
-          totalPrice: total,
-        };
-        
-        // Удаляем записи _main и _additional если они есть (для случаев когда тип камеры изменился)
-        removeCellSummary(`${cell.id}_main`);
-        removeCellSummary(`${cell.id}_additional`);
-        
-        setCellSummary(newSummary);
-      }
-    } else {
-      // Удаляем summary если total <= 0
-      removeCellSummary(cell.id);
-      removeCellSummary(`${cell.id}_main`);
-      removeCellSummary(`${cell.id}_additional`);
-    }
-    
-    
+    const summaries = buildRusnCellSummaries(
+      cell,
+      materials,
+      global.bodyType,
+      total,
+      selectedTransformer?.voltage
+    );
+    getRusnCellSummaryIds(cell.id).forEach(removeCellSummary);
+    summaries.forEach(setCellSummary);
   }, [
     cell.id,
     cell.cellType,
@@ -253,46 +244,19 @@ export default function RusnCell({
     cell.transformerPower?.id,
     cell.transformerPower?.name,
     cell.count,
+    cell.bhaMode,
     cell.calculationBreakdown,
     total,
     materials,
-    selectedGroupName,
+    selectedTransformer?.voltage,
     setCellSummary,
     removeCellSummary,
   ]);
 
-  // Отдельный useEffect для очистки старых записей при изменении cellType
-  React.useEffect(() => {
-    if (cell.purpose === 'Секционный разьединитель' && selectedGroupName === 'Камера КСО 366') {
-      // Удаляем старые записи только если cellType изменился на пустой или дефолтный
-      if (!cell.cellType || cell.cellType === 'Камера КСО А12-10') {
-        // Удаляем записи по названию - это более надежный способ
-        const { cellSummaries } = useRusnStore.getState();
-        const kso366Summaries = cellSummaries.filter(summary => 
-          summary.name.includes('Камера КСО 366-14, 15') ||
-          summary.name.includes('Шинный мост с разъединителем')
-        );
-        
-        kso366Summaries.forEach(summary => {
-          removeCellSummary(summary.cellId);
-        });
-        
-        // Также удаляем по cellId на всякий случай
-        removeCellSummary(cell.id);
-        removeCellSummary(`${cell.id}_main`);
-        removeCellSummary(`${cell.id}_additional`);
-        
-        // Принудительно обновляем компонент через изменение состояния
-        setTimeout(() => {
-          const { cellSummaries } = useRusnStore.getState();
-          // Принудительно обновляем store для перерендера
-          useRusnStore.setState({ cellSummaries: [...cellSummaries] });
-        }, 50);
-      }
-    }
-  }, [cell.cellType, cell.purpose, selectedGroupName, cell.id, removeCellSummary]);
+  const isBhaActive =
+    Boolean(cell.bhaMode) && isKsoA12BhaEligible(global.bodyType, cell.purpose);
 
-  const cellFields = getCellFieldConfig(cell.purpose, rusnMaterials, cell.cellType, selectedGroupName);
+  const cellFields = getCellFieldConfig(cell.purpose, materials, cell.cellType, selectedGroupName);
   
 
   const handleRemove = () => {
@@ -303,6 +267,10 @@ export default function RusnCell({
 
   // Проверяем, нужно ли показывать предупреждение о трансформаторе тока
   const shouldShowTTWarning = () => {
+    if (cell.bhaMode) {
+      return false;
+    }
+
     // Не показываем предупреждение для специальных ячеек, которые не требуют ТТ
     const specialCells = ['Кабельная перемычка', 'Изоляционный адаптер', 'Камера Siemens 8DJH'];
     if (specialCells.includes(cell.purpose)) {
@@ -319,14 +287,16 @@ export default function RusnCell({
   return (
     <div className="flex flex-col gap-4 animate-fade-in">
       {/* Отладочная панель */}
-      <DebugPanel
-        cell={cell}
-        materials={rusnMaterials}
-        groupSlug={groupSlug}
-        selectedGroupName={selectedGroupName}
-        selectedCalculationName={selectedCalculationName}
-        calculations={cellCalculations}
-      />
+      {debugPanelsEnabled && (
+        <DebugPanel
+          cell={cell}
+          materials={materials}
+          groupSlug={groupSlug}
+          selectedGroupName={selectedGroupName}
+          selectedCalculationName={selectedCalculationName}
+          calculations={cellCalculations}
+        />
+      )}
       
       {/* Селектор типа разъединителя для КСО 366 */}
       {needsDisconnectorTypeSelection && (
@@ -351,53 +321,36 @@ export default function RusnCell({
         </div>
       )}
 
+      <BhaModeToggle cell={cell} bodyType={global.bodyType} onUpdate={handleUpdate} />
+
       {/* Специальные поля для Камера Siemens 8DJH */}
       {cell.purpose === 'Камера Siemens 8DJH' ? (
-        <div className="flex flex-wrap gap-4 items-end p-4 rounded bg-white border border-gray-100">
-          {/* 8DJH (R) */}
-          <div className="flex flex-col gap-1 min-w-[200px]">
-            <span className="text-xs font-medium text-[#3A55DF]">8DJH (R)</span>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Кол-во:</span>
-              <input
-                type="number"
-                min="0"
-                value={(cell as any).siemens8DJH_R || 0}
-                onChange={(e) => handleUpdate(cell.id, 'siemens8DJH_R' as any, Number(e.target.value))}
-                className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
-              />
-            </div>
-          </div>
-
-          {/* 8DJH (L) */}
-          <div className="flex flex-col gap-1 min-w-[200px]">
-            <span className="text-xs font-medium text-[#3A55DF]">8DJH (L)</span>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Кол-во:</span>
-              <input
-                type="number"
-                min="0"
-                value={(cell as any).siemens8DJH_L || 0}
-                onChange={(e) => handleUpdate(cell.id, 'siemens8DJH_L' as any, Number(e.target.value))}
-                className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
-              />
-            </div>
-          </div>
-
-          {/* Кнопки действий */}
-          <CellActionButtons cell={cell} onRemove={handleRemove} />
-        </div>
+        <CellFormGrid footer={<CellActionButtons cell={cell} onRemove={handleRemove} />}>
+          <CellFormField label="8DJH (R)">
+            <input
+              type="number"
+              min={0}
+              value={(cell as any).siemens8DJH_R || 0}
+              onChange={(e) => handleUpdate(cell.id, 'siemens8DJH_R' as any, Number(e.target.value))}
+              className={inputClassName}
+            />
+          </CellFormField>
+          <CellFormField label="8DJH (L)">
+            <input
+              type="number"
+              min={0}
+              value={(cell as any).siemens8DJH_L || 0}
+              onChange={(e) => handleUpdate(cell.id, 'siemens8DJH_L' as any, Number(e.target.value))}
+              className={inputClassName}
+            />
+          </CellFormField>
+          <QuantityInput cell={cell} onUpdate={handleUpdate} />
+        </CellFormGrid>
       ) : cell.purpose === 'Кабельная перемычка' ? (
-        /* Специальные поля для Кабельная перемычка */
-        <div className="flex flex-wrap gap-4 items-end p-4 rounded bg-white border border-gray-100">
-          {/* Автоматический выбор типа перемычки на основе трансформатора */}
-          <div className="flex flex-col gap-1 min-w-[200px]">
-            <span className="text-xs font-medium text-[#3A55DF]">Тип перемычки</span>
-            <div className="text-sm text-gray-600">
+        <CellFormGrid footer={<CellActionButtons cell={cell} onRemove={handleRemove} />}>
+          <CellFormField label="Тип перемычки" className="sm:col-span-2">
+            <div className={`${inputClassName} flex items-center text-gray-700 bg-gray-50`}>
               {(() => {
-                // Получаем трансформатор из store
-                const selectedTransformer = useTransformerStore.getState().selectedTransformer;
-                
                 if (selectedTransformer?.voltage === '10') {
                   return 'Кабельная перемычка 10кВ';
                 } else if (selectedTransformer?.voltage === '20') {
@@ -407,25 +360,14 @@ export default function RusnCell({
                 }
               })()}
             </div>
-          </div>
-
-          {/* Поле количества */}
+          </CellFormField>
           <QuantityInput cell={cell} onUpdate={handleUpdate} />
-
-          {/* Кнопки действий */}
-          <CellActionButtons cell={cell} onRemove={handleRemove} />
-        </div>
+        </CellFormGrid>
       ) : cell.purpose === 'Изоляционный адаптер' ? (
-        /* Специальные поля для Изоляционный адаптер */
-        <div className="flex flex-wrap gap-4 items-end p-4 rounded bg-white border border-gray-100">
-          {/* Автоматический выбор типа адаптера на основе трансформатора */}
-          <div className="flex flex-col gap-1 min-w-[200px]">
-            <span className="text-xs font-medium text-[#3A55DF]">Тип адаптера</span>
-            <div className="text-sm text-gray-600">
+        <CellFormGrid footer={<CellActionButtons cell={cell} onRemove={handleRemove} />}>
+          <CellFormField label="Тип адаптера" className="sm:col-span-2">
+            <div className={`${inputClassName} flex items-center text-gray-700 bg-gray-50`}>
               {(() => {
-                // Получаем трансформатор из store
-                const selectedTransformer = useTransformerStore.getState().selectedTransformer;
-                
                 if (selectedTransformer?.voltage === '10') {
                   return 'Изоляционный адаптер 10кВ';
                 } else if (selectedTransformer?.voltage === '20') {
@@ -435,48 +377,45 @@ export default function RusnCell({
                 }
               })()}
             </div>
-          </div>
-
-          {/* Поле количества */}
+          </CellFormField>
           <QuantityInput cell={cell} onUpdate={handleUpdate} />
-
-          {/* Кнопки действий */}
-          <CellActionButtons cell={cell} onRemove={handleRemove} />
-        </div>
+        </CellFormGrid>
+      ) : isBhaActive ? (
+        <CellFormGrid footer={<CellActionButtons cell={cell} onRemove={handleRemove} />}>
+          <CellFormField label="Наименование" className="sm:col-span-2 lg:col-span-3">
+            <div className={`${inputClassName} flex items-center text-gray-700 bg-gray-50 min-h-[42px]`}>
+              {getKsoA12BhaCellDescription(cell.purpose)}
+            </div>
+          </CellFormField>
+          <QuantityInput cell={cell} onUpdate={handleUpdate} />
+        </CellFormGrid>
       ) : (
-        /* Обычные поля ячейки */
-        <div className="flex flex-wrap gap-4 items-end p-4 rounded bg-white border border-gray-100">
-          {/* Рендерим поля на основе конфигурации */}
+        <CellFormGrid footer={<CellActionButtons cell={cell} onRemove={handleRemove} />}>
           {cellFields.map(({ field, label }) => {
-            const fieldValue = cell[field];
-            const selectedId =
-              typeof fieldValue === 'object' && fieldValue !== null ? fieldValue.id : undefined;
+              const fieldValue = cell[field];
+              const selectedId =
+                typeof fieldValue === 'object' && fieldValue !== null ? fieldValue.id : undefined;
 
-            return (
-              <MaterialSelect
-                key={field}
-                field={field}
-                label={label}
-                materials={rusnMaterials}
-                cell={cell}
-                selectedId={selectedId}
-                onUpdate={handleUpdate}
-              />
-            );
-          })}
-
-          {/* Поле количества */}
+              return (
+                <MaterialSelect
+                  key={field}
+                  field={field}
+                  label={label}
+                  materials={materials}
+                  cell={cell}
+                  selectedId={selectedId}
+                  onUpdate={handleUpdate}
+                />
+              );
+            })}
           <QuantityInput cell={cell} onUpdate={handleUpdate} />
-
-          {/* Кнопки действий */}
-          <CellActionButtons cell={cell} onRemove={handleRemove} />
-        </div>
+        </CellFormGrid>
       )}
 
       {/* Итоговая таблица */}
       <CellSummaryTable
         cell={cell}
-        materials={rusnMaterials}
+        materials={materials}
         selectedGroupName={selectedGroupName}
         currentCalculation={currentCalculation}
         total={total}
@@ -490,14 +429,16 @@ export default function RusnCell({
       />
 
       {/* Детальная информация о расчетах */}
-      <CellCalculationDetails
-        cell={cell}
-        materials={rusnMaterials}
-        currentCalculation={currentCalculation}
-        calculations={calculations}
-        rzaCalculation={rzaCalculation}
-        foundCalculations={foundCalculations}
-      />
+      {!isBhaActive && (
+        <CellCalculationDetails
+          cell={cell}
+          materials={materials}
+          currentCalculation={currentCalculation}
+          calculations={calculations}
+          rzaCalculation={rzaCalculation}
+          foundCalculations={foundCalculations}
+        />
+      )}
     </div>
   );
 }

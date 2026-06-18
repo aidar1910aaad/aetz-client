@@ -1,8 +1,18 @@
 import { useState, useEffect } from 'react';
 import { api } from '@/api/baseUrl';
-import { Decimal } from 'decimal.js';
+import { currencyApi } from '@/api/currency';
+import {
+  calculateCalculationFinalPriceWithRates,
+  CalculationRates,
+} from '@/utils/calculationRollup';
+import {
+  API_FALLBACK_CALCULATION_RATES,
+  applyApiCalculationRates,
+  currencySettingsToCalculationRates,
+} from '@/utils/calculationSettings';
+import { fetchWithDedup } from '@/lib/materialsFetchCache';
 
-interface CalculationItem {
+export interface CalculationItem {
   id: number | null;
   name: string;
   unit: string;
@@ -10,12 +20,12 @@ interface CalculationItem {
   quantity: number;
 }
 
-interface CalculationCategory {
+export interface CalculationCategory {
   name: string;
   items: CalculationItem[];
 }
 
-interface Calculation {
+export interface Calculation {
   id: number;
   name: string;
   slug: string;
@@ -36,22 +46,39 @@ interface Calculation {
   };
 }
 
-interface CalculationState {
+export interface CalculationState {
   breaker: Calculation[];
   rza: Calculation[];
   meter: Calculation[];
   cell: Calculation[];
 }
 
+interface RusnCalculationPayload {
+  calculations: Calculation[];
+  settingsRates: CalculationRates;
+}
+
+const EMPTY_CALCULATION_STATE: CalculationState = {
+  breaker: [],
+  rza: [],
+  meter: [],
+  cell: [],
+};
+
+const rusnCalculationSlot: {
+  key: string;
+  data: RusnCalculationPayload | null;
+  promise: Promise<RusnCalculationPayload> | null;
+  updatedAt: number;
+} = { key: '', data: null, promise: null, updatedAt: 0 };
+
 export function useRusnCalculation(groupSlug?: string) {
-  const [calculations, setCalculations] = useState<CalculationState>({
-    breaker: [],
-    rza: [],
-    meter: [],
-    cell: [],
-  });
+  const [calculations, setCalculations] = useState<CalculationState>(EMPTY_CALCULATION_STATE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [settingsRates, setSettingsRates] = useState<CalculationRates>(
+    API_FALLBACK_CALCULATION_RATES
+  );
 
   useEffect(() => {
     const fetchCalculations = async () => {
@@ -63,26 +90,41 @@ export function useRusnCalculation(groupSlug?: string) {
 
       try {
         const token = localStorage.getItem('token') || '';
-        const url = `${api}/calculations/groups/${groupSlug}/calculations`;
-        
-        const response = await fetch(url, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+        const payload = await fetchWithDedup(rusnCalculationSlot, groupSlug, async () => {
+          const url = `${api}/calculations/groups/${groupSlug}/calculations`;
+          const response = await fetch(url, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (!response.ok) {
+            throw new Error(
+              `Failed to fetch calculations: ${response.status} ${response.statusText}`
+            );
+          }
+
+          const [data, settings] = await Promise.all([
+            response.json() as Promise<Calculation[]>,
+            currencyApi.getSettings().catch(() => null),
+          ]);
+
+          return {
+            calculations: data,
+            settingsRates: settings
+              ? currencySettingsToCalculationRates(settings)
+              : API_FALLBACK_CALCULATION_RATES,
+          };
         });
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch calculations: ${response.status} ${response.statusText}`);
-        }
-
-        const data: Calculation[] = await response.json();
+        setSettingsRates(payload.settingsRates);
 
         // Группируем расчеты по типам
         const groupedCalculations: CalculationState = {
           breaker: [],
           rza: [],
           meter: [],
-          cell: data, // Все калькуляции ячеек
+          cell: payload.calculations, // Все калькуляции ячеек
         };
 
         setCalculations(groupedCalculations);
@@ -101,28 +143,8 @@ export function useRusnCalculation(groupSlug?: string) {
     const calculation = calculations.cell.find((c) => c.id === calculationId);
     if (!calculation) return 0;
 
-    // Получаем отпускную цену из данных калькуляции
-    let totalMaterialsCost = calculation.data.categories.reduce((total, category) => {
-      return total + category.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    }, 0);
-
-    const calculationData = calculation.data.calculation;
-    if (!calculationData) return totalMaterialsCost;
-
-    // Calculate the total cost using precise decimal arithmetic
-    const totalSalary = new Decimal(calculationData.manufacturingHours).mul(calculationData.hourlyRate);
-    const overheadCost = new Decimal(totalMaterialsCost).mul(calculationData.overheadPercentage).div(100);
-    const productionCost = new Decimal(totalMaterialsCost).add(totalSalary).add(overheadCost);
-    const adminCost = new Decimal(totalMaterialsCost).mul(calculationData.adminPercentage).div(100);
-    const fullCost = productionCost.add(adminCost);
-    const plannedProfit = fullCost.mul(calculationData.plannedProfitPercentage).div(100);
-    const wholesalePrice = fullCost.add(plannedProfit);
-    const ndsAmount = wholesalePrice.mul(calculationData.ndsPercentage).div(100);
-    const finalPrice = wholesalePrice.add(ndsAmount);
-
-
-    // Возвращаем рассчитанную цену
-    return finalPrice.toNumber();
+    const calculationData = applyApiCalculationRates(calculation.data.calculation, settingsRates);
+    return calculateCalculationFinalPriceWithRates(calculation, calculationData);
   };
 
   return {
@@ -130,5 +152,6 @@ export function useRusnCalculation(groupSlug?: string) {
     loading,
     error,
     calculateCellTotal,
+    settingsRates,
   };
 }

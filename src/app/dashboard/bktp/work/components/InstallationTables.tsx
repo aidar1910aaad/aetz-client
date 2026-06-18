@@ -3,6 +3,7 @@
 import BmzInstallationTable from './BmzInstallationTable';
 import TransformerInstallationTable from './TransformerInstallationTable';
 import RusnInstallationTable from './RusnInstallationTable';
+import RunnInstallationTable from './RunnInstallationTable';
 
 interface InstallationTablesProps {
   isVisible: boolean;
@@ -25,6 +26,9 @@ export default function InstallationTables({ isVisible }: InstallationTablesProp
         
         {/* Таблица монтажа РУСН */}
         <RusnInstallationTable isVisible={true} />
+
+        {/* Таблица монтажа РУНН */}
+        <RunnInstallationTable isVisible={true} />
         
         {/* Таблица монтажа трансформаторов */}
         <TransformerInstallationTable isVisible={true} />

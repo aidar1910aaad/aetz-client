@@ -1,4 +1,5 @@
 import { BmzSettings } from '@/api/bmz';
+import { findMatchingAreaPriceRange } from '@/utils/bmzAreaPriceRange';
 
 export interface BmzData {
   buildingType: 'bmz' | 'tp' | 'none';
@@ -32,16 +33,16 @@ export const calculateArea = (width: number, length: number): number => {
 export const calculateBasePrice = (
   settings: BmzSettings | null,
   thickness: number,
-  area: number
+  area: number,
+  height: number
 ): number => {
   if (!settings) return 0;
 
-  const matchingRanges = settings.areaPriceRanges.filter(
-    (range) => thickness >= range.minWallThickness && thickness <= range.maxWallThickness
-  );
-
-  matchingRanges.sort((a, b) => b.minArea - a.minArea);
-  const priceRange = matchingRanges.find((range) => area >= range.minArea);
+  const priceRange = findMatchingAreaPriceRange(settings.areaPriceRanges, {
+    area,
+    thickness,
+    height,
+  });
 
   return priceRange?.pricePerSquareMeter || 0;
 };
@@ -87,7 +88,12 @@ export const calculateTotalPrice = (bmzData: BmzData): number => {
   let total = 0;
 
   if (bmzData.buildingType === 'bmz') {
-    const basePrice = calculateBasePrice(bmzData.settings, bmzData.thickness, area);
+    const basePrice = calculateBasePrice(
+      bmzData.settings,
+      bmzData.thickness,
+      area,
+      bmzData.height,
+    );
     total += basePrice * area;
   }
 

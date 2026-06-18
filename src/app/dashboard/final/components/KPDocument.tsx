@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import {
   calculateArea,
   calculateBasePrice,
@@ -25,26 +25,25 @@ import type { RusnState } from '@/store/useRusnStore';
 import type { WorkItem } from '@/store/useWorksStore';
 import type { AdditionalEquipmentState, AdditionalEquipmentItem } from '@/store/useAdditionalEquipmentStore';
 import { rusnTableConfig, bmzTableConfig, transformerTableConfig, runnTableConfig, additionalEquipmentTableConfig, worksTableConfig } from '@/components/FinalReview/tableConfigs';
+import { getRunnTableRows } from '@/utils/runnExportRows';
+import { PdfSpecTableSection } from './PdfSpecTableSection';
+import { useMaterialPrices } from '@/hooks/useMaterialPrices';
+import { calculateBusbarUstCost } from '@/utils/busbarUstCost';
+import { PdfCommercialHeader, type PdfHeaderMeta } from './PdfCommercialHeader';
+import { registerPdfFonts, PDF_FONT_REGULAR, PDF_FONT_BOLD } from '@/lib/pdfFonts';
 
-// Регистрируем шрифт с поддержкой кириллицы
-Font.register({
-  family: 'Roboto',
-  src: 'https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-regular-webfont.ttf',
-});
-
-Font.register({
-  family: 'Roboto-Bold',
-  src: 'https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-bold-webfont.ttf',
-});
+registerPdfFonts();
 
 // Создаем стили для PDF
 const styles = StyleSheet.create({
   page: {
     flexDirection: 'column',
     backgroundColor: '#ffffff',
-    padding: 20,
+    paddingTop: 0,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
     fontSize: 8,
-    fontFamily: 'Roboto',
+    fontFamily: PDF_FONT_REGULAR,
   },
   header: {
     marginBottom: 15,
@@ -54,13 +53,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 8,
     color: '#000000',
-    fontFamily: 'Roboto-Bold',
+    fontFamily: PDF_FONT_BOLD,
   },
   subtitle: {
     fontSize: 10,
     marginBottom: 3,
     color: '#666666',
-    fontFamily: 'Roboto',
+    fontFamily: PDF_FONT_REGULAR,
   },
   section: {
     marginBottom: 12,
@@ -70,7 +69,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 6,
     color: '#000000',
-    fontFamily: 'Roboto-Bold',
+    fontFamily: PDF_FONT_BOLD,
   },
   table: {
     width: '100%',
@@ -91,13 +90,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#90bd20',
     color: '#fff',
     fontWeight: 'bold',
-    fontFamily: 'Roboto-Bold',
+    fontFamily: PDF_FONT_BOLD,
   },
   tableCell: {
     padding: 3,
     fontSize: 7,
     flex: 1,
-    fontFamily: 'Roboto',
+    fontFamily: PDF_FONT_REGULAR,
     color: '#000',
   },
   tableCellNumber: {
@@ -105,14 +104,14 @@ const styles = StyleSheet.create({
     fontSize: 7,
     width: 25,
     textAlign: 'center',
-    fontFamily: 'Roboto',
+    fontFamily: PDF_FONT_REGULAR,
     color: '#000',
   },
   tableCellName: {
     padding: 3,
     fontSize: 7,
     flex: 3,
-    fontFamily: 'Roboto',
+    fontFamily: PDF_FONT_REGULAR,
     color: '#000',
   },
   tableCellUnit: {
@@ -120,7 +119,7 @@ const styles = StyleSheet.create({
     fontSize: 7,
     width: 35,
     textAlign: 'center',
-    fontFamily: 'Roboto',
+    fontFamily: PDF_FONT_REGULAR,
     color: '#000',
   },
   tableCellQuantity: {
@@ -128,7 +127,7 @@ const styles = StyleSheet.create({
     fontSize: 7,
     width: 35,
     textAlign: 'center',
-    fontFamily: 'Roboto',
+    fontFamily: PDF_FONT_REGULAR,
     color: '#000',
   },
   tableCellTotal: {
@@ -136,7 +135,7 @@ const styles = StyleSheet.create({
     fontSize: 7,
     width: 80,
     textAlign: 'right',
-    fontFamily: 'Roboto',
+    fontFamily: PDF_FONT_REGULAR,
     color: '#000',
   },
   totalRow: {
@@ -146,13 +145,13 @@ const styles = StyleSheet.create({
   totalCell: {
     color: '#fff',
     fontWeight: 'bold',
-    fontFamily: 'Roboto-Bold',
+    fontFamily: PDF_FONT_BOLD,
   },
   totalAmount: {
     padding: 3,
     fontSize: 7,
     textAlign: 'right',
-    fontFamily: 'Roboto-Bold',
+    fontFamily: PDF_FONT_BOLD,
     fontWeight: 'bold',
     color: '#fff',
     flexWrap: 'nowrap',
@@ -173,6 +172,8 @@ interface KPDocumentProps {
   filename: string;
   fullName: string;
   user: any;
+  pdfHeader?: PdfHeaderMeta;
+  pdfLogoSrc?: string;
   bmzStore: BmzData;
   selectedTransformer: ExtendedTransformer | null;
   rusnStore: RusnState;
@@ -195,6 +196,8 @@ export const KPDocument = ({
   filename,
   fullName,
   user,
+  pdfHeader,
+  pdfLogoSrc,
   bmzStore,
   selectedTransformer,
   rusnStore,
@@ -207,6 +210,8 @@ export const KPDocument = ({
   tableMarkupTotals,
   customRowsByTable = {},
 }: KPDocumentProps) => {
+  const { aluminum: aluminumPrice, copper: copperPrice } = useMaterialPrices();
+  const busbarMaterialPrices = { aluminum: aluminumPrice, copper: copperPrice };
   const { bmzTotal, transformerTotal, rusnTotal, runnTotal, additionalEquipmentTotal, worksTotal, grandTotal } = totals;
 
   // Получаем итоговые суммы с наценкой для каждой таблицы
@@ -229,7 +234,7 @@ export const KPDocument = ({
   const area = calculateArea(bmzStore.length || 0, bmzStore.width || 0);
   const roundedArea = Math.round(area);
   const unitPrice = bmzStore.buildingType === 'bmz' 
-    ? calculateBasePrice(bmzStore.settings, bmzStore.thickness || 0, area) 
+    ? calculateBasePrice(bmzStore.settings, bmzStore.thickness || 0, area, bmzStore.height || 0)
     : 0;
   const buildingTotal = unitPrice * roundedArea;
   const activeEquipment = getActiveEquipment(bmzStore);
@@ -268,10 +273,10 @@ export const KPDocument = ({
     return finalPrice;
   };
 
-  const busbarUstCost = selectedTransformer?.busbarUstData
-    ? (selectedTransformer.busbarUstData.mainUstWeight + selectedTransformer.busbarUstData.zeroUstWeight) *
-      (selectedTransformer.busbarUstData.material === 'Алюминий' ? 2800 : 5600)
-    : 0;
+  const busbarUstCost = calculateBusbarUstCost(
+    selectedTransformer?.busbarUstData,
+    busbarMaterialPrices,
+  );
 
   // Дополнительное оборудование
   const additionalEquipmentItems = Object.entries(selectedEquipment || {})
@@ -286,6 +291,8 @@ export const KPDocument = ({
         total: (val.price || 0) * (val.count ?? 0),
       };
     });
+
+  const runnTableRows = getRunnTableRows(runnStore);
 
   // Проверяем наличие необходимых данных
   if (!bmzStore || !rusnStore || !selectedWorks || !worksList || !runnStore) {
@@ -304,17 +311,20 @@ export const KPDocument = ({
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Заголовок */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Коммерческое предложение {filename}</Text>
-          <Text style={styles.subtitle}>Исполнитель: ТОО &#34;АЭТЗ&#34;</Text>
-          <Text style={styles.subtitle}>
-            Исполнитель {user?.lastName || ''} {user?.firstName || ''}
-            {user?.phone && ` | ${user.phone}`}
-            {user?.email && ` | ${user.email}`}
-          </Text>
-          <Text style={styles.subtitle}>Дата: {new Date().toLocaleDateString('ru-RU')}</Text>
-        </View>
+        {pdfHeader ? (
+          <PdfCommercialHeader meta={pdfHeader} user={user} logoSrc={pdfLogoSrc} />
+        ) : (
+          <View style={styles.header}>
+            <Text style={styles.title}>Коммерческое предложение {filename}</Text>
+            <Text style={styles.subtitle}>Исполнитель: ТОО &#34;АЭТЗ&#34;</Text>
+            <Text style={styles.subtitle}>
+              Исполнитель {user?.lastName || ''} {user?.firstName || ''}
+              {user?.phone && ` | ${user.phone}`}
+              {user?.email && ` | ${user.email}`}
+            </Text>
+            <Text style={styles.subtitle}>Дата: {new Date().toLocaleDateString('ru-RU')}</Text>
+          </View>
+        )}
 
         {/* Секция БМЗ */}
         {bmzStore.buildingType !== 'none' && (
@@ -516,89 +526,14 @@ export const KPDocument = ({
           );
         })()}
 
-        {/* Секция РУ-0.4кВ - Общая сводка РУНН */}
-        {(() => {
-          const runnCellSummaries = runnStore?.cellSummaries || [];
-          const runnBusbarSummary = runnStore?.busbarSummary;
-          const runnBusBridgeSummary = runnStore?.busBridgeSummary;
-          
-          return (runnCellSummaries.length > 0 || runnBusbarSummary || runnBusBridgeSummary) && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>РУ-0.4кВ</Text>
-            <View style={styles.table}>
-              <View style={[styles.tableRow, styles.tableHeader]}>
-                <Text style={[styles.tableCellNumber, styles.totalCell]}>№</Text>
-                <Text style={[styles.tableCellName, styles.totalCell]}>Наименование</Text>
-                <Text style={[styles.tableCellUnit, styles.totalCell]}>Ед. изм.</Text>
-                <Text style={[styles.tableCellQuantity, styles.totalCell]}>Кол-во</Text>
-              </View>
-              
-              {/* Ячейки из общей сводки */}
-              {runnCellSummaries.map((summary: any, index: number) => (
-                <View key={`cell-${summary.cellId}`} style={styles.tableRow}>
-                  <Text style={styles.tableCellNumber}>{index + 1}</Text>
-                  <Text style={styles.tableCellName}>{summary.name}</Text>
-                  <Text style={styles.tableCellUnit}>шт.</Text>
-                  <Text style={styles.tableCellQuantity}>{summary.quantity}</Text>
-                </View>
-              ))}
-
-              {/* Шина */}
-              {runnBusbarSummary && (
-                <View style={styles.tableRow}>
-                  <Text style={styles.tableCellNumber}>
-                    {runnCellSummaries.length + 1}
-                  </Text>
-                  <Text style={styles.tableCellName}>{runnBusbarSummary.name}</Text>
-                  <Text style={styles.tableCellUnit}>шт.</Text>
-                  <Text style={styles.tableCellQuantity}>{runnBusbarSummary.quantity}</Text>
-                </View>
-              )}
-
-              {/* Мостовая шина */}
-              {runnBusBridgeSummary && (
-                <View style={styles.tableRow}>
-                  <Text style={styles.tableCellNumber}>
-                    {runnCellSummaries.length + (runnBusbarSummary ? 1 : 0) + 1}
-                  </Text>
-                  <Text style={styles.tableCellName}>{runnBusBridgeSummary.name}</Text>
-                  <Text style={styles.tableCellUnit}>шт.</Text>
-                  <Text style={styles.tableCellQuantity}>{runnBusBridgeSummary.quantity}</Text>
-                </View>
-              )}
-
-              {/* Пользовательские строки для РУНН */}
-              {(customRowsByTable?.runn || []).map((row: any, idx: number) => {
-                const baseRowCount = runnCellSummaries.length + (runnBusbarSummary ? 1 : 0) + (runnBusBridgeSummary ? 1 : 0);
-                const rowNumber = baseRowCount + 1 + idx;
-                const indentLevel = row.indent || 0;
-                const indentPadding = indentLevel * 8;
-                return (
-                  <View key={row.id || `custom-runn-${idx}`} style={styles.tableRow}>
-                    <Text style={styles.tableCellNumber}>{rowNumber}</Text>
-                    <Text style={[styles.tableCellName, { paddingLeft: indentPadding }]}>
-                      {indentLevel > 0 && '└'.repeat(Math.min(indentLevel, 3))}
-                      {row.name || ''}
-                    </Text>
-                    <Text style={styles.tableCellUnit}>{row.unit || 'шт.'}</Text>
-                    <Text style={styles.tableCellQuantity}>{row.quantity || 1}</Text>
-                  </View>
-                );
-              })}
-
-              {/* Итого РУ-0.4кВ */}
-              <View style={[styles.tableRow, styles.totalRow]}>
-                <Text style={[styles.tableCellNumber, styles.totalCell]}></Text>
-                <Text style={[styles.tableCellName, styles.totalCell]}>Всего:</Text>
-                <Text style={[styles.tableCellUnit, styles.totalCell]}></Text>
-                <Text style={[styles.tableCellTotal, styles.totalCell]}>
-                  {formatNumber(runnMarkupTotal)} тг
-                </Text>
-              </View>
-            </View>
-          </View>
-        );
-        })()}
+        <PdfSpecTableSection
+          title="РУ-0.4кВ"
+          rows={runnTableRows}
+          total={runnMarkupTotal}
+          customRows={customRowsByTable?.runn || []}
+          showPrices={false}
+          totalLabel="Всего:"
+        />
 
         {/* Секция дополнительного оборудования */}
         {additionalEquipmentItems.length > 0 && (
@@ -710,7 +645,7 @@ export const KPDocument = ({
         {/* Итоговая сумма по всем секциям */}
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 20 }}>
           <Text
-            style={{ fontSize: 11, fontWeight: 'bold', fontFamily: 'Roboto-Bold', color: '#000' }}
+            style={{ fontSize: 11, fontWeight: 'bold', fontFamily: PDF_FONT_BOLD, color: '#000' }}
           >
             Сумма: {formatNumber(finalTotalWithMarkup)} тг
           </Text>

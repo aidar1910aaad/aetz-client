@@ -3,6 +3,7 @@ import { calculateCost } from '@/utils/calculationUtils';
 import { useState } from 'react';
 import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import MaterialsTable from '../../rusn/calculations/MaterialsTable';
+import { extractCurrentFromBreakerName } from '@/utils/panelNameUtils';
 
 interface SectionSwitchCalculationProps {
   cell: RunnCell;
@@ -43,7 +44,6 @@ export default function SectionSwitchCalculation({
         
         // Если не найден по точному названию, ищем по току
         if (!selectedMaterial) {
-          const { extractCurrentFromBreakerName } = require('@/utils/panelNameUtils');
           const cellCurrent = extractCurrentFromBreakerName(cell.breaker);
           if (cellCurrent) {
             selectedMaterial = materials[type].find((material: any) => {
@@ -68,34 +68,19 @@ export default function SectionSwitchCalculation({
         
         // Если все еще не найден, ищем по диапазону тока (универсальный поиск)
         if (!selectedMaterial) {
-          const { extractCurrentFromBreakerName } = require('@/utils/panelNameUtils');
           const cellCurrent = extractCurrentFromBreakerName(cell.breaker);
-          console.log('🔍 Универсальный поиск по току:', { cellCurrent });
-          
+
           if (cellCurrent) {
             // Ищем материал с ближайшим током (в пределах 20% от требуемого)
             const tolerance = cellCurrent * 0.2; // 20% допуск
-            console.log('🔍 Поиск в пределах допуска:', { tolerance });
-            
+
             selectedMaterial = materials[type].find((material: any) => {
               const materialCurrent = extractCurrentFromBreakerName(material.name);
               const isInRange = materialCurrent && Math.abs(materialCurrent - cellCurrent) <= tolerance;
-              console.log('🔍 Проверка диапазона:', { 
-                materialName: material.name, 
-                materialCurrent, 
-                cellCurrent, 
-                difference: Math.abs(materialCurrent - cellCurrent),
-                tolerance,
-                isInRange 
-              });
               return isInRange;
             });
-            
-            if (selectedMaterial) {
-              console.log('✅ Найден материал в диапазоне:', selectedMaterial.name);
-            } else {
-              console.log('❌ Материал в диапазоне не найден, ищем ближайший');
-              
+
+            if (!selectedMaterial) {
               // Если не найден в пределах допуска, берем ближайший
               selectedMaterial = materials[type].reduce((closest: any, material: any) => {
                 const materialCurrent = extractCurrentFromBreakerName(material.name);
@@ -104,10 +89,6 @@ export default function SectionSwitchCalculation({
                 }
                 return closest;
               }, null);
-              
-              if (selectedMaterial) {
-                console.log('✅ Найден ближайший материал:', selectedMaterial.name);
-              }
             }
           }
         }
@@ -117,14 +98,6 @@ export default function SectionSwitchCalculation({
       // Если не найден по имени, берем первый
       if (!selectedMaterial) {
         selectedMaterial = materials[type][0];
-        console.log('⚠️ Материал не найден, используется первый:', {
-          cellBreaker: cell.breaker,
-          selectedMaterial: selectedMaterial.name,
-          price: selectedMaterial.price,
-          availableMaterials: materials[type].slice(0, 5).map((m: any) => ({ name: m.name, price: m.price })), // Показываем только первые 5
-          totalAvailable: materials[type].length
-        });
-      } else {
       }
       
       selectedMaterialsTotal += selectedMaterial.price;

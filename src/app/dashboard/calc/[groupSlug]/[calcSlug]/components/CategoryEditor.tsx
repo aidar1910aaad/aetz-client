@@ -80,8 +80,8 @@ export function CategoryEditor({ category, categoryIndex, onUpdate, onRemove }: 
           <tr>
             <th className="border p-2 text-left">Наименование</th>
             <th className="border p-2 text-left">Ед.</th>
-            <th className="border p-2 text-right">Цена</th>
             <th className="border p-2 text-right">Кол-во</th>
+            <th className="border p-2 text-right">Цена</th>
             <th className="border p-2 text-right">Сумма</th>
             <th className="border p-2 text-center">Действия</th>
           </tr>
@@ -112,16 +112,16 @@ export function CategoryEditor({ category, categoryIndex, onUpdate, onRemove }: 
               <td className="border p-2">
                 <input
                   type="number"
-                  value={item.price}
-                  onChange={(e) => updateItem(itemIndex, 'price', Number(e.target.value))}
+                  value={item.quantity}
+                  onChange={(e) => updateItem(itemIndex, 'quantity', Number(e.target.value))}
                   className="w-full p-1 border rounded text-right"
                 />
               </td>
               <td className="border p-2">
                 <input
                   type="number"
-                  value={item.quantity}
-                  onChange={(e) => updateItem(itemIndex, 'quantity', Number(e.target.value))}
+                  value={item.price}
+                  onChange={(e) => updateItem(itemIndex, 'price', Number(e.target.value))}
                   className="w-full p-1 border rounded text-right"
                 />
               </td>

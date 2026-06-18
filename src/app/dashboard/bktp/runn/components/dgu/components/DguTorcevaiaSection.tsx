@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useEffect } from 'react';
 import type { RunnCell } from '@/store/useRunnStore';
 import TogglerWithInput from '../../../TogglerWithInput';
 import { useRunnTorcevaiaCalculation } from '@/hooks/useRunnInputCalculation';
 import { calculateCost } from '@/utils/calculationUtils';
+import { useDguSetCellSummary } from '../hooks/useDguSummaryHelpers';
 
 interface DguTorcevaiaSectionProps {
   torcevaiaCell: RunnCell | undefined;
@@ -19,17 +20,43 @@ export default function DguTorcevaiaSection({
   onUpdateQuantity,
   onRemoveCell,
 }: DguTorcevaiaSectionProps) {
-  // Мемоизируем объект ячейки, чтобы избежать постоянных перезагрузок
-  const tempTorcevaiaCell = useMemo(() => {
-    if (!torcevaiaCell) return null;
-    return {
-      ...torcevaiaCell,
-      purpose: 'Торцевая панель' as const
-    };
-  }, [torcevaiaCell?.id, torcevaiaCell?.quantity]);
-  
-  // Вызываем хук на верхнем уровне компонента (всегда в одном порядке)
-  const { calculation: torcevaiaCalculation, loading: torcevaiaCalculationLoading } = useRunnTorcevaiaCalculation(tempTorcevaiaCell);
+  const setCellSummary = useDguSetCellSummary();
+  const { calculation: torcevaiaCalculation, loading: torcevaiaCalculationLoading } =
+    useRunnTorcevaiaCalculation(torcevaiaCell ?? null);
+
+  useEffect(() => {
+    if (!torcevaiaCell || !torcevaiaCalculation?.data) return;
+
+    const materialsTotal =
+      torcevaiaCalculation.data.categories?.reduce(
+        (sum: number, category: any) =>
+          sum +
+          (category.items?.reduce(
+            (itemSum: number, item: any) => itemSum + (item.price || 0) * (item.quantity || 0),
+            0
+          ) || 0),
+        0
+      ) || 0;
+
+    const calculationData = torcevaiaCalculation.data.calculation;
+    let finalPrice = 0;
+    if (calculationData) {
+      finalPrice =
+        calculateCost(materialsTotal, calculationData, 0).finalPrice || 0;
+    } else {
+      finalPrice =
+        torcevaiaCalculation.data.finalPrice ||
+        torcevaiaCalculation.data.totalPrice ||
+        0;
+    }
+
+    setCellSummary(
+      torcevaiaCell.id,
+      'РУНН-ДГУ: Торцевая панель',
+      finalPrice,
+      torcevaiaCell.quantity || 1
+    );
+  }, [torcevaiaCell?.id, torcevaiaCell?.quantity, torcevaiaCalculation]);
 
   return (
     <TogglerWithInput label="РУНН-ДГУ: Торцевая панель">

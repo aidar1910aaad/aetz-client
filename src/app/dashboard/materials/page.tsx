@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Package, Plus, FolderOpen } from 'lucide-react';
+import { Package, Plus, FolderOpen, ArrowLeftRight } from 'lucide-react';
 import { useMaterials } from '@/hooks/useMaterials';
 import { Material } from '@/api/material/index';
 import CreateMaterialModal from '@/shared/modals/materials/CreateMaterialModal';
@@ -10,6 +10,7 @@ import EditMaterialModal from '@/shared/modals/materials/EditMaterialModal';
 import MaterialsTableSection from './MaterialsTableSection';
 import PageLoader from '@/shared/loader/PageLoader';
 import { useRoleCheck } from '@/hooks/useRoleCheck';
+import { getMaterialImportBadges, ImportBadges } from '@/api/material/priceImport';
 
 function MaterialsPageContent() {
   const {
@@ -28,9 +29,12 @@ function MaterialsPageContent() {
     categories,
     selectedCategory,
     setSelectedCategory,
+    selectedCurrency,
+    setSelectedCurrency,
     loading,
     handleCreate,
     handleDelete,
+    handleDeleteMany,
     handleUpdate,
     allCategories,
   } = useMaterials();
@@ -38,7 +42,23 @@ function MaterialsPageContent() {
   const { isManagerUser } = useRoleCheck();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
-  
+  const [importBadges, setImportBadges] = useState<ImportBadges | null>(null);
+
+  useEffect(() => {
+    const loadBadges = async () => {
+      try {
+        const token = localStorage.getItem('token') || '';
+        const badges = await getMaterialImportBadges(token);
+        setImportBadges(badges);
+      } catch {
+        setImportBadges(null);
+      }
+    };
+    loadBadges();
+  }, []);
+
+  const importBadgeById = useMemo(() => importBadges?.byId ?? {}, [importBadges]);
+
   // Менеджер может только просматривать, не может редактировать и создавать
   const canEdit = !isManagerUser;
 
@@ -66,6 +86,13 @@ function MaterialsPageContent() {
             </div>
             <div className="flex items-center gap-3">
               <Link
+                href="/dashboard/materials/price-import"
+                className="flex items-center gap-2 bg-gray-100 hover:bg-[#8eba1e] text-gray-700 hover:text-white px-4 py-2 rounded-xl transition-all duration-200"
+              >
+                <ArrowLeftRight size={18} />
+                Было → станет
+              </Link>
+              <Link
                 href="/dashboard/materials/categories"
                 className="flex items-center gap-2 bg-gray-100 hover:bg-[#8eba1e] text-gray-700 hover:text-white px-4 py-2 rounded-xl transition-all duration-200"
               >
@@ -75,7 +102,7 @@ function MaterialsPageContent() {
               {canEdit && (
                 <button
                   onClick={() => setModalOpen(true)}
-                  className="flex items-center gap-2 bg-[#8eba1e] hover:bg-[#7aa31a] text-white px-6 py-3 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                  className="flex items-center gap-2 bg-[#8eba1e] hover:bg-[#7aa31a] text-white px-4 py-2 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
                 >
                   <Plus size={18} />
                   Создать материал
@@ -111,9 +138,13 @@ function MaterialsPageContent() {
           categories={categories}
           selectedCategory={selectedCategory}
           setSelectedCategory={setSelectedCategory}
+          selectedCurrency={selectedCurrency}
+          setSelectedCurrency={setSelectedCurrency}
           setEditingMaterial={setEditingMaterial}
           handleDelete={handleDelete}
+          handleDeleteMany={handleDeleteMany}
           canEdit={canEdit}
+          importBadgeById={importBadgeById}
         />
       </div>
 

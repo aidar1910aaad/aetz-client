@@ -8,12 +8,15 @@ import { CurrencySettings } from '@/types/api/currency';
 import { currencyApi } from '@/api/currency';
 import { useRoleCheck } from '@/hooks/useRoleCheck';
 import { UserRole } from '@/types/user';
+import PageLoader from '@/shared/loader/PageLoader';
 
 export default function CurrencyPage() {
-  const { isManagerUser, isAdminUser, isPTOUser } = useRoleCheck();
+  const { isAdminUser, isPTOUser } = useRoleCheck();
   const [settings, setSettings] = useState<CurrencySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [isChanged, setIsChanged] = useState(false);
   const [tempSettings, setTempSettings] = useState<CurrencySettings | null>(null);
   
@@ -45,6 +48,7 @@ export default function CurrencyPage() {
       [field]: value
     };
     setTempSettings(newSettings);
+    setSaveErrorMessage(null);
     setIsChanged(true);
   };
 
@@ -55,14 +59,21 @@ export default function CurrencyPage() {
       const confirmed = await showConfirm({
         title: 'Сохранить настройки?',
         message: 'Вы уверены, что хотите сохранить изменения?',
+        confirmText: 'Сохранить',
+        cancelText: 'Отмена',
+        confirmVariant: 'primary',
       });
 
       if (!confirmed) return;
+
+      setSaving(true);
+      setSaveErrorMessage(null);
 
       const updatedSettings = await currencyApi.updateSettings({
         usdRate: parseFloat(tempSettings.usdRate),
         eurRate: parseFloat(tempSettings.eurRate),
         rubRate: parseFloat(tempSettings.rubRate),
+        cnyRate: parseFloat(tempSettings.cnyRate),
         hourlyWage: parseFloat(tempSettings.hourlyWage),
         vatRate: parseFloat(tempSettings.vatRate),
         administrativeExpenses: parseFloat(tempSettings.administrativeExpenses),
@@ -75,25 +86,20 @@ export default function CurrencyPage() {
       setIsChanged(false);
       showToast('Настройки успешно сохранены', 'success');
     } catch (err) {
-      setError('Ошибка при обновлении настроек');
       console.error(err);
+      const errorText =
+        err instanceof Error && err.message
+          ? `Не удалось сохранить изменения: ${err.message}`
+          : 'Не удалось сохранить изменения. Проверьте данные и попробуйте снова.';
+      setSaveErrorMessage(errorText);
       showToast('Ошибка при обновлении настроек', 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
   if (loading) {
-    return (
-      <div className="h-[calc(100vh-64px)] bg-white overflow-y-auto">
-        <div className="p-6">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#8eba1e] mx-auto mb-4"></div>
-              <p className="text-gray-600">Загрузка настроек валют...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (error) {
@@ -117,6 +123,12 @@ export default function CurrencyPage() {
   return (
     <div className="h-[calc(100vh-64px)] bg-white overflow-y-auto">
       <div className="p-6">
+        {saveErrorMessage && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex items-center gap-2 text-red-800">
+            <span className="text-sm font-medium">{saveErrorMessage}</span>
+          </div>
+        )}
+
         {/* Header Section */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-6">
@@ -144,6 +156,7 @@ export default function CurrencyPage() {
               { label: 'Доллар США (USD)', key: 'usdRate' },
               { label: 'Евро (EUR)', key: 'eurRate' },
               { label: 'Российский рубль (RUB)', key: 'rubRate' },
+              { label: 'Китайский юань (CNY)', key: 'cnyRate' },
             ].map(({ label, key }) => (
               <div key={key} className="bg-white p-6 border border-gray-200 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:border-[#8eba1e]/30">
                 <label className="block text-sm font-medium text-gray-700 mb-3">{label}</label>
@@ -209,15 +222,15 @@ export default function CurrencyPage() {
           <div className="flex justify-end">
             <button
               onClick={handleSave}
-              disabled={!isChanged}
+              disabled={!isChanged || saving}
               className={`flex items-center gap-2 px-8 py-4 rounded-xl transition-all duration-200 shadow-lg ${
-                isChanged
+                isChanged && !saving
                   ? 'bg-[#8eba1e] text-white hover:bg-[#7aa31a] hover:shadow-xl transform hover:scale-105'
                   : 'bg-gray-200 text-gray-500 cursor-not-allowed'
               }`}
             >
               <Save size={18} />
-              {isChanged ? 'Сохранить изменения' : 'Нет изменений'}
+              {saving ? 'Сохранение...' : isChanged ? 'Сохранить изменения' : 'Нет изменений'}
             </button>
           </div>
         )}

@@ -1,5 +1,5 @@
-import { Plus, X, Eye, EyeOff } from 'lucide-react';
-
+import { X, Eye, EyeOff } from 'lucide-react';
+import { CategorySearchSelect } from './CategorySearchSelect';
 interface Category {
   id: string;
   name: string;
@@ -87,37 +87,16 @@ export function SettingsSection({
         ))}
       </div>
 
-      {/* Add Category Dropdown */}
+      {/* Add Category Search */}
       {availableCategories.length > 0 && (
-        <div className="relative">
-          <select
-            onChange={(e) => {
-              const categoryId = e.target.value;
-              if (categoryId) {
-                onAddCategory(type, categoryId);
-                e.target.value = '';
-              }
-            }}
-            className="w-full p-2 border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#3A55DF] focus:border-transparent"
-            defaultValue=""
-          >
-            <option value="" disabled>
-              Добавить категорию
-            </option>
-            {availableCategories.map((category) => (
-              <option
-                key={category.id}
-                value={typeof category.original === 'string' ? category.name : category.id}
-              >
-                {category.name}
-              </option>
-            ))}
-          </select>
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-            <Plus className="w-4 h-4 text-gray-400" />
-          </div>
-        </div>
-      )}
-    </div>
+        <CategorySearchSelect
+          options={availableCategories.map((category) => ({
+            id: category.id,
+            name: category.name,
+            value: typeof category.original === 'string' ? category.name : category.id,
+          }))}
+          onSelect={(categoryId) => onAddCategory(type, categoryId)}
+        />
+      )}    </div>
   );
 }

@@ -1,6 +1,8 @@
 'use client';
 
 import { useTransformerStore } from '@/store/useTransformerStore';
+import { useWorkPricesStore } from '@/store/useWorkPricesStore';
+import { formatIntSpace } from '@/utils/formatIntSpace';
 
 interface TransformerInstallationTableProps {
   isVisible: boolean;
@@ -9,20 +11,13 @@ interface TransformerInstallationTableProps {
 export default function TransformerInstallationTable({ isVisible }: TransformerInstallationTableProps) {
   const transformerStore = useTransformerStore();
   const selectedTransformer = transformerStore.selectedTransformer;
-  
-  // Цены за монтаж трансформаторов (из изображения)
-  const installationPrices = {
-    630: 65310, // Мощность 630 кВА
-    1000: 87070, // Мощность 1000-1600 кВА
-    2500: 108840, // Мощность 2500-3150 кВА
-  };
-  
-  // Определяем цену на основе мощности трансформатора
+  const workPrices = useWorkPricesStore();
+
   const getInstallationPrice = (power: number) => {
-    if (power <= 630) return installationPrices[630];
-    if (power <= 1600) return installationPrices[1000];
-    if (power <= 3150) return installationPrices[2500];
-    return installationPrices[2500]; // Для больших мощностей используем максимальную цену
+    if (power <= 630) return workPrices.transformerPrice630;
+    if (power <= 1600) return workPrices.transformerPrice1000;
+    if (power <= 3150) return workPrices.transformerPrice2500;
+    return workPrices.transformerPrice2500;
   };
   
   // Определяем диапазон мощности для отображения
@@ -55,8 +50,8 @@ export default function TransformerInstallationTable({ isVisible }: TransformerI
             <tr>
               <th className="px-4 py-2 text-left font-medium text-gray-700">Описание</th>
               <th className="px-4 py-2 text-center font-medium text-gray-700">Количество</th>
-              <th className="px-4 py-2 text-center font-medium text-gray-700">Цена за единицу</th>
-              <th className="px-4 py-2 text-center font-medium text-gray-700">Сумма</th>
+              <th className="px-4 py-2 text-right font-medium text-gray-700">Цена за единицу</th>
+              <th className="px-4 py-2 text-right font-medium text-gray-700">Сумма</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -66,11 +61,11 @@ export default function TransformerInstallationTable({ isVisible }: TransformerI
                 Монтаж трансформатора (Мощность {powerRange})
               </td>
               <td className="px-4 py-3 text-center text-gray-900">{quantity}</td>
-              <td className="px-4 py-3 text-center text-gray-900">
-                {installationPrice.toLocaleString()} тг
+              <td className="px-4 py-3 text-right text-gray-900">
+                {formatIntSpace(installationPrice)} тг
               </td>
-              <td className="px-4 py-3 text-center font-medium text-gray-900">
-                {installationTotal.toLocaleString()} тг
+              <td className="px-4 py-3 text-right font-medium text-gray-900">
+                {formatIntSpace(installationTotal)} тг
               </td>
             </tr>
           </tbody>
@@ -79,8 +74,8 @@ export default function TransformerInstallationTable({ isVisible }: TransformerI
               <td colSpan={3} className="px-4 py-3 text-right font-medium text-gray-900">
                 Итого:
               </td>
-              <td className="px-4 py-3 text-center font-bold text-gray-900">
-                {installationTotal.toLocaleString()} тг
+              <td className="px-4 py-3 text-right font-bold text-gray-900">
+                {formatIntSpace(installationTotal)} тг
               </td>
             </tr>
           </tfoot>

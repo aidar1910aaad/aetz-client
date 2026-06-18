@@ -71,12 +71,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-gray-100 text-black flex flex-col">
+    <div className="min-h-screen bg-gray-100 text-black">
       <Header />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-[calc(100vh-4rem)] pt-16">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto ">{children}</main>
+        <main className="flex-1 overflow-y-auto outline-none focus:outline-none">{children}</main>
       </div>
     </div>
   );

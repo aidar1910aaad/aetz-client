@@ -1,5 +1,6 @@
 import { RunnCell } from '@/store/useRunnStore';
 import { Material } from '@/api/material';
+import { Select } from '@/components/ui/select';
 
 interface MoldedCaseWithRubilnikSelectorProps {
   cell: RunnCell & { update: (field: keyof RunnCell, val: string | number | string[]) => void; remove: () => void; };
@@ -60,10 +61,6 @@ export default function MoldedCaseWithRubilnikSelector({ cell, avtomatLityMateri
     
     // Убираем дублирующиеся значения
     const uniqueOptions = [...new Set(allOptions)];
-    
-    // Отладочная информация
-    if (process.env.NODE_ENV === 'development') {
-    }
     
     // Фильтруем только валидные значения
     const validSelectedRubilniki = selectedRubilniki.filter(rubilnik => 
@@ -134,7 +131,7 @@ export default function MoldedCaseWithRubilnikSelector({ cell, avtomatLityMateri
           {/* Автомат 1 */}
           <div className="flex flex-col gap-1">
             <span className="text-xs text-gray-500">Автомат 1</span>
-            <select
+            <Select
               value={selectedRubilniki[0] || ''}
               onChange={(e) => updateRubilnik(0, e.target.value)}
               className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
@@ -143,13 +140,13 @@ export default function MoldedCaseWithRubilnikSelector({ cell, avtomatLityMateri
               {options1.map((opt, index) => (
                 <option key={`${opt}-${index}`} value={opt}>{opt}</option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {/* Автомат 2 */}
           <div className="flex flex-col gap-1">
             <span className="text-xs text-gray-500">Автомат 2</span>
-            <select
+            <Select
               value={selectedRubilniki[1] || ''}
               onChange={(e) => updateRubilnik(1, e.target.value)}
               className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
@@ -158,13 +155,13 @@ export default function MoldedCaseWithRubilnikSelector({ cell, avtomatLityMateri
               {options2.map((opt, index) => (
                 <option key={`${opt}-${index}`} value={opt}>{opt}</option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {/* Автомат 3 */}
           <div className="flex flex-col gap-1">
             <span className="text-xs text-gray-500">Автомат 3</span>
-            <select
+            <Select
               value={selectedRubilniki[2] || ''}
               onChange={(e) => updateRubilnik(2, e.target.value)}
               className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
@@ -173,7 +170,7 @@ export default function MoldedCaseWithRubilnikSelector({ cell, avtomatLityMateri
               {options3.map((opt, index) => (
                 <option key={`${opt}-${index}`} value={opt}>{opt}</option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
 
@@ -184,7 +181,7 @@ export default function MoldedCaseWithRubilnikSelector({ cell, avtomatLityMateri
           {/* Автомат 4 */}
           <div className="flex flex-col gap-1">
             <span className="text-xs text-gray-500">Автомат 4</span>
-            <select
+            <Select
               value={selectedRubilniki[3] || ''}
               onChange={(e) => updateRubilnik(3, e.target.value)}
               className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
@@ -193,13 +190,13 @@ export default function MoldedCaseWithRubilnikSelector({ cell, avtomatLityMateri
               {options4.map((opt, index) => (
                 <option key={`${opt}-${index}`} value={opt}>{opt}</option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {/* Автомат 5 */}
           <div className="flex flex-col gap-1">
             <span className="text-xs text-gray-500">Автомат 5</span>
-            <select
+            <Select
               value={selectedRubilniki[4] || ''}
               onChange={(e) => updateRubilnik(4, e.target.value)}
               className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
@@ -208,13 +205,13 @@ export default function MoldedCaseWithRubilnikSelector({ cell, avtomatLityMateri
               {options5.map((opt, index) => (
                 <option key={`${opt}-${index}`} value={opt}>{opt}</option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {/* Автомат 6 */}
           <div className="flex flex-col gap-1">
             <span className="text-xs text-gray-500">Автомат 6</span>
-            <select
+            <Select
               value={selectedRubilniki[5] || ''}
               onChange={(e) => updateRubilnik(5, e.target.value)}
               className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
@@ -223,7 +220,7 @@ export default function MoldedCaseWithRubilnikSelector({ cell, avtomatLityMateri
               {options6.map((opt, index) => (
                 <option key={`${opt}-${index}`} value={opt}>{opt}</option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
       </div>

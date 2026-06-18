@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
 import { getMaterialById } from '@/api/material';
+import {
+  BUSBAR_UST_FALLBACK_PRICE_PER_KG,
+  BUSBAR_UST_MATERIAL_IDS,
+} from '@/utils/busbarUstCost';
 
 interface MaterialPrices {
   aluminum: number;
@@ -10,8 +14,8 @@ interface MaterialPrices {
 
 export function useMaterialPrices() {
   const [prices, setPrices] = useState<MaterialPrices>({
-    aluminum: 2800, // Значение по умолчанию
-    copper: 5600,   // Значение по умолчанию
+    aluminum: BUSBAR_UST_FALLBACK_PRICE_PER_KG.aluminum,
+    copper: BUSBAR_UST_FALLBACK_PRICE_PER_KG.copper,
     loading: true,
     error: null
   });
@@ -26,10 +30,9 @@ export function useMaterialPrices() {
           throw new Error('Токен авторизации не найден');
         }
 
-        // Загружаем алюминий (ID: 3489) и медь (ID: 3490)
         const [aluminumMaterial, copperMaterial] = await Promise.all([
-          getMaterialById(3489, token),
-          getMaterialById(3490, token)
+          getMaterialById(BUSBAR_UST_MATERIAL_IDS.aluminum, token),
+          getMaterialById(BUSBAR_UST_MATERIAL_IDS.copper, token),
         ]);
 
         setPrices({

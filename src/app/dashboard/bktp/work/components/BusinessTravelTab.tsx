@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useWorkPricesStore } from '@/store/useWorkPricesStore';
 
 interface BusinessTravelTabProps {
   isVisible: boolean;
@@ -19,12 +20,13 @@ interface Brigade {
 }
 
 export default function BusinessTravelTab({ isVisible, onTotalChange, onReset }: BusinessTravelTabProps) {
+  const workPrices = useWorkPricesStore();
   // Базовые ставки
-  const mrpRate = 3932; // МРП, тг
-  const apartmentRent = 30000; // Аренда квартиры, тг
-  const transportRate = 100000; // Транспортные расходы за рейс
-  const accommodationRate = 30000; // Проживание за день
-  const dailyAllowanceRate = 15728; // Суточные (4 МРП * 3932)
+  const mrpRate = workPrices.mrp;
+  const apartmentRent = workPrices.accommodationPerDay;
+  const transportRate = workPrices.transportExpenses;
+  const accommodationRate = workPrices.accommodationPerDay;
+  const dailyAllowanceRate = workPrices.mrp * workPrices.dailyAllowanceMultiplier;
   
   // Бригады
   const [brigades, setBrigades] = useState<Brigade[]>([
@@ -304,7 +306,7 @@ export default function BusinessTravelTab({ isVisible, onTotalChange, onReset }:
           </div>
           <div className="text-center p-3 bg-white rounded-lg border border-[#8eba1e]/20">
             <div className="text-sm text-gray-600 mb-1">кол-во МРП</div>
-            <div className="font-bold text-lg text-gray-900">4</div>
+            <div className="font-bold text-lg text-gray-900">{workPrices.dailyAllowanceMultiplier}</div>
           </div>
         </div>
 
@@ -700,9 +702,9 @@ export default function BusinessTravelTab({ isVisible, onTotalChange, onReset }:
             <div>
               <h4 className="font-semibold text-gray-900 mb-2">Автоматический расчет</h4>
               <div className="text-sm text-gray-700 space-y-1">
-                <p><strong>Транспортные расходы:</strong> Количество рейсов × 100,000 ₸</p>
-                <p><strong>Проживание:</strong> Количество дней × 30,000 ₸</p>
-                <p><strong>Суточные:</strong> (Количество человек × Количество дней) × 15,728 ₸</p>
+                <p><strong>Транспортные расходы:</strong> Количество рейсов × {transportRate.toLocaleString()} ₸</p>
+                <p><strong>Проживание:</strong> Количество дней × {accommodationRate.toLocaleString()} ₸</p>
+                <p><strong>Суточные:</strong> (Количество человек × Количество дней) × {dailyAllowanceRate.toLocaleString()} ₸</p>
               </div>
             </div>
           </div>

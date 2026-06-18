@@ -6,6 +6,7 @@ import { DGU_CABLE_SPECS, type DguCableSpec, CABLE_SECTION_TO_MATERIAL_ID } from
 import { getMaterialById } from '@/api/material';
 import { useDguCableNodeCalculation } from '../hooks/useDguCableNodeCalculation';
 import { calculateCost } from '@/utils/calculationUtils';
+import { useDguSetCellSummary } from '../hooks/useDguSummaryHelpers';
 import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 
 interface DguCableNodeSectionProps {
@@ -69,7 +70,8 @@ export default function DguCableNodeSection({
   onRemoveCell,
 }: DguCableNodeSectionProps) {
   const dgu = useDguStore();
-  
+  const setCellSummary = useDguSetCellSummary();
+
   // Находим подходящий кабель на основе номинальной мощности
   const selectedCable = useMemo(() => {
     return findCableByPower(dgu.settings.nominalPowerKva);
@@ -170,6 +172,22 @@ export default function DguCableNodeSection({
       totalPrice: result.finalPrice * (dguCableNodeCell?.quantity || 1),
     };
   }, [cableNodeCalculation, selectedCable, cablePrice, cableLength, dguCableNodeCell?.quantity]);
+
+  useEffect(() => {
+    if (!dguCableNodeCell || !calculationResult) {
+      return;
+    }
+    const pricePerUnit = calculationResult.finalPrice || 0;
+    const cableLabel = selectedCable
+      ? `РУНН-ДГУ: Узел ДГУ кабель (${selectedCable.cableSpec})`
+      : 'РУНН-ДГУ: Узел ДГУ кабель';
+    setCellSummary(
+      dguCableNodeCell.id,
+      cableLabel,
+      pricePerUnit,
+      dguCableNodeCell.quantity || 1
+    );
+  }, [dguCableNodeCell?.id, dguCableNodeCell?.quantity, calculationResult, selectedCable]);
 
   return (
     <TogglerWithInput label="РУНН-ДГУ: Узел ДГУ кабель">

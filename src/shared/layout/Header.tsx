@@ -3,21 +3,42 @@
 import Link from 'next/link';
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
-import { ChevronDown, History, User, Settings, LogOut } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useUserStore } from '@/store/useUserStore';
 import { useBktpStore } from '@/store/useBktpStore';
+
+function getUserLabel(user: ReturnType<typeof useUserStore.getState>['user']) {
+  if (user?.lastName && user?.firstName) {
+    return `${user.lastName} ${user.firstName[0]}.`;
+  }
+  if (user?.firstName) {
+    return user.firstName;
+  }
+  return user?.username || 'Пользователь';
+}
+
+function getUserInitials(user: ReturnType<typeof useUserStore.getState>['user']) {
+  if (user?.lastName && user?.firstName) {
+    return `${user.lastName[0]}${user.firstName[0]}`.toUpperCase();
+  }
+  if (user?.firstName) {
+    return user.firstName.slice(0, 2).toUpperCase();
+  }
+  return user?.username?.slice(0, 2).toUpperCase() || '?';
+}
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { taskNumber, client } = useBktpStore();
-
-  const hasStarted = taskNumber.trim() !== '' || client.trim() !== '';
   const router = useRouter();
   const { user } = useUserStore();
 
-  // Закрытие меню при клике вне блока
+  const hasStarted = taskNumber.trim() !== '' || client.trim() !== '';
+  const displayName = getUserLabel(user);
+  const initials = getUserInitials(user);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -28,100 +49,118 @@ export default function Header() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Форматирование имени
-  const formattedName =
-    user?.lastName && user?.firstName ? `${user.lastName} ${user.firstName[0]}.` : user?.username;
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setMenuOpen(false);
+    router.push('/');
+  };
 
   return (
-    <header className="h-16 bg-white fixed border-b border-gray-200 flex items-center justify-between px-6 relative z-50">
-      {/* Левая часть */}
-      <div className="flex items-center gap-6">
-        <Link href="/dashboard" className="cursor-pointer hover:opacity-80 transition-opacity">
-          <Image 
-            src="/login/logo.png" 
-            alt="Лого" 
-            width={120} 
-            height={60} 
-            style={{ width: "auto", height: "auto" }} 
-          />
-        </Link>
-        <Link href={hasStarted ? "/dashboard/final" : "/dashboard/bktp"}>
-          <button className="bg-[#8eba1e] text-white px-6 py-3 rounded-2xl hover:bg-[#7aa31a] transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 font-medium">
-            {hasStarted ? 'Текущая заявка' : 'Новая заявка'}
-          </button>
-        </Link>
-      </div>
-
-      {/* Правая часть */}
-      <div className="flex items-center gap-4 relative" ref={menuRef}>
-        {/* История заявок */}
-        <Link href="/dashboard/requests" className="group">
-          <div className="p-3 bg-gray-100 hover:bg-[#8eba1e] rounded-xl transition-all duration-200 hover:scale-110 shadow-sm hover:shadow-md">
-            <History className="w-5 h-5 text-gray-600 group-hover:text-white" />
-          </div>
-        </Link>
-
-        {/* Имя пользователя + стрелка */}
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="flex items-center gap-3 cursor-pointer group"
-        >
-          <div className="flex items-center gap-3 bg-white hover:bg-gray-50 px-4 py-2 rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 border border-gray-200 hover:border-[#8eba1e]">
-            <div className="w-8 h-8 bg-[#8eba1e] rounded-full flex items-center justify-center">
-              <User className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-medium text-gray-700 group-hover:text-[#8eba1e] transition-colors">
-              {formattedName || 'Пользователь'}
-            </span>
-            <ChevronDown
-              size={16}
-              className={`text-[#8eba1e] transition-transform duration-200 ${menuOpen ? 'rotate-180' : ''}`}
+    <header className="fixed inset-x-0 top-0 z-50 h-16 border-b border-gray-200 bg-white">
+      <div className="flex h-full items-center justify-between gap-4 px-4 sm:px-6">
+        {/* Left: logo + primary action */}
+        <div className="flex min-w-0 items-center gap-4">
+          <Link
+            href="/dashboard"
+            className="flex shrink-0 items-center transition-opacity hover:opacity-85"
+          >
+            <Image
+              src="/login/logo.png"
+              alt="AETZ"
+              width={112}
+              height={36}
+              priority
+              className="h-9 w-auto"
             />
-          </div>
-        </button>
+          </Link>
 
-        {/* Выпадающее меню */}
-        {menuOpen && (
-          <div className="absolute top-16 right-0 bg-white border border-gray-200 rounded-2xl shadow-xl w-56 z-50 overflow-hidden">
-            <div className="p-2">
-              <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-                <p className="text-sm text-gray-600">Добро пожаловать</p>
-                <p className="font-semibold text-gray-900">{formattedName || 'Пользователь'}</p>
+          <span className="hidden h-5 w-px bg-gray-200 sm:block" aria-hidden />
+
+          <Link href={hasStarted ? '/dashboard/final' : '/dashboard/bktp'}>
+            <span className="inline-flex items-center rounded-lg bg-[#8eba1e] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#7aa31a]">
+              {hasStarted ? 'Текущая заявка' : 'Новая заявка'}
+            </span>
+          </Link>
+        </div>
+
+        {/* Right: nav + user */}
+        <div className="flex items-center gap-2 sm:gap-4" ref={menuRef}>
+          <Link
+            href="/dashboard/requests"
+            className="hidden text-sm font-medium text-gray-600 transition-colors hover:text-[#8eba1e] md:inline-block"
+          >
+            Заявки
+          </Link>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="flex items-center gap-2 rounded-lg border border-gray-200 px-2 py-1.5 transition-colors hover:border-[#8eba1e]/40 hover:bg-gray-50 sm:gap-2.5 sm:px-3"
+              aria-expanded={menuOpen}
+              aria-haspopup="menu"
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#8eba1e]/15 text-xs font-semibold text-[#6b8f16]">
+                {initials}
+              </span>
+              <span className="hidden max-w-[140px] truncate text-sm font-medium text-gray-800 sm:inline">
+                {displayName}
+              </span>
+              <ChevronDown
+                size={16}
+                className={`shrink-0 text-gray-400 transition-transform ${menuOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+
+            {menuOpen && (
+              <div className="absolute right-0 top-[calc(100%+6px)] w-56 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+                <div className="border-b border-gray-100 px-4 py-3">
+                  <p className="truncate text-sm font-semibold text-gray-900">{displayName}</p>
+                  {user?.email && (
+                    <p className="mt-0.5 truncate text-xs text-gray-500">{user.email}</p>
+                  )}
+                </div>
+
+                <ul className="py-1">
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        router.push('/dashboard/profile');
+                        setMenuOpen(false);
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-[#8eba1e]/5 hover:text-[#8eba1e]"
+                    >
+                      Профиль
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        router.push('/dashboard/bktp');
+                        setMenuOpen(false);
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-[#8eba1e]/5 hover:text-[#8eba1e]"
+                    >
+                      БКТП
+                    </button>
+                  </li>
+                </ul>
+
+                <div className="border-t border-gray-100 py-1">
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="w-full px-4 py-2.5 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
+                  >
+                    Выйти
+                  </button>
+                </div>
               </div>
-              
-              <ul className="py-2">
-                <li
-                  onClick={() => {
-                    router.push('/dashboard/profile');
-                    setMenuOpen(false);
-                  }}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors group"
-                >
-                  <User className="w-4 h-4 text-[#8eba1e] group-hover:text-[#7aa31a]" />
-                  <span className="text-gray-700 group-hover:text-[#8eba1e]">Профиль</span>
-                </li>
-                
-                <li className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors group">
-                  <Settings className="w-4 h-4 text-[#8eba1e] group-hover:text-[#7aa31a]" />
-                  <span className="text-gray-700 group-hover:text-[#8eba1e]">Настройки</span>
-                </li>
-                
-                <div className="border-t border-gray-200 my-2"></div>
-                
-                <li
-                  onClick={() => {
-                    router.push('/');
-                    setMenuOpen(false);
-                  }}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-red-50 cursor-pointer transition-colors group"
-                >
-                  <LogOut className="w-4 h-4 text-red-500 group-hover:text-red-600" />
-                  <span className="text-red-500 group-hover:text-red-600">Выйти</span>
-                </li>
-              </ul>
-            </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </header>
   );

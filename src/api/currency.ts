@@ -17,19 +17,30 @@ export const currencyApi = {
   },
 
   updateSettings: async (data: UpdateCurrencySettingsRequest): Promise<CurrencySettings> => {
+    const token = localStorage.getItem('token');
     const response = await fetch(`${api}/currency-settings`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
+        'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to update currency settings');
+      const errorText = await response.text().catch(() => '');
+      throw new Error(errorText || 'Failed to update currency settings via PUT');
     }
 
-    return response.json();
+    if (response.status === 204) {
+      return data as unknown as CurrencySettings;
+    }
+
+    const text = await response.text();
+    if (!text) {
+      return data as unknown as CurrencySettings;
+    }
+
+    return JSON.parse(text) as CurrencySettings;
   }
 }; 

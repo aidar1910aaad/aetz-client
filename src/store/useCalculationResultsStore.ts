@@ -10,6 +10,7 @@ interface CalculationResults {
 interface CalculationResultsState {
   results: CalculationResults;
   updateCellResult: (cellId: string, type: 'main' | 'meter', price: number) => void;
+  removeCellResult: (cellId: string) => void;
   getCellResult: (cellId: string) => { mainCalculation: number; meterCalculation: number };
   clearResults: () => void;
 }
@@ -39,6 +40,13 @@ export const useCalculationResultsStore = create<CalculationResultsState>((set, 
       };
     });
   },
+
+  removeCellResult: (cellId: string) =>
+    set((state) => {
+      if (!state.results[cellId]) return state;
+      const { [cellId]: _removed, ...rest } = state.results;
+      return { results: rest };
+    }),
   
   getCellResult: (cellId: string) => {
     const state = get();

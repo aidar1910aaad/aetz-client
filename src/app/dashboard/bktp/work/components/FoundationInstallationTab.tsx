@@ -1,6 +1,7 @@
 'use client';
 
 import { useBmzStore } from '@/store/useBmzStore';
+import { useWorkPricesStore } from '@/store/useWorkPricesStore';
 
 interface FoundationInstallationTabProps {
   isVisible: boolean;
@@ -8,6 +9,7 @@ interface FoundationInstallationTabProps {
 
 export default function FoundationInstallationTab({ isVisible }: FoundationInstallationTabProps) {
   const bmzStore = useBmzStore();
+  const workPrices = useWorkPricesStore();
   
   // Получаем длину и ширину из BMZ store (в миллиметрах)
   const lengthMm = bmzStore.length || 0;
@@ -18,8 +20,7 @@ export default function FoundationInstallationTab({ isVisible }: FoundationInsta
     ? Math.round((lengthMm * widthMm) / 1000000 * 100) / 100 // мм² в м² с округлением до 2 знаков
     : 1; // По умолчанию 1 м² если нет данных
   
-  // Фиксированная цена за м²
-  const workPricePerM2 = 50000;
+  const workPricePerM2 = workPrices.foundationPricePerM2;
   const totalWorkCost = areaM2 * workPricePerM2;
 
   if (!isVisible) return null;
@@ -55,8 +56,8 @@ export default function FoundationInstallationTab({ isVisible }: FoundationInsta
               <tr>
                 <th className="px-4 py-2 text-left font-medium text-gray-700">Описание</th>
                 <th className="px-4 py-2 text-center font-medium text-gray-700">Количество</th>
-                <th className="px-4 py-2 text-center font-medium text-gray-700">Цена за единицу</th>
-                <th className="px-4 py-2 text-center font-medium text-gray-700">Сумма</th>
+                <th className="px-4 py-2 text-right font-medium text-gray-700">Цена за единицу</th>
+                <th className="px-4 py-2 text-right font-medium text-gray-700">Сумма</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -65,10 +66,10 @@ export default function FoundationInstallationTab({ isVisible }: FoundationInsta
                   Монтаж фундамента (с материалами) за м²
                 </td>
                 <td className="px-4 py-3 text-center text-gray-900">{areaM2}</td>
-                <td className="px-4 py-3 text-center text-gray-900">
+                <td className="px-4 py-3 text-right text-gray-900">
                   {workPricePerM2.toLocaleString()} ₸
                 </td>
-                <td className="px-4 py-3 text-center font-medium text-gray-900">
+                <td className="px-4 py-3 text-right font-medium text-gray-900">
                   {totalWorkCost.toLocaleString()} ₸
                 </td>
               </tr>
@@ -78,7 +79,7 @@ export default function FoundationInstallationTab({ isVisible }: FoundationInsta
                 <td colSpan={3} className="px-4 py-3 text-right font-medium text-gray-900">
                   Итого:
                 </td>
-                <td className="px-4 py-3 text-center font-bold text-gray-900">
+                <td className="px-4 py-3 text-right font-bold text-gray-900">
                   {totalWorkCost.toLocaleString()} ₸
                 </td>
               </tr>

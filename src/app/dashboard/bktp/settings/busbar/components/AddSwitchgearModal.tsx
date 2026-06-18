@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { showToast } from '@/shared/modals/ToastProvider';
+import { Select } from '@/components/ui/select';
 
 interface AddSwitchgearModalProps {
   open: boolean;
@@ -100,7 +101,7 @@ export const AddSwitchgearModal: React.FC<AddSwitchgearModalProps> = ({
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Тип</label>
-                <select
+                <Select
                   value={newConfig.type}
                   onChange={(e) => setNewConfig({ ...newConfig, type: e.target.value })}
                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3"
@@ -111,7 +112,7 @@ export const AddSwitchgearModal: React.FC<AddSwitchgearModalProps> = ({
                       {t}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
               <div>
                 <label htmlFor="breaker" className="block text-sm font-medium text-gray-700">

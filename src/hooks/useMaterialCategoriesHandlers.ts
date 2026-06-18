@@ -16,7 +16,7 @@ import { showEditModal } from '@/shared/modals/EditModalContainer';
 interface NewCategory {
   name: string;
   description: string;
-  id: number;
+  id?: number;
 }
 
 export function useMaterialCategoriesHandlers(
@@ -38,8 +38,8 @@ export function useMaterialCategoriesHandlers(
     async (newCategory: NewCategory) => {
       const trimmedName = newCategory.name.trim();
 
-      if (!trimmedName || !newCategory.id) {
-        showToast('Название и ID категории обязательны', 'error');
+      if (!trimmedName) {
+        showToast('Название категории обязательно', 'error');
         return;
       }
 
@@ -51,10 +51,12 @@ export function useMaterialCategoriesHandlers(
         return;
       }
 
-      const existsById = categories.some((cat) => cat.id === newCategory.id);
-      if (existsById) {
-        showToast('Категория с таким ID уже существует', 'error');
-        return;
+      if (newCategory.id) {
+        const existsById = categories.some((cat) => cat.id === newCategory.id);
+        if (existsById) {
+          showToast('Категория с таким ID уже существует', 'error');
+          return;
+        }
       }
 
       try {
@@ -62,13 +64,13 @@ export function useMaterialCategoriesHandlers(
         const created = await createCategory(
           {
             name: trimmedName,
-            id: newCategory.id,
+            ...(newCategory.id ? { id: newCategory.id } : {}),
             description: newCategory.description.trim(),
           },
           token
         );
         setCategories((prev) => [...prev, created]);
-        setNewCategory({ name: '', description: '', id: 0 });
+        setNewCategory({ name: '', description: '' });
         showToast('Категория создана!', 'success');
       } catch (error: any) {
         showToast(error.message || 'Ошибка при создании категории', 'error');
@@ -111,10 +113,17 @@ export function useMaterialCategoriesHandlers(
       const result = await showEditModal({
         title: 'Редактировать категорию',
         initialValues: {
+          id: cat.id,
           name: cat.name,
           description: cat.description,
         },
         fields: [
+          {
+            name: 'id',
+            label: 'ID категории',
+            type: 'number',
+            required: true,
+          },
           {
             name: 'name',
             label: 'Название',
@@ -135,11 +144,17 @@ export function useMaterialCategoriesHandlers(
       }
 
 
-      const { name, description } = result;
-      const trimmedName = name.trim();
+      const { name, description, id } = result;
+      const trimmedName = String(name).trim();
+      const nextId = Number(id);
 
       if (!trimmedName) {
         showToast('Название категории обязательно', 'error');
+        return;
+      }
+
+      if (!Number.isInteger(nextId) || nextId < 1) {
+        showToast('ID категории должен быть положительным числом', 'error');
         return;
       }
 
@@ -151,26 +166,31 @@ export function useMaterialCategoriesHandlers(
         return;
       }
 
+      const existsById = categories.some((c) => c.id === nextId && c.id !== cat.id);
+      if (existsById) {
+        showToast('Категория с таким ID уже существует', 'error');
+        return;
+      }
+
       try {
         const token = localStorage.getItem('token') || '';
-        const updateData = {
+        const updateData: {
+          name: string;
+          description?: string;
+          id?: number;
+        } = {
           name: trimmedName,
+          description: description?.toString().trim() || '',
         };
 
+        if (nextId !== cat.id) {
+          updateData.id = nextId;
+        }
 
-        await updateCategory(cat.id, updateData, token);
-
+        const updated = await updateCategory(cat.id, updateData, token);
 
         setCategories((prev) =>
-          prev.map((item) =>
-            item.id === cat.id
-              ? {
-                  ...item,
-                  name: trimmedName,
-                  description: description?.trim() || '',
-                }
-              : item
-          )
+          prev.map((item) => (item.id === cat.id ? updated : item))
         );
         showToast('Категория обновлена!', 'success');
       } catch (err: any) {

@@ -11,7 +11,6 @@ import {
   worksTableConfig,
   runnTableConfig,
   rusnTableConfig,
-  dguTableConfig,
 } from '@/components/FinalReview/tableConfigs';
 import { Plus, X } from 'lucide-react';
 import type { BmzData } from '@/utils/bmzCalculations';
@@ -23,7 +22,9 @@ import type {
 } from '@/store/useAdditionalEquipmentStore';
 import type { WorkItem } from '@/store/useWorksStore';
 import { useRunnStore } from '@/store/useRunnStore';
+import { useDguStore } from '@/store/useDguStore';
 import TableManager from './TableManager';
+import { useMaterialPrices } from '@/hooks/useMaterialPrices';
 
 interface FinalReviewContentProps {
   bmzStore: BmzData;
@@ -82,6 +83,11 @@ export default function FinalReviewContent({
   customRowsByTable = {},
   onCustomRowsChange,
 }: FinalReviewContentProps) {
+  const { aluminum: aluminumPrice, copper: copperPrice } = useMaterialPrices();
+  const busbarMaterialPrices = React.useMemo(
+    () => ({ aluminum: aluminumPrice, copper: copperPrice }),
+    [aluminumPrice, copperPrice],
+  );
   const runnStoreFromZustand = useRunnStore();
   // Используем переданные данные РУНН, если они есть, иначе данные из Zustand store
   const runn = propRunnStore || runnStoreFromZustand;
@@ -138,10 +144,10 @@ export default function FinalReviewContent({
 
   const transformerRows = React.useMemo(() => {
     if (selectedTransformer) {
-      return transformerTableConfig.dataMapper(selectedTransformer);
+      return transformerTableConfig.dataMapper(selectedTransformer, { busbarMaterialPrices });
     }
     return [];
-  }, [selectedTransformer]);
+  }, [selectedTransformer, busbarMaterialPrices]);
 
   const rusnRows = React.useMemo(() => {
     const cellConfigs = rusnStore?.cellConfigs || [];
@@ -163,37 +169,66 @@ export default function FinalReviewContent({
     return [];
   }, [rusnStore]);
 
+  const dguStore = useDguStore();
+
   const runnRows = React.useMemo(() => {
     const cellConfigs = runn?.cellConfigs || [];
     const cellSummaries = runn?.cellSummaries || [];
     const busbarSummary = runn?.busbarSummary;
     const busBridgeSummary = runn?.busBridgeSummary;
     const busBridgeSummaries = runn?.busBridgeSummaries || [];
-    
-    const hasRunnData = 
+    const dguFromRunn = (runn as { dgu?: typeof dguStore }).dgu;
+    const hasDguData =
+      (dguFromRunn?.enabled ?? dguStore.enabled) &&
+      ((dguFromRunn?.cellSummaries?.length ?? 0) > 0 ||
+        (dguStore.cellSummaries?.length ?? 0) > 0 ||
+        !!dguFromRunn?.busbarSummary ||
+        !!dguStore.busbarSummary ||
+        (dguFromRunn?.busBridgeSummaries?.length ?? 0) > 0 ||
+        (dguStore.busBridgeSummaries?.length ?? 0) > 0);
+
+    const hasRunnData =
       cellConfigs.length > 0 ||
       cellSummaries.length > 0 ||
       !!busbarSummary ||
       !!busBridgeSummary ||
-      busBridgeSummaries.length > 0;
+      busBridgeSummaries.length > 0 ||
+      hasDguData;
 
     if (hasRunnData) {
       const shouldCheck = propRunnStore ? true : isHydrated;
       if (shouldCheck) {
-        return runnTableConfig.dataMapper(runn);
+        const runnWithDgu = dguFromRunn
+          ? runn
+          : {
+              ...runn,
+              dgu: {
+                enabled: dguStore.enabled,
+                settings: dguStore.settings,
+                cells: dguStore.cells,
+                cellSummaries: dguStore.cellSummaries,
+                busbarSummary: dguStore.busbarSummary,
+                busBridgeSummaries: dguStore.busBridgeSummaries,
+                total: 0,
+              },
+            };
+        return runnTableConfig.dataMapper(runnWithDgu);
       }
     }
     return [];
-  }, [runn, propRunnStore, isHydrated]);
+  }, [
+    runn,
+    propRunnStore,
+    isHydrated,
+    dguStore.enabled,
+    dguStore.cellSummaries,
+    dguStore.busbarSummary,
+    dguStore.busBridgeSummaries,
+  ]);
 
   const additionalEquipmentRows = React.useMemo(() => {
     return additionalEquipmentTableConfig.dataMapper({ selected: selectedEquipment, equipmentList });
   }, [selectedEquipment, equipmentList]);
-
-  // Данные для ДГУ (заглушка)
-  const dguRows = React.useMemo(() => {
-    return dguTableConfig.dataMapper({});
-  }, []);
 
   // Проверяем наличие данных в каждой таблице
   const hasBmzRows = bmzRows.length > 0;
@@ -202,8 +237,6 @@ export default function FinalReviewContent({
   const hasRunnRows = runnRows.length > 0;
   const hasAdditionalEquipmentRows = additionalEquipmentRows.length > 0;
   const hasWorksRows = worksRows.length > 0;
-  const hasDguRows = dguRows.length > 0;
-
   // Функция для проверки, должна ли таблица отображаться
   // В режиме редактирования показываем только видимые таблицы
   // В обычном режиме тоже показываем только видимые таблицы (таблицы с данными автоматически добавлены)
@@ -220,7 +253,6 @@ export default function FinalReviewContent({
   React.useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
       console.log('🔍 FinalReviewContent - Видимые таблицы:', Array.from(visibleTables));
-      console.log('🔍 FinalReviewContent - ДГУ видна:', visibleTables.has(dguTableConfig.id));
     }
   }, [visibleTables]);
 
@@ -273,6 +305,7 @@ export default function FinalReviewContent({
         <UniversalTable 
           config={transformerTableConfig}
           data={selectedTransformer}
+          additionalData={{ busbarMaterialPrices }}
           managerMarkupPercent={tableMarkupPercents[transformerTableConfig.id] ?? managerMarkupPercent}
           tableId={transformerTableConfig.id}
           tableMarkupPercent={tableMarkupPercents[transformerTableConfig.id] ?? managerMarkupPercent}
@@ -326,7 +359,20 @@ export default function FinalReviewContent({
       {shouldShowTable(runnTableConfig.id, hasRunnRows) && hasRunnRows && (
         <UniversalTable 
           config={runnTableConfig}
-          data={runn}
+          data={
+            (runn as { dgu?: unknown }).dgu
+              ? runn
+              : {
+                  ...runn,
+                  dgu: {
+                    enabled: dguStore.enabled,
+                    settings: dguStore.settings,
+                    cellSummaries: dguStore.cellSummaries,
+                    busbarSummary: dguStore.busbarSummary,
+                    busBridgeSummaries: dguStore.busBridgeSummaries,
+                  },
+                }
+          }
           managerMarkupPercent={tableMarkupPercents[runnTableConfig.id] ?? managerMarkupPercent}
           tableId={runnTableConfig.id}
           tableMarkupPercent={tableMarkupPercents[runnTableConfig.id] ?? managerMarkupPercent}
@@ -401,31 +447,6 @@ export default function FinalReviewContent({
         />
       )}
 
-      {/* ДГУ - показываем если видна (можно добавить пустую таблицу) */}
-      {visibleTables.has(dguTableConfig.id) && (
-        <UniversalTable 
-          config={dguTableConfig}
-          data={{}}
-          managerMarkupPercent={tableMarkupPercents[dguTableConfig.id] ?? managerMarkupPercent}
-          tableId={dguTableConfig.id}
-          tableMarkupPercent={tableMarkupPercents[dguTableConfig.id] ?? managerMarkupPercent}
-          setTableMarkupPercent={(value: number) => {
-            if (setTableMarkupPercents) {
-              setTableMarkupPercents(prev => ({ ...prev, [dguTableConfig.id]: value }));
-            }
-          }}
-          tableMarkupTotal={tableMarkupTotals[dguTableConfig.id]}
-          setTableMarkupTotal={(value: number | null) => {
-            if (setTableMarkupTotals) {
-              setTableMarkupTotals(prev => ({ ...prev, [dguTableConfig.id]: value }));
-            }
-          }}
-          isReadOnly={isReadOnly}
-          isEditing={isEditing}
-          customRows={customRowsByTable[dguTableConfig.id] || []}
-          onCustomRowsChange={(rows) => onCustomRowsChange?.(dguTableConfig.id, rows)}
-        />
-      )}
     </div>
   );
 }

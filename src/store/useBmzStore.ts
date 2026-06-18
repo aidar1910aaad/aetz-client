@@ -2,9 +2,11 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { BmzSettings } from '@/api/bmz';
 
+export type BmzBuildingType = 'bmz' | 'tp' | 'none' | null;
+
 interface BmzState {
   settings: BmzSettings | null;
-  buildingType: 'bmz' | 'tp' | 'none';
+  buildingType: BmzBuildingType;
   length: number;
   width: number;
   height: number;
@@ -12,7 +14,7 @@ interface BmzState {
   blockCount: number;
   equipmentState: Record<string, boolean>;
   setSettings: (settings: BmzSettings) => void;
-  setBuildingType: (type: 'bmz' | 'tp' | 'none') => void;
+  setBuildingType: (type: BmzBuildingType) => void;
   setLength: (length: number) => void;
   setWidth: (width: number) => void;
   setHeight: (height: number) => void;
@@ -39,7 +41,7 @@ interface BmzState {
 
 const initialState = {
   settings: null,
-  buildingType: 'none' as const,
+  buildingType: null as BmzBuildingType,
   length: 0,
   width: 0,
   height: 0,
@@ -113,17 +115,48 @@ export const useBmzStore = create<BmzState>()(
       },
 
       // Сеттеры для совместимости с BmzForm
-      setHasLighting: (value: boolean) => this.setEquipmentState('Освещение', value),
-      setHasHeating: (value: boolean) => this.setEquipmentState('Отопление', value),
-      setHasSecurity: (value: boolean) => this.setEquipmentState('Охрано-пожарная сигнализация', value),
-      setHasInsulatedFloor: (value: boolean) => this.setEquipmentState('Утепленный пол', value),
-      setHasVentilationShaft: (value: boolean) => this.setEquipmentState('Шахта для вентиляции', value),
-      setHasCableShelves: (value: boolean) => this.setEquipmentState('Кабельные полки и стойки', value),
+      setHasLighting: (value: boolean) =>
+        set((state) => ({
+          equipmentState: { ...state.equipmentState, освещение: value },
+        })),
+      setHasHeating: (value: boolean) =>
+        set((state) => ({
+          equipmentState: { ...state.equipmentState, отопление: value },
+        })),
+      setHasSecurity: (value: boolean) =>
+        set((state) => ({
+          equipmentState: { ...state.equipmentState, 'охрано-пожарнаясигнализация': value },
+        })),
+      setHasInsulatedFloor: (value: boolean) =>
+        set((state) => ({
+          equipmentState: { ...state.equipmentState, утепленныйпол: value },
+        })),
+      setHasVentilationShaft: (value: boolean) =>
+        set((state) => ({
+          equipmentState: { ...state.equipmentState, шахтадлявентиляции: value },
+        })),
+      setHasCableShelves: (value: boolean) =>
+        set((state) => ({
+          equipmentState: { ...state.equipmentState, кабельныеполкиистойки: value },
+        })),
 
       reset: () => set(initialState),
     }),
     {
       name: 'bmz-storage',
+      version: 2,
+      migrate: (persistedState: unknown, version) => {
+        if (version >= 2 || !persistedState || typeof persistedState !== 'object') {
+          return persistedState;
+        }
+
+        const state = persistedState as Partial<BmzState>;
+        return {
+          ...state,
+          // В старых сохранениях "none" было дефолтом. Теперь дефолт — без выбора.
+          buildingType: state.buildingType === 'none' ? null : state.buildingType,
+        };
+      },
     }
   )
 );

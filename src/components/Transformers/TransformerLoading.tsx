@@ -1,5 +1,5 @@
-import React from 'react';
 import Breadcrumbs from '@/components/Breadcrumbs/Breadcrumbs';
+import PageLoader from '@/shared/loader/PageLoader';
 
 export function TransformerLoading() {
   return (
@@ -7,8 +7,8 @@ export function TransformerLoading() {
       <div className="px-6 pt-6 pb-2">
         <Breadcrumbs />
         <h2 className="text-2xl font-semibold mt-2">Силовой трансформатор</h2>
-        <div className="mt-4 text-center">Загрузка...</div>
       </div>
+      <PageLoader inline className="min-h-[calc(100vh-220px)]" />
     </div>
   );
 }

@@ -6,6 +6,16 @@ import { RusnMaterials } from '@/utils/rusnMaterials';
 import { useRusnCalculation } from './useRusnCalculation';
 import { getRusnMaterialById } from '@/utils/rusnMaterials';
 import { calculateCost, CalculationData } from '@/utils/calculationUtils';
+import { applyApiCalculationRates } from '@/utils/calculationSettings';
+import { resolveRusnCellCalculations } from '@/domain/rusn/calculationMatcher';
+import { findKsoA12BhaCalculation } from '@/domain/rusn/bhaCalculation';
+import {
+  KSO_366_CALCULATION_IDS,
+  KSO_366_CELL_TYPE,
+  RUSN_CAMERA,
+  RUSN_CELL_PURPOSE,
+  SIEMENS_8DJH_CALCULATION_NAMES,
+} from '@/domain/rusn/rusnConstants';
 
 interface UseCellCalculationProps {
   cell: RusnCell;
@@ -24,7 +34,7 @@ export const useCellCalculation = ({
   selectedCalculationName,
   onUpdate,
 }: UseCellCalculationProps) => {
-  const { calculations, calculateCellTotal } = useRusnCalculation(groupSlug);
+  const { calculations, calculateCellTotal, settingsRates } = useRusnCalculation(groupSlug);
   const { global } = useRusnStore();
   const [currentCalculation, setCurrentCalculation] = useState<string>(selectedCalculationName);
   const [total, setTotal] = useState(0);
@@ -66,121 +76,24 @@ export const useCellCalculation = ({
     setCurrentCalculation(selectedCalculationName);
   }, [selectedCalculationName]);
 
-  const findMatchingCalculation = (
-    breakerId: string,
-    rzaId?: string,
-    disconnectorId?: string,
-    puId?: string,
-    tsnId?: string,
-    tnId?: string
-  ) => {
-    if (!calculations.cell || (!breakerId && !rzaId && !disconnectorId && !puId && !tsnId && !tnId))
-      return null;
-
-    // Логирование для отладки поиска по ID
-    // console.log('=== FINDING CALCULATIONS BY ID ===');
-    // console.log('Searching for IDs:', { breakerId, rzaId, disconnectorId, puId, tsnId, tnId });
-
-    const breakerCalculation = breakerId
-      ? calculations.cell.find((calc) => {
-          if (!calc.data?.cellConfig?.materials?.switch) return false;
-          const switchMaterials = calc.data.cellConfig.materials.switch as Array<{ id: string }>;
-          const found = switchMaterials.some((switchItem) => {
-            const match = String(switchItem.id) === String(breakerId);
-            return match;
-          });
-          return found;
-        })
-      : null;
-
-    const rzaCalculation = rzaId
-      ? calculations.cell.find((calc) => {
-          if (!calc.data?.cellConfig?.materials?.rza) return false;
-          const rzaMaterials = calc.data.cellConfig.materials.rza as Array<{ id: string }>;
-          const found = rzaMaterials.some((rzaItem) => {
-            const match = String(rzaItem.id) === String(rzaId);
-            return match;
-          });
-          return found;
-        })
-      : null;
-
-    const disconnectorCalculation = disconnectorId
-      ? calculations.cell.find((calc) => {
-          if (!calc.data?.cellConfig?.materials?.disconnector) return false;
-          const disconnectorMaterials = calc.data.cellConfig.materials.disconnector as Array<{
-            id: string;
-          }>;
-          const found = disconnectorMaterials.some((disconnectorItem) => {
-            const match = String(disconnectorItem.id) === String(disconnectorId);
-            return match;
-          });
-          return found;
-        })
-      : null;
-
-    const puCalculation = puId
-      ? calculations.cell.find((calc) => {
-          if (!calc.data?.cellConfig?.materials?.pu) return false;
-          const puMaterials = calc.data.cellConfig.materials.pu as Array<{ id: string }>;
-          const found = puMaterials.some((puItem) => {
-            const match = String(puItem.id) === String(puId);
-            return match;
-          });
-          return found;
-        })
-      : null;
-
-    const tsnCalculation = tsnId
-      ? calculations.cell.find((calc) => {
-          if (!calc.data?.cellConfig?.materials?.tsn) return false;
-          const tsnMaterials = calc.data.cellConfig.materials.tsn as Array<{ id: string }>;
-          const found = tsnMaterials.some((tsnItem) => {
-            const match = String(tsnItem.id) === String(tsnId);
-            return match;
-          });
-          return found;
-        })
-      : null;
-
-    const tnCalculation = tnId
-      ? calculations.cell.find((calc) => {
-          if (!calc.data?.cellConfig?.materials?.tn) return false;
-          const tnMaterials = calc.data.cellConfig.materials.tn as Array<{ id: string }>;
-          const found = tnMaterials.some((tnItem) => {
-            const match = String(tnItem.id) === String(tnId);
-            return match;
-          });
-          return found;
-        })
-      : null;
-
-    // console.log('Found calculations by ID:', {
-    //   breaker: !!breakerCalculation,
-    //   rza: !!rzaCalculation,
-    //   disconnector: !!disconnectorCalculation,
-    //   pu: !!puCalculation,
-    //   tsn: !!tsnCalculation,
-    //   tn: !!tnCalculation,
-    // });
-    // console.log('================================');
-
-
-    return {
-      breakerCalculation,
-      rzaCalculation,
-      disconnectorCalculation,
-      puCalculation,
-      tsnCalculation,
-      tnCalculation,
-    };
-  };
+  const getApiBackedCalculationData = (
+    calculation?: {
+      manufacturingHours?: number;
+    },
+    fallbackManufacturingHours = 4
+  ): CalculationData =>
+    applyApiCalculationRates(
+      {
+        manufacturingHours: calculation?.manufacturingHours ?? fallbackManufacturingHours,
+      },
+      settingsRates
+    );
 
   const calculateTotal = () => {
     let newCalculationName = currentCalculation;
 
     // Специальная логика для Камера Siemens 8DJH
-    if (cell.purpose === 'Камера Siemens 8DJH') {
+    if (cell.purpose === RUSN_CELL_PURPOSE.SIEMENS_8DJH) {
       const siemens8DJH_R = (cell as any).siemens8DJH_R || 0;
       const siemens8DJH_L = (cell as any).siemens8DJH_L || 0;
       
@@ -194,12 +107,16 @@ export const useCellCalculation = ({
       })));
       
       // Находим калькуляции для 8DJH (R) и 8DJH (L)
-      const calculationR = calculations.cell.find(calc => calc.name === '8DJH (R) ');
-      const calculationL = calculations.cell.find(calc => calc.name === '8DJH (L)');
+      const calculationR = calculations.cell.find(
+        (calc) => calc.name === SIEMENS_8DJH_CALCULATION_NAMES.R
+      );
+      const calculationL = calculations.cell.find(
+        (calc) => calc.name === SIEMENS_8DJH_CALCULATION_NAMES.L
+      );
       // Находим дополнительную калькуляцию для 8DJH (L) РЗиА
       // Ищем калькуляцию, содержащую "8DJH (L) РЗиА" в названии
       const calculationLRza = calculations.cell.find(calc => 
-        calc.name.includes('8DJH (L) РЗиА')
+        calc.name.includes(SIEMENS_8DJH_CALCULATION_NAMES.L_RZA_TOKEN)
       );
       
       console.log('[Siemens 8DJH] Найденные калькуляции:', { 
@@ -255,7 +172,7 @@ export const useCellCalculation = ({
     }
 
     // Специальная логика для Кабельная перемычка
-    if (cell.purpose === 'Кабельная перемычка') {
+    if (cell.purpose === RUSN_CELL_PURPOSE.CABLE_JUMPER) {
       // Получаем трансформатор из store
       const selectedTransformer = useTransformerStore.getState().selectedTransformer;
       
@@ -292,7 +209,7 @@ export const useCellCalculation = ({
     }
 
     // Специальная логика для Изоляционный адаптер
-    if (cell.purpose === 'Изоляционный адаптер') {
+    if (cell.purpose === RUSN_CELL_PURPOSE.INSULATION_ADAPTER) {
       console.log('[Изоляционный адаптер] Начинаем расчет');
       console.log('[Изоляционный адаптер] Тип ячейки:', cell.cellType);
       
@@ -316,17 +233,47 @@ export const useCellCalculation = ({
       return;
     }
 
+    // Режим BHA для КСО А12-10: фиксированная калькуляция по slug
+    if (global.bodyType === RUSN_CAMERA.KSO_A12_10 && cell.bhaMode) {
+      const bhaCalculation = findKsoA12BhaCalculation(calculations.cell, cell.purpose);
+
+      if (bhaCalculation) {
+        const price = calculateCellTotal(bhaCalculation.id);
+        const result = price * (cell.count || 1);
+
+        if (total !== result) {
+          setTotal(result);
+        }
+        if (currentCalculation !== bhaCalculation.name) {
+          setCurrentCalculation(bhaCalculation.name);
+        }
+        if (onUpdate && cell.calculationId !== bhaCalculation.id) {
+          onUpdate(cell.id, 'calculationId', bhaCalculation.id);
+        }
+        setRzaCalc(null);
+        return;
+      }
+
+      if (total !== 0) {
+        setTotal(0);
+      }
+      if (currentCalculation !== '') {
+        setCurrentCalculation('');
+      }
+      return;
+    }
+
     // Получаем ID всех материалов ячейки
     const tempBreakerId = cell.breaker?.id;
     const tempRzaId = cell.rza?.id;
     const tempDisconnectorId =
-      cell.purpose === 'Секционный разьединитель' ? cell.sr?.id : undefined;
+      cell.purpose === RUSN_CELL_PURPOSE.SECTION_DISCONNECTOR ? cell.sr?.id : undefined;
     const tempPuId = cell.meterType?.id;
     const tempTsnId = cell.transformerPower?.id;
     const tempTnId = cell.transformerVoltage?.id;
 
     // Специальный режим для КСО 366: статическая калькуляция без материалов
-    if (global.bodyType === 'Камера КСО 366') {
+    if (global.bodyType === RUSN_CAMERA.KSO_366) {
       // Если cellType пустой (для селектора типа разъединителя), не выполняем расчеты
       if (!cell.cellType) {
         return {
@@ -346,20 +293,22 @@ export const useCellCalculation = ({
 
         // Карта предпочтительных калькуляций по назначению для КСО-366
         const preferredByPurpose: Record<string, number> = {
-          'Ввод': 38,
-          'Отходящая': 38,
-          'Трансформаторная': 41,
+          [RUSN_CELL_PURPOSE.INPUT]: KSO_366_CALCULATION_IDS.INPUT_OR_OUTGOING,
+          [RUSN_CELL_PURPOSE.OUTGOING]: KSO_366_CALCULATION_IDS.INPUT_OR_OUTGOING,
+          [RUSN_CELL_PURPOSE.TRANSFORMER]: KSO_366_CALCULATION_IDS.TRANSFORMER,
         };
 
         // Специальная логика для секционных разъединителей
-        if (cell.purpose === 'Секционный разьединитель' && cell.cellType) {
-          if (cell.cellType === 'Камера КСО 366-13') {
+        if (cell.purpose === RUSN_CELL_PURPOSE.SECTION_DISCONNECTOR && cell.cellType) {
+          if (cell.cellType === KSO_366_CELL_TYPE.KSO_13) {
             // Для КСО 366-13 используем калькуляцию с ID 39
-            const kso13Calc = ksoCandidates.find((c) => c.id === 39);
+            const kso13Calc = ksoCandidates.find((c) => c.id === KSO_366_CALCULATION_IDS.KSO_13);
             if (kso13Calc) preferred = kso13Calc;
-          } else if (cell.cellType === 'Камера КСО 366 ШМР 14, 15') {
+          } else if (cell.cellType === KSO_366_CELL_TYPE.SHMR_14_15) {
             // Для КСО 366 ШМР используем калькуляцию с ID 42 (основная часть)
-            const ksoShmrCalc = ksoCandidates.find((c) => c.id === 42);
+            const ksoShmrCalc = ksoCandidates.find(
+              (c) => c.id === KSO_366_CALCULATION_IDS.SHMR_MAIN
+            );
             if (ksoShmrCalc) preferred = ksoShmrCalc;
           }
         } else {
@@ -372,21 +321,14 @@ export const useCellCalculation = ({
         }
 
         // Фолбэк: для «Ввод» ищем по слову в названии
-        if (cell.purpose === 'Ввод') {
+        if (cell.purpose === RUSN_CELL_PURPOSE.INPUT) {
           const byName = ksoCandidates.find((c) => (c.name || '').toLowerCase().includes('ввод'));
           if (byName) preferred = byName;
         }
 
         // Временные логи для диагностики выбора калькуляции КСО-366
 
-        const calcData: CalculationData = {
-          hourlyRate: preferred.data.calculation?.hourlyRate || 1000,
-          manufacturingHours: preferred.data.calculation?.manufacturingHours || 4,
-          overheadPercentage: preferred.data.calculation?.overheadPercentage || 15,
-          adminPercentage: preferred.data.calculation?.adminPercentage || 10,
-          plannedProfitPercentage: preferred.data.calculation?.plannedProfitPercentage || 20,
-          ndsPercentage: preferred.data.calculation?.ndsPercentage || 12,
-        };
+        const calcData = getApiBackedCalculationData(preferred.data.calculation);
         let base = preferred.data.categories.reduce(
           (sum: number, category: { items: Array<{ price: number; quantity: number }> }) =>
             sum +
@@ -399,8 +341,10 @@ export const useCellCalculation = ({
         );
 
         // Для КСО 366 ШМР добавляем дополнительную калькуляцию с ID 44
-        if (cell.cellType === 'Камера КСО 366 ШМР 14, 15') {
-          const additionalCalc = ksoCandidates.find((c) => c.id === 44);
+        if (cell.cellType === KSO_366_CELL_TYPE.SHMR_14_15) {
+          const additionalCalc = ksoCandidates.find(
+            (c) => c.id === KSO_366_CALCULATION_IDS.SHMR_ADDITIONAL
+          );
           if (additionalCalc && onUpdate) {
             // Рассчитываем полную стоимость дополнительной калькуляции
             const additionalBase = additionalCalc.data.categories.reduce(
@@ -415,14 +359,10 @@ export const useCellCalculation = ({
             );
             
             // Рассчитываем полную стоимость дополнительной калькуляции с наценками
-            const additionalCalcData: CalculationData = {
-              hourlyRate: additionalCalc.data.calculation?.hourlyRate || 2000,
-              manufacturingHours: additionalCalc.data.calculation?.manufacturingHours || 25,
-              overheadPercentage: additionalCalc.data.calculation?.overheadPercentage || 10,
-              adminPercentage: additionalCalc.data.calculation?.adminPercentage || 15,
-              plannedProfitPercentage: additionalCalc.data.calculation?.plannedProfitPercentage || 10,
-              ndsPercentage: additionalCalc.data.calculation?.ndsPercentage || 12,
-            };
+            const additionalCalcData = getApiBackedCalculationData(
+              additionalCalc.data.calculation,
+              25
+            );
             
             const { finalPrice: additionalFinalPrice } = calculateCost(additionalBase, additionalCalcData, 0);
             
@@ -451,7 +391,7 @@ export const useCellCalculation = ({
         }
 
         // Для КСО 366 ШМР используем calculationBreakdown.total напрямую
-        if (cell.cellType === 'Камера КСО 366 ШМР 14, 15' && cell.calculationBreakdown) {
+        if (cell.cellType === KSO_366_CELL_TYPE.SHMR_14_15 && cell.calculationBreakdown) {
           const result = cell.calculationBreakdown.total * (cell.count || 1);
           
           if (total !== result) {
@@ -486,124 +426,26 @@ export const useCellCalculation = ({
       return;
     }
 
-    // Находим подходящие калькуляции
     const {
-      breakerCalculation,
-      rzaCalculation,
-      disconnectorCalculation,
-      puCalculation,
-      tsnCalculation,
-      tnCalculation,
-    } = findMatchingCalculation(
-      tempBreakerId || '',
-      tempRzaId,
-      tempDisconnectorId,
-      tempPuId,
-      tempTsnId,
-      tempTnId
-    );
-
-    // Если не нашли калькуляцию ПУ по ID, ищем по типу калькуляции
-    let finalPuCalculation = puCalculation;
-    if (!puCalculation && tempPuId) {
-      finalPuCalculation = calculations.cell.find((calc) => calc.data?.cellConfig?.type === 'pu');
-    }
-
-    // Если не нашли калькуляцию разъединителя по ID, ищем по типу калькуляции
-    let finalDisconnectorCalculation = disconnectorCalculation;
-    if (!disconnectorCalculation && tempDisconnectorId) {
-      finalDisconnectorCalculation = calculations.cell.find(
-        (calc) => calc.data?.cellConfig?.type === 'disconnector'
-      );
-    }
-
-    // Если не нашли калькуляцию ТН по ID, ищем по типу калькуляции
-    let finalTnCalculation = tnCalculation;
-    if (!tnCalculation && tempTnId) {
-      finalTnCalculation = calculations.cell.find((calc) => calc.data?.cellConfig?.type === 'tn');
-      if (finalTnCalculation) {
-        // console.log('Found TN calculation by type:', finalTnCalculation.name);
-      } else {
-        // console.log('No TN calculation found by type');
-      }
-    }
-
-    // Дополнительный fallback для ТН по назначению ячейки
-    if (!finalTnCalculation && cell.purpose === 'Трансформатор напряжения') {
-      finalTnCalculation = calculations.cell.find((calc) => calc.data?.cellConfig?.type === 'tn');
-      if (finalTnCalculation) {
-        // console.log('Found TN calculation by cell purpose:', finalTnCalculation.name);
-      } else {
-        // console.log('No TN calculation found by cell purpose');
-      }
-    }
-
-    // Если не нашли калькуляцию ТСН по ID, ищем по типу калькуляции
-    let finalTsnCalculation = tsnCalculation;
-    if (!tsnCalculation && tempTsnId) {
-      finalTsnCalculation = calculations.cell.find((calc) => calc.data?.cellConfig?.type === 'tsn');
-      if (finalTsnCalculation) {
-        // console.log('Found TSN calculation by type:', finalTsnCalculation.name);
-      } else {
-        // console.log('No TSN calculation found by type');
-      }
-    }
-
-    // Дополнительный fallback для ТСН по назначению ячейки
-    if (!finalTsnCalculation && cell.purpose === 'Трансформатор собственных нужд') {
-      finalTsnCalculation = calculations.cell.find((calc) => calc.data?.cellConfig?.type === 'tsn');
-      if (finalTsnCalculation) {
-        // console.log('Found TSN calculation by cell purpose:', finalTsnCalculation.name);
-      } else {
-        // console.log('No TSN calculation found by cell purpose');
-      }
-    }
-
-    // Определяем тип ячейки на основе найденных калькуляций
-    let cellType = 'Выключатель'; // По умолчанию
-
-    // Приоритет определения типа ячейки
-    if (finalPuCalculation) {
-      cellType = 'ПУ';
-    } else if (finalDisconnectorCalculation) {
-      cellType = 'Разъединитель';
-    } else if (finalTsnCalculation) {
-      cellType = 'ТСН';
-    } else if (finalTnCalculation) {
-      cellType = 'ТН';
-    } else if (breakerCalculation) {
-      cellType = 'Выключатель';
-    }
-
-    // Дополнительная логика определения типа по назначению ячейки и выбранным материалам
-    if (cell.purpose === 'Секционный разьединитель') {
-      cellType = 'Разъединитель';
-    } else if (cell.purpose === 'Трансформатор собственных нужд') {
-      cellType = 'ТСН';
-    } else if (cell.purpose === 'Трансформатор напряжения') {
-      cellType = 'ТН';
-    } else if (cell.meterType && !finalPuCalculation) {
-      // Если выбран ПУ, но калькуляция не найдена, все равно определяем как ПУ
-      cellType = 'ПУ';
-    } else if (
-      cell.purpose === 'Ввод' &&
-      !finalPuCalculation &&
-      !finalTsnCalculation &&
-      !finalTnCalculation
-    ) {
-      cellType = 'Выключатель';
-    }
-
-    // Сохраняем все найденные калькуляции
-    const nextFoundCalculations = {
       breakerCalculation,
       rzaCalculation,
       disconnectorCalculation: finalDisconnectorCalculation,
       puCalculation: finalPuCalculation,
       tsnCalculation: finalTsnCalculation,
       tnCalculation: finalTnCalculation,
-      cellType,
-    };
+    } = resolveRusnCellCalculations(
+      calculations.cell,
+      {
+        breakerId: tempBreakerId,
+        rzaId: tempRzaId,
+        disconnectorId: tempDisconnectorId,
+        puId: tempPuId,
+        tsnId: tempTsnId,
+        tnId: tempTnId,
+      },
+      cell.purpose,
+      Boolean(cell.meterType)
+    );
 
     // Определяем основную калькуляцию
     const mainCalculation =
@@ -660,14 +502,7 @@ export const useCellCalculation = ({
     ) => {
       if (!calculation || !materialId) return 0;
 
-      const calculationData: CalculationData = {
-        hourlyRate: calculation.data.calculation?.hourlyRate || 1000,
-        manufacturingHours: calculation.data.calculation?.manufacturingHours || 4,
-        overheadPercentage: calculation.data.calculation?.overheadPercentage || 15,
-        adminPercentage: calculation.data.calculation?.adminPercentage || 10,
-        plannedProfitPercentage: calculation.data.calculation?.plannedProfitPercentage || 20,
-        ndsPercentage: calculation.data.calculation?.ndsPercentage || 12,
-      };
+      const calculationData = getApiBackedCalculationData(calculation.data.calculation);
 
       const materialsTotal = calculation.data.categories.reduce(
         (sum: number, category: { items: Array<{ price: number; quantity: number }> }) =>
@@ -740,111 +575,49 @@ export const useCellCalculation = ({
     }
   };
 
-  // --- Новый useMemo для foundCalculations ---
   const foundCalculations = useMemo(() => {
-    // Получаем ID всех материалов ячейки
+    if (global.bodyType === RUSN_CAMERA.KSO_A12_10 && cell.bhaMode) {
+      return { cellType: 'BHA' };
+    }
+
     const tempBreakerId = cell.breaker?.id;
     const tempRzaId = cell.rza?.id;
     const tempDisconnectorId =
-      cell.purpose === 'Секционный разьединитель' ? cell.sr?.id : undefined;
+      cell.purpose === RUSN_CELL_PURPOSE.SECTION_DISCONNECTOR ? cell.sr?.id : undefined;
     const tempPuId = cell.meterType?.id;
     const tempTsnId = cell.transformerPower?.id;
     const tempTnId = cell.transformerVoltage?.id;
 
-    // Находим подходящие калькуляции
-    const {
-      breakerCalculation,
-      rzaCalculation,
-      disconnectorCalculation,
-      puCalculation,
-      tsnCalculation,
-      tnCalculation,
-    } =
-      findMatchingCalculation(
-        tempBreakerId || '',
-        tempRzaId,
-        tempDisconnectorId,
-        tempPuId,
-        tempTsnId,
-        tempTnId
-      ) || {};
-
-    // Если не нашли калькуляцию ПУ по ID, ищем по типу калькуляции
-    let finalPuCalculation = puCalculation;
-    if (!puCalculation && tempPuId) {
-      finalPuCalculation = calculations.cell.find((calc) => calc.data?.cellConfig?.type === 'pu');
-    }
-
-    // Если не нашли калькуляцию разъединителя по ID, ищем по типу калькуляции
-    let finalDisconnectorCalculation = disconnectorCalculation;
-    if (!disconnectorCalculation && tempDisconnectorId) {
-      finalDisconnectorCalculation = calculations.cell.find(
-        (calc) => calc.data?.cellConfig?.type === 'disconnector'
-      );
-    }
-
-    // Если не нашли калькуляцию ТН по ID, ищем по типу калькуляции
-    let finalTnCalculation = tnCalculation;
-    if (!tnCalculation && tempTnId) {
-      finalTnCalculation = calculations.cell.find((calc) => calc.data?.cellConfig?.type === 'tn');
-    }
-    if (!finalTnCalculation && cell.purpose === 'Трансформатор напряжения') {
-      finalTnCalculation = calculations.cell.find((calc) => calc.data?.cellConfig?.type === 'tn');
-    }
-
-    // Если не нашли калькуляцию ТСН по ID, ищем по типу калькуляции
-    let finalTsnCalculation = tsnCalculation;
-    if (!tsnCalculation && tempTsnId) {
-      finalTsnCalculation = calculations.cell.find((calc) => calc.data?.cellConfig?.type === 'tsn');
-    }
-    if (!finalTsnCalculation && cell.purpose === 'Трансформатор собственных нужд') {
-      finalTsnCalculation = calculations.cell.find((calc) => calc.data?.cellConfig?.type === 'tsn');
-    }
-
-    // Определяем тип ячейки на основе найденных калькуляций
-    let cellType = 'Выключатель'; // По умолчанию
-    if (finalPuCalculation) {
-      cellType = 'ПУ';
-    } else if (finalDisconnectorCalculation) {
-      cellType = 'Разъединитель';
-    } else if (finalTsnCalculation) {
-      cellType = 'ТСН';
-    } else if (finalTnCalculation) {
-      cellType = 'ТН';
-    } else if (breakerCalculation) {
-      cellType = 'Выключатель';
-    }
-    if (cell.purpose === 'Секционный разьединитель') {
-      cellType = 'Разъединитель';
-    } else if (cell.purpose === 'Трансформатор собственных нужд') {
-      cellType = 'ТСН';
-    } else if (cell.purpose === 'Трансформатор напряжения') {
-      cellType = 'ТН';
-    } else if (cell.meterType && !finalPuCalculation) {
-      cellType = 'ПУ';
-    } else if (
-      cell.purpose === 'Ввод' &&
-      !finalPuCalculation &&
-      !finalTsnCalculation &&
-      !finalTnCalculation
-    ) {
-      cellType = 'Выключатель';
-    }
-
-    return {
-      breakerCalculation,
-      rzaCalculation,
-      disconnectorCalculation: finalDisconnectorCalculation,
-      puCalculation: finalPuCalculation,
-      tsnCalculation: finalTsnCalculation,
-      tnCalculation: finalTnCalculation,
-      cellType,
-    };
-  }, [cell, calculations.cell, cell.cellType]);
+    return resolveRusnCellCalculations(
+      calculations.cell,
+      {
+        breakerId: tempBreakerId,
+        rzaId: tempRzaId,
+        disconnectorId: tempDisconnectorId,
+        puId: tempPuId,
+        tsnId: tempTsnId,
+        tnId: tempTnId,
+      },
+      cell.purpose,
+      Boolean(cell.meterType)
+    );
+  }, [
+    calculations.cell,
+    cell.breaker?.id,
+    cell.rza?.id,
+    cell.sr?.id,
+    cell.meterType?.id,
+    cell.transformerPower?.id,
+    cell.transformerVoltage?.id,
+    cell.purpose,
+    cell.bhaMode,
+    global.bodyType,
+  ]);
 
   useEffect(() => {
     calculateTotal();
   }, [
+    cell.bhaMode,
     cell.breaker,
     cell.rza,
     cell.meterType,
@@ -864,6 +637,8 @@ export const useCellCalculation = ({
     // Добавляем зависимость от store трансформатора для Кабельная перемычка
     useTransformerStore.getState().selectedTransformer,
     materials,
+    settingsRates,
+    global.bodyType,
   ]);
 
   return {

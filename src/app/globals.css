@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 
-/* Анимации для плавного появления ячеек */
+/* РђРЅРёРјР°С†РёРё РґР»СЏ РїР»Р°РІРЅРѕРіРѕ РїРѕСЏРІР»РµРЅРёСЏ СЏС‡РµРµРє */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -43,7 +43,7 @@
   animation: progressBar 2s ease-in-out infinite;
 }
 
-/* Плавная анимация для прогресс-бара */
+/* РџР»Р°РІРЅР°СЏ Р°РЅРёРјР°С†РёСЏ РґР»СЏ РїСЂРѕРіСЂРµСЃСЃ-Р±Р°СЂР° */
 .progress-bar-smooth {
   transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -64,13 +64,12 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --font-sans: var(--font-jakarta); /* ⬅️ Используем Jakarta */
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-jakarta); /* ⬅️ Здесь тоже */
+  --font-sans: var(--font-onest), ui-sans-serif, system-ui, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -83,14 +82,19 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), sans-serif; /* ⬅️ Применяем Jakarta */
+  font-family: var(--font-sans);
+}
+
+/* Next.js фокусирует main после навигации — убираем чёрную рамку до первого клика */
+main:focus {
+  outline: none;
 }
 
 button[data-testid='vercel-feedback-button'] {
   display: none !important;
 }
 
-/* Анимации */
+/* РђРЅРёРјР°С†РёРё */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -106,7 +110,7 @@ button[data-testid='vercel-feedback-button'] {
   animation: fadeIn 0.5s ease-out;
 }
 
-/* Премиум анимации для лоадера */
+/* РџСЂРµРјРёСѓРј Р°РЅРёРјР°С†РёРё РґР»СЏ Р»РѕР°РґРµСЂР° */
 @keyframes gradient-shift {
   0%, 100% {
     background-position: 0% 50%;
@@ -222,3 +226,36 @@ button[data-testid='vercel-feedback-button'] {
 .animate-spin-pulse-fast {
   animation: spin-pulse 0.8s ease-in-out infinite;
 }
+
+/* Login page */
+@keyframes loginFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes loginShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+
+.animate-login-fade-up {
+  animation: loginFadeUp 0.6s ease-out both;
+}
+
+.animate-login-shake {
+  animation: loginShake 0.4s ease-in-out;
+}
+
+.animation-delay-100 { animation-delay: 100ms; }
+.animation-delay-200 { animation-delay: 200ms; }
+.animation-delay-300 { animation-delay: 300ms; }
+.animation-delay-400 { animation-delay: 400ms; }
+.animation-delay-500 { animation-delay: 500ms; }
+

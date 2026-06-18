@@ -2,17 +2,20 @@ import { useEffect, useRef } from 'react';
 import { useWorksStore } from '@/store/useWorksStore';
 import { useBmzStore } from '@/store/useBmzStore';
 import { useRusnStore } from '@/store/useRusnStore';
+import { useRunnStore } from '@/store/useRunnStore';
 import { useTransformerStore } from '@/store/useTransformerStore';
+import { useWorkPricesStore } from '@/store/useWorkPricesStore';
 import {
   calculateBmzInstallationCost,
   calculateBmzExternalGroundingCost,
+  calculateBmzExternalGroundingLength,
   calculateRusnInstallationCost,
   calculateRusnAveragePricePerCell,
   calculateBmzAveragePricePerBlock,
-  calculateBmzExternalGroundingAveragePricePerBlock,
-  BMZ_PRICES,
-  RUSN_PRICES,
-  TRANSFORMER_PRICES,
+  calculateRunnAveragePricePerPanel,
+  calculateRunnInstallationCost,
+  getRunnTransformerUnitPriceKey,
+  getTransformerInstallationPrice,
 } from '@/utils/worksCalculationUtils';
 
 interface CalculatedWork {
@@ -28,7 +31,9 @@ export function useAutoWorksCalculation() {
   const { setWorksList, setSelected, worksList, isEnabled, selected } = useWorksStore();
   const bmzStore = useBmzStore();
   const rusnStore = useRusnStore();
+  const runnStore = useRunnStore();
   const { selectedTransformer } = useTransformerStore();
+  const workPrices = useWorkPricesStore();
   const hasInitialized = useRef(false);
   const lastCalculationRef = useRef<string>('');
 
@@ -40,6 +45,7 @@ export function useAutoWorksCalculation() {
       const calculatedWorks = worksList.filter(work => 
         work.category === 'Монтаж БМЗ' || 
         work.category === 'Монтаж РУСН' || 
+        work.category === 'Монтаж РУНН' ||
         work.category === 'Монтаж трансформаторов' ||
         work.category === 'Заземление' ||
         work.name === 'Монтаж оборудования'
@@ -77,10 +83,15 @@ export function useAutoWorksCalculation() {
       bmzLength: bmzStore.length,
       bmzWidth: bmzStore.width,
       rusnCells: rusnStore.cellConfigs?.map(cell => ({ count: cell.count, purpose: cell.purpose })) || [],
+      rusnBusBridges: rusnStore.busBridges,
+      runnCells: runnStore.cellConfigs?.map(cell => ({ quantity: cell.quantity, purpose: cell.purpose })) || [],
+      runnBusBridges: runnStore.busBridges,
+      runnBusbarSummary: runnStore.busbarSummary?.name,
       transformerId: selectedTransformer?.id,
       transformerPower: selectedTransformer?.power,
-      // Добавляем версию для принудительного обновления при изменении цен
-      version: '1.1',
+      transformerQuantity: selectedTransformer?.quantity,
+      workPrices,
+      version: '2.0',
     });
 
     // Если данные не изменились, не пересчитываем
@@ -95,16 +106,14 @@ export function useAutoWorksCalculation() {
     // Расчет работ для БМЗ
     if (bmzStore.buildingType === 'bmz' && bmzStore.blockCount > 0) {
       // Монтаж БМЗ с учетом сложной логики цен
-      const bmzInstallationTotal = calculateBmzInstallationCost(bmzStore.blockCount);
-      const bmzAveragePrice = calculateBmzAveragePricePerBlock(bmzStore.blockCount);
+      const bmzInstallationTotal = calculateBmzInstallationCost(bmzStore.blockCount, workPrices);
+      const bmzAveragePrice = calculateBmzAveragePricePerBlock(bmzStore.blockCount, workPrices);
 
       // Отладочная информация
       console.log('BMZ Calculation Debug:', {
         blockCount: bmzStore.blockCount,
         totalCost: bmzInstallationTotal,
         averagePrice: bmzAveragePrice,
-        expectedTotal: 513710, // Для 10 блоков
-        expectedAverage: 51371, // Для 10 блоков
       });
 
       calculatedWorks.push({
@@ -117,45 +126,51 @@ export function useAutoWorksCalculation() {
       });
 
       // Внешний контур заземления с учетом сложной логики цен
-      const externalGroundingTotal = calculateBmzExternalGroundingCost(bmzStore.blockCount);
-      const externalGroundingAveragePrice = calculateBmzExternalGroundingAveragePricePerBlock(bmzStore.blockCount);
+      const externalGroundingLength = calculateBmzExternalGroundingLength(
+        bmzStore.length,
+        bmzStore.width
+      );
+      const externalGroundingTotal = calculateBmzExternalGroundingCost(
+        bmzStore.length,
+        bmzStore.width,
+        workPrices
+      );
 
       // Отладочная информация для внешнего контура
       console.log('External Grounding Debug:', {
         blockCount: bmzStore.blockCount,
+        length: externalGroundingLength,
         totalCost: externalGroundingTotal,
-        averagePrice: externalGroundingAveragePrice,
-        expectedTotal: 361336, // Для 10 блоков
-        expectedAverage: 36134, // Для 10 блоков
+        pricePerMeter: workPrices.bmzExternalGroundingPerMeter,
       });
 
       calculatedWorks.push({
         name: 'Внешний контур заземления',
-        price: externalGroundingAveragePrice,
-        unit: 'раб',
+        price: workPrices.bmzExternalGroundingPerMeter,
+        unit: 'м',
         category: 'Заземление',
-        quantity: bmzStore.blockCount,
+        quantity: externalGroundingLength,
         total: externalGroundingTotal,
       });
 
       // Внутренний контур заземления (фиксированная цена)
       calculatedWorks.push({
         name: 'Внутренний контур заземления',
-        price: BMZ_PRICES.internalGrounding,
+        price: workPrices.bmzInternalGroundingPerKit,
         unit: 'раб',
         category: 'Заземление',
         quantity: 1,
-        total: BMZ_PRICES.internalGrounding,
+        total: workPrices.bmzInternalGroundingPerKit,
       });
 
       // Монтаж кабельных стоек и полок (фиксированная цена)
       calculatedWorks.push({
         name: 'Монтаж кабельных металлических стоек и полок',
-        price: BMZ_PRICES.cableRacks,
+        price: workPrices.bmzCableRacks,
         unit: 'раб',
         category: 'Монтаж БМЗ',
         quantity: 1,
-        total: BMZ_PRICES.cableRacks,
+        total: workPrices.bmzCableRacks,
       });
     }
 
@@ -165,8 +180,8 @@ export function useAutoWorksCalculation() {
       const totalCellCount = rusnStore.cellConfigs.reduce((total, cell) => total + (cell.count || 1), 0);
       
       // Монтаж РУСН с учетом сложной логики цен
-      const rusnInstallationTotal = calculateRusnInstallationCost(totalCellCount);
-      const rusnAveragePrice = calculateRusnAveragePricePerCell(totalCellCount);
+      const rusnInstallationTotal = calculateRusnInstallationCost(totalCellCount, workPrices);
+      const rusnAveragePrice = calculateRusnAveragePricePerCell(totalCellCount, workPrices);
 
       calculatedWorks.push({
         name: `Монтаж РУСН (${totalCellCount} ячеек)`,
@@ -178,39 +193,106 @@ export function useAutoWorksCalculation() {
       });
 
       // Шинный мост
-      if (rusnStore.busBridgeSummary) {
+      const totalBusBridgeCount =
+        rusnStore.busBridges?.reduce((total, bridge) => total + (bridge.quantity || 1), 0) ||
+        rusnStore.busBridgeSummaries?.reduce((total, bridge) => total + (bridge.quantity || 1), 0) ||
+        (rusnStore.busBridgeSummary ? rusnStore.busBridgeSummary.quantity || 1 : 0);
+
+      if (totalBusBridgeCount > 0) {
         calculatedWorks.push({
           name: 'Шинный мост монтаж и изготовление',
-          price: RUSN_PRICES.busBridge,
+          price: workPrices.rusnBusBridgePrice,
           unit: 'шт',
           category: 'Монтаж РУСН',
           quantity: 1,
-          total: RUSN_PRICES.busBridge,
+          total: workPrices.rusnBusBridgePrice,
+        });
+        calculatedWorks.push({
+          name: 'Установка шинного моста',
+          price: workPrices.rusnBusBridgeInstallationPrice,
+          unit: 'шт',
+          category: 'Монтаж РУСН',
+          quantity: totalBusBridgeCount,
+          total: workPrices.rusnBusBridgeInstallationPrice * totalBusBridgeCount,
         });
       }
 
       // Трансформаторы для РУСН
       if (selectedTransformer) {
+        const transformerQuantity = selectedTransformer.quantity || 2;
         calculatedWorks.push({
           name: `Узел силового трансформатора ${selectedTransformer.voltage}кВ`,
-          price: RUSN_PRICES.transformerUnit,
+          price: workPrices.rusnTransformerUnitPrice,
           unit: 'шт',
           category: 'Монтаж РУСН',
-          quantity: 2,
-          total: RUSN_PRICES.transformerUnit * 2,
+          quantity: transformerQuantity,
+          total: workPrices.rusnTransformerUnitPrice * transformerQuantity,
+        });
+      }
+    }
+
+    const totalRunnPanelCount = runnStore.cellConfigs?.reduce(
+      (total, cell) => total + (cell.quantity || 1),
+      0
+    ) || 0;
+
+    if (totalRunnPanelCount > 0) {
+      const runnInstallationTotal = calculateRunnInstallationCost(totalRunnPanelCount, workPrices);
+      const runnAveragePrice = calculateRunnAveragePricePerPanel(totalRunnPanelCount, workPrices);
+
+      calculatedWorks.push({
+        name: `Монтаж РУНН (${totalRunnPanelCount} панелей)`,
+        price: runnAveragePrice,
+        unit: 'панель',
+        category: 'Монтаж РУНН',
+        quantity: totalRunnPanelCount,
+        total: runnInstallationTotal,
+      });
+
+      const runnBusBridgeCount =
+        runnStore.busBridges?.reduce((total, bridge) => total + (bridge.quantity || 1), 0) ||
+        runnStore.busBridgeSummaries
+          ?.filter((summary) => summary.name.toLowerCase().includes('шинный мост'))
+          .reduce((total, bridge) => total + (bridge.quantity || 1), 0) ||
+        0;
+
+      if (runnBusBridgeCount > 0) {
+        calculatedWorks.push({
+          name: 'Установка ШМ РУ-0,4 кВ',
+          price: workPrices.runnShmInstallation,
+          unit: 'шт',
+          category: 'Монтаж РУНН',
+          quantity: runnBusBridgeCount,
+          total: workPrices.runnShmInstallation * runnBusBridgeCount,
+        });
+      }
+
+      const runnTransformerUnitPriceKey = getRunnTransformerUnitPriceKey(runnStore.busbarSummary?.name);
+      if (selectedTransformer && runnTransformerUnitPriceKey) {
+        const transformerQuantity = selectedTransformer.quantity || 2;
+        const unitPrice = Number(workPrices[runnTransformerUnitPriceKey]) || 0;
+        calculatedWorks.push({
+          name: 'Узел силового трансформатора 0,4 кВ',
+          price: unitPrice,
+          unit: 'шт',
+          category: 'Монтаж РУНН',
+          quantity: transformerQuantity,
+          total: unitPrice * transformerQuantity,
         });
       }
     }
 
     // Расчет работ для трансформаторов
     if (selectedTransformer) {
+      const transformerQuantity = selectedTransformer.quantity || 2;
+      const installationPrice = getTransformerInstallationPrice(selectedTransformer.power, workPrices);
       calculatedWorks.push({
         name: `Монтаж трансформатора (${selectedTransformer.power} кВА)`,
-        price: TRANSFORMER_PRICES.installation,
+        price: installationPrice,
         unit: 'шт',
         category: 'Монтаж трансформаторов',
-        quantity: 2,
-        total: TRANSFORMER_PRICES.installation * 2,
+        quantity: transformerQuantity,
+        total: installationPrice * transformerQuantity,
       });
     }
 
@@ -226,6 +308,7 @@ export function useAutoWorksCalculation() {
         !work.category || (
           work.category !== 'Монтаж БМЗ' && 
           work.category !== 'Монтаж РУСН' && 
+          work.category !== 'Монтаж РУНН' &&
           work.category !== 'Монтаж трансформаторов' &&
           work.category !== 'Заземление' &&
           work.name !== 'Монтаж оборудования'
@@ -239,6 +322,7 @@ export function useAutoWorksCalculation() {
           price: totalInstallationCost,
           unit: 'раб',
           category: 'Монтаж оборудования',
+          calculationDetails: calculatedWorks,
         }
       ];
 
@@ -255,6 +339,7 @@ export function useAutoWorksCalculation() {
         if (work && (!work.category || (
           work.category !== 'Монтаж БМЗ' && 
           work.category !== 'Монтаж РУСН' && 
+          work.category !== 'Монтаж РУНН' &&
           work.category !== 'Монтаж трансформаторов' &&
           work.category !== 'Заземление' &&
           work.name !== 'Монтаж оборудования'
@@ -278,9 +363,17 @@ export function useAutoWorksCalculation() {
     bmzStore.length,
     bmzStore.width,
     rusnStore.cellConfigs,
+    rusnStore.busBridges,
     rusnStore.busBridgeSummary,
+    rusnStore.busBridgeSummaries,
+    runnStore.cellConfigs,
+    runnStore.busBridges,
+    runnStore.busBridgeSummaries,
+    runnStore.busbarSummary,
     selectedTransformer?.id,
     selectedTransformer?.power,
+    selectedTransformer?.quantity,
+    workPrices,
     isEnabled,
     setWorksList,
     setSelected,

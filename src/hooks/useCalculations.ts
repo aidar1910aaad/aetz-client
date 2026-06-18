@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   getAllCalculationGroups,
   createCalculationGroup,
@@ -25,12 +25,15 @@ export function useCalculations() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
 
-  const [loading, setLoading] = useState(true);
+  const [groupsLoading, setGroupsLoading] = useState(true);
+  const [calculationsLoading, setCalculationsLoading] = useState(false);
+  const [loadedGroupSlug, setLoadedGroupSlug] = useState<string | null>(null);
   const [selectedCalculation, setSelectedCalculation] = useState<Calculation | null>(null);
+  const didInitialGroupsFetch = useRef(false);
 
   // ✅ Загрузка групп калькуляций
   const fetchGroups = useCallback(async () => {
-    setLoading(true);
+    setGroupsLoading(true);
     try {
       const token = localStorage.getItem('token') || '';
       const result = await getAllCalculationGroups(token);
@@ -40,32 +43,42 @@ export function useCalculations() {
       console.error('Error fetching groups:', error);
       showToast(error.message || 'Ошибка при загрузке групп', 'error');
     } finally {
-      setLoading(false);
+      setGroupsLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    if (didInitialGroupsFetch.current) {
+      return;
+    }
+    didInitialGroupsFetch.current = true;
     fetchGroups();
   }, [fetchGroups]);
 
   // ✅ Загрузка калькуляций по выбранной группе
   const fetchCalculations = useCallback(async () => {
     if (!selectedGroup) {
+      setCalculations([]);
+      setLoadedGroupSlug(null);
       return;
     }
-    setLoading(true);
+    setCalculationsLoading(true);
+    setLoadedGroupSlug(null);
     try {
       const token = localStorage.getItem('token') || '';
       const result = await getCalculationsByGroup(selectedGroup.slug, token);
       
       
       setCalculations(result);
+      setLoadedGroupSlug(selectedGroup.slug);
     } catch (err: unknown) {
       const error = err as Error;
       console.error('Error fetching calculations:', error);
       showToast(error.message || 'Ошибка при загрузке калькуляций', 'error');
+      setCalculations([]);
+      setLoadedGroupSlug(selectedGroup.slug);
     } finally {
-      setLoading(false);
+      setCalculationsLoading(false);
     }
   }, [selectedGroup]);
 
@@ -139,6 +152,8 @@ export function useCalculations() {
     }
   };
 
+  const loading = groupsLoading || calculationsLoading;
+
   return {
     groups,
     calculations,
@@ -148,6 +163,9 @@ export function useCalculations() {
     setSearch,
     debouncedSearch,
     loading,
+    groupsLoading,
+    calculationsLoading,
+    loadedGroupSlug,
     handleCreateGroup,
     handleUpdateGroup,
     handleDeleteGroup,

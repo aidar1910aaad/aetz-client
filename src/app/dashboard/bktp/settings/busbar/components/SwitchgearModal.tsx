@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Switchgear, CreateSwitchgearDto } from '@/api/switchgear';
 import { Plus, Trash2 } from 'lucide-react';
 import { amperageDefinitions } from './BusbarTable';
+import { Select } from '@/components/ui/select';
 
 interface SwitchgearModalProps {
   isOpen: boolean;
@@ -72,7 +73,7 @@ export function SwitchgearModal({
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Выключатель</label>
-              <select
+              <Select
                 value={formData.breaker}
                 onChange={(e) => setFormData({ ...formData, breaker: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -84,11 +85,11 @@ export function SwitchgearModal({
                     <option value={`${amperage}А`}>{amperage}А</option>
                   </optgroup>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Ток</label>
-              <select
+              <Select
                 value={formData.amperage}
                 onChange={(e) =>
                   setFormData({
@@ -105,7 +106,7 @@ export function SwitchgearModal({
                     {amperage} А
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Группа</label>
@@ -144,7 +145,7 @@ export function SwitchgearModal({
               <div key={index} className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Тип ячейки</label>
-                  <select
+                  <Select
                     value={cell.name}
                     onChange={(e) => {
                       const newCells = [...formData.cells];
@@ -161,7 +162,7 @@ export function SwitchgearModal({
                     <option value="Ввод">Ввод</option>
                     <option value="СВ">СВ</option>
                     <option value="ОТХ">ОТХ</option>
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Количество</label>

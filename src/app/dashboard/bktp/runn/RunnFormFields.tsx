@@ -16,15 +16,18 @@ import { BusbarSystemContainer } from '@/components/runn/BusbarSystem/BusbarSyst
 import { BusbarBridgeCalculation } from '@/components/runn/BusbarBridge/BusbarBridgeCalculation';
 import RunnDguSection from './components/RunnDguSection';
 
-type TabType = 'main' | 'bus-bridge' | 'dgu';
+export type RunnTabType = 'main' | 'dgu';
 
 interface RunnFormFieldsProps {
-  onTabChange?: (tab: TabType) => void;
+  activeTab: RunnTabType;
+  onTabChange: (tab: RunnTabType) => void;
 }
 
-export default function RunnFormFields({ onTabChange }: RunnFormFieldsProps = {}) {
+export default function RunnFormFields({ activeTab, onTabChange }: RunnFormFieldsProps) {
   const { global, cellConfigs } = useRunnStore();
-  const { selectedCategories } = useRunnSettings();
+  const { selectedCategories, loading: settingsLoading } = useRunnSettings({
+    skipMaterialsLoad: true,
+  });
   const { materials: runnMaterials, loading: runnMaterialsLoading } = useRunnMaterials();
   
   // Инициализируем расчеты для шинных мостов
@@ -59,28 +62,6 @@ export default function RunnFormFields({ onTabChange }: RunnFormFieldsProps = {}
     categoryName: global.withdrawableBreaker || '',
   });
 
-
-  // Сохраняем активную вкладку в localStorage
-  const [activeTab, setActiveTab] = useState<TabType>('main');
-
-  // Слушаем событие переключения на вкладку "Сборные шины"
-  useEffect(() => {
-    const handleSwitchToBusbar = () => {
-      setActiveTab('bus-bridge');
-    };
-
-    window.addEventListener('switchToBusbar', handleSwitchToBusbar);
-    return () => {
-      window.removeEventListener('switchToBusbar', handleSwitchToBusbar);
-    };
-  }, []);
-
-  // Уведомляем родительский компонент об изменении вкладки
-  useEffect(() => {
-    if (onTabChange) {
-      onTabChange(activeTab);
-    }
-  }, [activeTab, onTabChange]);
 
   // Универсальная функция для получения материалов
   const fetchMaterials = async (categoryName: string, categoryType: 'avtomatVyk' | 'counter' | 'avtomatLity', setter: (materials: Material[]) => void) => {
@@ -141,118 +122,63 @@ export default function RunnFormFields({ onTabChange }: RunnFormFieldsProps = {}
   }, [global.meterType, selectedCategories]);
 
 
-  // Сохраняем активную вкладку при изменении
-  const handleTabChange = (tab: TabType) => {
-    setActiveTab(tab);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('runn-active-tab', tab);
-    }
-    // Вызываем callback для уведомления родительского компонента
-    if (onTabChange) {
-      onTabChange(tab);
-    }
-  };
+  const summaryBlock = (
+    <div>
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">Общая сводка</h3>
+      <RunnGeneralSummary
+        cellConfigs={cellConfigs}
+        breakerCalculation={breakerCalculation}
+        counterCalculation={counterCalculation}
+        sectionSwitchCalculation={sectionSwitchCalculation}
+        outgoingCalculation={outgoingCalculation}
+        runnMaterials={runnMaterials}
+      />
+    </div>
+  );
 
   const renderTabContent = () => {
-    switch (activeTab) {
-      case 'main':
-        return (
-          <div className="space-y-8">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Общие настройки</h3>
-              <RunnGlobalConfig
-                materials={materials}
-              />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Ячейки</h3>
-              <RunnCellTable
-                categoryMaterials={materials}
-                autoSelectedMaterial={autoSelectedMaterial}
-                autoSelectedSvMaterial={autoSelectedSvMaterial}
-                meterMaterials={meterMaterials}
-                rpsLeftMaterials={runnMaterials.rpsLeft}
-                fusesPnMaterials={runnMaterials.fusesPn}
-                avtomatLityMaterials={runnMaterials.avtomatLity}
-              />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Общая сводка</h3>
-              <RunnGeneralSummary
-                cellConfigs={cellConfigs}
-                breakerCalculation={breakerCalculation}
-                counterCalculation={counterCalculation}
-                sectionSwitchCalculation={sectionSwitchCalculation}
-                outgoingCalculation={outgoingCalculation}
-                runnMaterials={runnMaterials}
-              />
-            </div>
-          </div>
-        );
-      case 'bus-bridge':
-        return (
-          <div className="space-y-8">
-            <BusbarSystemContainer />
-            <BusbarBridgeCalculation />
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Общая сводка</h3>
-              <RunnGeneralSummary
-                cellConfigs={cellConfigs}
-                breakerCalculation={breakerCalculation}
-                counterCalculation={counterCalculation}
-                sectionSwitchCalculation={sectionSwitchCalculation}
-                outgoingCalculation={outgoingCalculation}
-                runnMaterials={runnMaterials}
-              />
-            </div>
-          </div>
-        );
-      case 'dgu':
-        return (
-          <div className="space-y-8">
-            <RunnDguSection
-              categoryMaterials={materials}
-              meterMaterials={meterMaterials}
-              meterMaterialsLoading={materialsLoading}
-              rpsLeftMaterials={runnMaterials.rpsLeft}
-            />
-          </div>
-        );
-      default:
-        return (
-          <div className="space-y-8">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Общие настройки</h3>
-              <RunnGlobalConfig
-                materials={materials}
-              />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Ячейки</h3>
-              <RunnCellTable
-                categoryMaterials={materials}
-                autoSelectedMaterial={autoSelectedMaterial}
-                autoSelectedSvMaterial={autoSelectedSvMaterial}
-                meterMaterials={meterMaterials}
-                rpsLeftMaterials={runnMaterials.rpsLeft}
-                fusesPnMaterials={runnMaterials.fusesPn}
-                avtomatLityMaterials={runnMaterials.avtomatLity}
-              />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Общая сводка</h3>
-              <RunnGeneralSummary
-                cellConfigs={cellConfigs}
-                breakerCalculation={breakerCalculation}
-                counterCalculation={counterCalculation}
-                sectionSwitchCalculation={sectionSwitchCalculation}
-                outgoingCalculation={outgoingCalculation}
-                runnMaterials={runnMaterials}
-              />
-            </div>
-          </div>
-        );
+    if (activeTab === 'dgu') {
+      return (
+        <div className="space-y-8">
+          <RunnDguSection
+            categoryMaterials={materials}
+            meterMaterials={meterMaterials}
+            meterMaterialsLoading={materialsLoading}
+            rpsLeftMaterials={runnMaterials.rpsLeft}
+            runnMaterials={runnMaterials}
+          />
+        </div>
+      );
     }
+
+    return (
+      <div className="space-y-8">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Общие настройки</h3>
+          <RunnGlobalConfig
+            materials={materials}
+            selectedCategories={selectedCategories}
+            settingsLoading={settingsLoading}
+          />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Ячейки</h3>
+              <RunnCellTable
+                categoryMaterials={materials}
+                autoSelectedMaterial={autoSelectedMaterial}
+                autoSelectedSvMaterial={autoSelectedSvMaterial}
+                meterMaterials={meterMaterials}
+                rpsLeftMaterials={runnMaterials.rpsLeft}
+                fusesPnMaterials={runnMaterials.fusesPn}
+                avtomatLityMaterials={runnMaterials.avtomatLity}
+                runnMaterials={runnMaterials}
+              />
+        </div>
+        <BusbarSystemContainer />
+        <BusbarBridgeCalculation />
+        {summaryBlock}
+      </div>
+    );
   };
 
 
@@ -260,7 +186,7 @@ export default function RunnFormFields({ onTabChange }: RunnFormFieldsProps = {}
   return (
     <div className="space-y-6">
       {/* Tabs Navigation */}
-      <RunnConfigTabs activeTab={activeTab} onTabChange={handleTabChange} />
+      <RunnConfigTabs activeTab={activeTab} onTabChange={onTabChange} />
 
       {/* Loading Indicator */}
       {isAnyLoading && (

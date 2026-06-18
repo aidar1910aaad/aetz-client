@@ -1,222 +1,196 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useUserStore } from '@/store/useUserStore';
 import { useBktpStore } from '@/store/useBktpStore';
 import { useRouter } from 'next/navigation';
-import { Building2, FileText, User, Calendar, Clock, ArrowRight, Lightbulb } from 'lucide-react';
+import {
+  Building2,
+  FileText,
+  User,
+  Calendar,
+  ArrowRight,
+  Lightbulb,
+  CheckCircle2,
+} from 'lucide-react';
 import Breadcrumbs from '@/components/Breadcrumbs/Breadcrumbs';
 import { showToast } from '@/shared/modals/ToastProvider';
+import { formatBktpDateTime } from '@/utils/bktpDateTime';
+
+const steps = [
+  { n: 1, title: 'Основные данные', desc: 'Номер задачи в Битрикс и заказчик' },
+  { n: 2, title: 'БМЗ и трансформатор', desc: 'Параметры здания и силовое оборудование' },
+  { n: 3, title: 'РУСН и РУНН', desc: 'Распределительные устройства' },
+  { n: 4, title: 'Работы и доп. оборудование', desc: 'Монтаж и прочие позиции' },
+  { n: 5, title: 'Спецификация', desc: 'Итог, PDF и сохранение в базу' },
+];
 
 export default function BktpRequestPage() {
   const router = useRouter();
   const { user } = useUserStore();
-  const { taskNumber, client, time, date, setField } = useBktpStore();
+  const { taskNumber, client, date, time, stampDateTime, setField } = useBktpStore();
 
   const fullName = user ? `${user.lastName || ''} ${user.firstName || ''}`.trim() : '';
+  const canContinue = Boolean(taskNumber.trim() && client.trim());
+
+  useEffect(() => {
+    stampDateTime();
+  }, [stampDateTime]);
 
   const handleNext = () => {
-    if (!taskNumber.trim() || !client.trim() || !date || !time) {
-      showToast('Пожалуйста, заполните все обязательные поля', 'error');
+    if (!canContinue) {
+      showToast('Укажите номер задачи в Битрикс и заказчика', 'error');
       return;
     }
 
     setField('executor', fullName);
+    stampDateTime();
     router.push('/dashboard/bktp/bmz');
   };
 
   return (
-    <div className="h-[calc(100vh-64px)] bg-white flex flex-col">
-      <div className="flex-1 p-6 space-y-8">
+    <div className="flex min-h-[calc(100vh-64px)] flex-col bg-gray-50">
+      <div className="flex-1 p-6">
         <Breadcrumbs />
 
-        {/* Заголовок с иконкой */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="p-3 bg-gray-100 rounded-xl">
-            <Building2 className="w-6 h-6 text-[#8eba1e]" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Новая заявка: БКТП</h1>
-            <p className="text-gray-600">Заполните основную информацию о заявке</p>
+        <div className="mb-8">
+          <div className="flex flex-wrap items-start gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#8eba1e]/10">
+              <Building2 className="h-6 w-6 text-[#8eba1e]" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 md:text-3xl">Новая заявка: БКТП</h1>
+              <p className="mt-1 text-gray-600">
+                Укажите номер задачи и заказчика — дата и время подставятся автоматически при сохранении
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Основная форма - занимает 2 колонки */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-              {/* Заголовок карточки */}
-              <div className="bg-[#8eba1e] px-8 py-6">
-                <h2 className="text-xl font-semibold text-white flex items-center gap-3">
-                  <FileText className="w-5 h-5" />
-                  Информация о заявке
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
+          <div className="space-y-4 lg:col-span-2">
+            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+              <div className="border-b border-gray-100 bg-[#8eba1e] px-6 py-4">
+                <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
+                  <FileText className="h-5 w-5" />
+                  Данные заявки
                 </h2>
+                <p className="mt-1 text-sm text-white/85">Обязательные поля отмечены *</p>
               </div>
 
-              {/* Форма */}
-              <div className="p-8 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Номер задачи */}
+              <div className="space-y-6 p-6">
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-[#8eba1e]" />
-                      Номер задачи в Битрикс
-                      <span className="text-red-500">*</span>
+                    <label htmlFor="taskNumber" className="text-sm font-medium text-gray-700">
+                      Номер задачи в Битрикс <span className="text-red-500">*</span>
                     </label>
-                    <div className="relative">
-                      <input
-                        value={taskNumber}
-                        onChange={(e) => setField('taskNumber', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e] transition-all duration-200 text-gray-900 placeholder-gray-400"
-                        placeholder="Введите номер задачи"
-                      />
-                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                        <FileText className="h-5 w-5 text-gray-400" />
-                      </div>
-                    </div>
+                    <input
+                      id="taskNumber"
+                      value={taskNumber}
+                      onChange={(e) => setField('taskNumber', e.target.value)}
+                      className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 transition-colors placeholder:text-gray-400 focus:border-[#8eba1e] focus:outline-none focus:ring-2 focus:ring-[#8eba1e]/20"
+                      placeholder="Например, 28451"
+                      autoComplete="off"
+                    />
                   </div>
 
-                  {/* Заказчик */}
                   <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
-                      <User className="w-4 h-4 text-[#8eba1e]" />
-                      Заказчик / Объект
-                      <span className="text-red-500">*</span>
+                    <label htmlFor="client" className="text-sm font-medium text-gray-700">
+                      Заказчик / объект <span className="text-red-500">*</span>
                     </label>
-                    <div className="relative">
-                      <input
-                        value={client}
-                        onChange={(e) => setField('client', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e] transition-all duration-200 text-gray-900 placeholder-gray-400"
-                        placeholder="Введите название заказчика или объекта"
-                      />
-                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                        <Building2 className="h-5 w-5 text-gray-400" />
-                      </div>
-                    </div>
+                    <input
+                      id="client"
+                      value={client}
+                      onChange={(e) => setField('client', e.target.value)}
+                      className="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 transition-colors placeholder:text-gray-400 focus:border-[#8eba1e] focus:outline-none focus:ring-2 focus:ring-[#8eba1e]/20"
+                      placeholder="Название организации или объекта"
+                      autoComplete="organization"
+                    />
                   </div>
                 </div>
 
-                {/* Дата и время */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-[#8eba1e]" />
-                      Дата
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        value={date || ''}
-                        onChange={(e) => setField('date', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e] transition-all duration-200 text-gray-900"
-                      />
-                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                        <Calendar className="h-5 w-5 text-gray-400" />
-                      </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                    <Calendar className="mt-0.5 h-5 w-5 shrink-0 text-[#8eba1e]" />
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                        Дата и время
+                      </p>
+                      <p className="mt-0.5 text-sm font-semibold text-gray-900">
+                        {formatBktpDateTime(date, time)}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">Обновятся при сохранении заявки</p>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-[#8eba1e]" />
-                      Время
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="time"
-                        value={time || ''}
-                        onChange={(e) => setField('time', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e] transition-all duration-200 text-gray-900"
-                      />
-                      <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                        <Clock className="h-5 w-5 text-gray-400" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Информация о пользователе */}
-                {user && (
-                  <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-[#8eba1e] rounded-full flex items-center justify-center">
-                        <User className="w-5 h-5 text-white" />
+                  {user && (
+                    <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#8eba1e]">
+                        <User className="h-4 w-4 text-white" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-700">Исполнитель</p>
-                        <p className="text-sm text-gray-600">{fullName || 'Не указан'}</p>
+                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                          Исполнитель
+                        </p>
+                        <p className="mt-0.5 text-sm font-semibold text-gray-900">
+                          {fullName || 'Не указан'}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">Подставится при переходе далее</p>
                       </div>
                     </div>
+                  )}
+                </div>
+
+                {canContinue && (
+                  <div className="flex items-center gap-2 rounded-xl border border-[#8eba1e]/25 bg-[#8eba1e]/5 px-4 py-3 text-sm text-gray-700">
+                    <CheckCircle2 className="h-5 w-5 shrink-0 text-[#8eba1e]" />
+                    Можно перейти к настройке БМЗ
                   </div>
                 )}
-
               </div>
             </div>
           </div>
 
-          {/* Информационная карточка - занимает 1 колонку справа */}
-          <div className="lg:col-span-1">
-            <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200 sticky top-6">
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-[#8eba1e] rounded-full flex items-center justify-center flex-shrink-0">
-                  <Lightbulb className="w-5 h-5 text-white" />
+          <aside className="lg:col-span-1">
+            <div className="sticky top-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#8eba1e]">
+                  <Lightbulb className="h-4 w-4 text-white" />
                 </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    Как использовать программу
-                  </h3>
-                  <div className="text-gray-700 leading-relaxed space-y-2">
-                    <p>
-                      <strong>1. Заполните основную информацию</strong> - номер задачи, заказчика и дату
-                      создания заявки.
-                    </p>
-                    <p>
-                      <strong>2. Настройте параметры здания</strong> - выберите тип БМЗ или ТП, укажите
-                      размеры и дополнительное оборудование.
-                    </p>
-                    <p>
-                      <strong>3. Добавьте трансформаторы</strong> - выберите мощность и количество
-                      силовых трансформаторов.
-                    </p>
-                    <p>
-                      <strong>4. Настройте РУСН и РУНН</strong> - сконфигурируйте распределительные
-                      устройства среднего и низкого напряжения.
-                    </p>
-                    <p>
-                      <strong>5. Добавьте работы и оборудование</strong> - укажите монтажные работы и
-                      дополнительное оборудование.
-                    </p>
-                    <p>
-                      <strong>6. Получите готовую спецификацию</strong> - программа автоматически
-                      рассчитает стоимость и сформирует документ.
-                    </p>
-                  </div>
-                </div>
+                <h3 className="text-base font-semibold text-gray-900">Этапы конфигурации</h3>
               </div>
+              <ol className="space-y-3">
+                {steps.map((step) => (
+                  <li key={step.n} className="flex gap-3">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xs font-bold text-[#8eba1e]">
+                      {step.n}
+                    </span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{step.title}</p>
+                      <p className="text-xs text-gray-500">{step.desc}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
             </div>
-          </div>
+          </aside>
         </div>
-
       </div>
 
-      {/* Navigation - прижата к низу */}
-      <div className="p-6 border-t border-gray-200 bg-white">
-        <div className="flex justify-start">
-          <button
-            onClick={handleNext}
-            disabled={!taskNumber.trim() || !client.trim() || !date || !time}
-            className={`flex items-center gap-2 px-8 py-4 rounded-xl text-lg font-semibold transition-all duration-200 ${
-              !taskNumber.trim() || !client.trim() || !date || !time
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-[#8eba1e] hover:bg-[#7aa31a] text-white shadow-lg hover:shadow-xl transform hover:scale-105'
-            }`}
-          >
-            <ArrowRight className="w-5 h-5" />
-            Перейти к настройке БМЗ
-          </button>
-        </div>
+      <div className="border-t border-gray-200 bg-white px-6 py-4">
+        <button
+          type="button"
+          onClick={handleNext}
+          disabled={!canContinue}
+          className={`inline-flex items-center gap-2 rounded-xl px-8 py-3.5 text-base font-semibold transition-all ${
+            canContinue
+              ? 'bg-[#8eba1e] text-white shadow-md hover:bg-[#7aa31a] hover:shadow-lg'
+              : 'cursor-not-allowed bg-gray-200 text-gray-500'
+          }`}
+        >
+          Перейти к настройке БМЗ
+          <ArrowRight className="h-5 w-5" />
+        </button>
       </div>
     </div>
   );

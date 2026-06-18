@@ -1,5 +1,9 @@
-import React from 'react';
+import PageLoader from '@/shared/loader/PageLoader';
 
 export function BusbarLoader() {
-  return <div>Loading...</div>;
-} 
+  return (
+    <div className="h-[calc(100vh-64px)]">
+      <PageLoader inline />
+    </div>
+  );
+}

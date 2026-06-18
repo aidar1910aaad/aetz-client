@@ -1,7 +1,5 @@
 'use client';
 
-import { FileDiff } from 'lucide-react';
-
 interface HistoryHeaderProps {
   total: number;
   showing: number;
@@ -10,30 +8,25 @@ interface HistoryHeaderProps {
 
 export default function HistoryHeader({ total, showing, loading }: HistoryHeaderProps) {
   return (
-    <div className="mb-8">
-      <div className="flex items-center gap-4 mb-6">
-        <div className="p-3 bg-gray-100 rounded-xl">
-          <FileDiff className="w-6 h-6 text-[#8eba1e]" />
-        </div>
+    <div className="border-b border-[#7aa31a]/30 bg-gradient-to-r from-[#7aa31a] to-[#8eba1e] px-6 py-5">
+      <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">История изменений</h1>
-          <p className="text-gray-600">Просмотр всех изменений в системе</p>
+          <h1 className="text-2xl font-semibold text-white">Единый журнал</h1>
+          <p className="mt-1 text-sm text-white/85">
+            Изменения материалов, калькуляций и курсов валют
+          </p>
         </div>
+        {(total > 0 || showing > 0) && (
+          <div className="flex flex-wrap gap-2">
+            <div className="rounded-lg bg-white/15 px-3 py-1.5 text-sm text-white backdrop-blur-sm">
+              Всего: <span className="font-semibold">{loading ? '…' : total}</span>
+            </div>
+            <div className="rounded-lg bg-white/15 px-3 py-1.5 text-sm text-white backdrop-blur-sm">
+              На странице: <span className="font-semibold">{loading ? '…' : showing}</span>
+            </div>
+          </div>
+        )}
       </div>
-
-      {(total > 0 || showing > 0) && (
-        <div className="flex items-center gap-6 mb-6">
-          <div className="bg-gray-50 px-4 py-2 rounded-lg">
-            <span className="text-sm text-gray-600">Всего изменений: </span>
-            <span className="font-semibold text-[#8eba1e]">{total || 0}</span>
-          </div>
-          <div className="bg-gray-50 px-4 py-2 rounded-lg">
-            <span className="text-sm text-gray-600">Показано: </span>
-            <span className="font-semibold text-[#8eba1e]">{showing || 0}</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-

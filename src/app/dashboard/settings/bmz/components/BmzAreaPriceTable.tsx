@@ -1,6 +1,7 @@
 'use client';
 
 import { AreaPriceRange } from '@/api/bmz';
+import { normalizeAreaPriceRange } from '@/utils/bmzAreaPriceRange';
 
 interface BmzAreaPriceTableProps {
   areaPriceRanges: AreaPriceRange[];
@@ -25,6 +26,9 @@ export default function BmzAreaPriceTable({
                   Площадь (м²)
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Высота (мм)
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Толщина стен (мм)
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -36,21 +40,26 @@ export default function BmzAreaPriceTable({
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {areaPriceRanges.map((price, index) => (
+              {areaPriceRanges.map((price, index) => {
+                const r = normalizeAreaPriceRange(price);
+                return (
                 <tr key={index}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {price.minArea} - {price.maxArea}
+                    {r.minArea} – {r.maxArea}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {price.minWallThickness} - {price.maxWallThickness}
+                    {r.minHeight} – {r.maxHeight === 999999 ? '∞' : r.maxHeight}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {r.minWallThickness} – {r.maxWallThickness}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {price.pricePerSquareMeter.toLocaleString()} тг
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
-                      onClick={() => onEdit(price)}
-                      className="text-[#3A55DF] hover:text-[#2e46c5] mr-4"
+                      onClick={() => onEdit(r)}
+                      className="text-[#8eba1e] hover:text-[#7aa31a] mr-4"
                     >
                       Редактировать
                     </button>
@@ -62,7 +71,8 @@ export default function BmzAreaPriceTable({
                     </button>
                   </td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>

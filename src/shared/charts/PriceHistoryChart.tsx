@@ -23,7 +23,12 @@ interface Props {
 }
 
 export default function PriceHistoryChart({ data }: Props) {
-  const sortedData = [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const sortedData = [...data]
+    .map((point) => ({
+      ...point,
+      date: point.date instanceof Date ? point.date.getTime() : new Date(point.date).getTime(),
+    }))
+    .sort((a, b) => a.date - b.date);
   
   // Находим минимальное и максимальное значения для градиента
   const minPrice = Math.min(...sortedData.map(d => d.price));
@@ -64,7 +69,7 @@ export default function PriceHistoryChart({ data }: Props) {
           
           <XAxis
             dataKey="date"
-            tickFormatter={(value) =>
+            tickFormatter={(value: number) =>
               new Date(value).toLocaleString('ru-RU', {
                 day: '2-digit',
                 month: '2-digit',
@@ -98,7 +103,7 @@ export default function PriceHistoryChart({ data }: Props) {
               `${value.toLocaleString('ru-RU')} ₸`,
               'Цена'
             ]}
-            labelFormatter={(label: Date) =>
+            labelFormatter={(label: number) =>
               `📅 ${new Date(label).toLocaleString('ru-RU', {
                 day: '2-digit',
                 month: 'long',
@@ -120,6 +125,7 @@ export default function PriceHistoryChart({ data }: Props) {
             stroke="#8eba1e"
             strokeWidth={3}
             fill="url(#priceGradient)"
+            connectNulls
             dot={{
               fill: '#8eba1e',
               stroke: '#ffffff',

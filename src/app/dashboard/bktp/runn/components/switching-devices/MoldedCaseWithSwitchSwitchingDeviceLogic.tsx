@@ -1,5 +1,6 @@
 import { RunnCell } from '@/store/useRunnStore';
 import { Material } from '@/api/material';
+import { Select } from '@/components/ui/select';
 
 interface MoldedCaseWithSwitchSwitchingDeviceLogicProps {
   cell: RunnCell & { update: (field: keyof RunnCell, val: string | number) => void; remove: () => void; };
@@ -98,7 +99,7 @@ export default function MoldedCaseWithSwitchSwitchingDeviceLogic({
         <label className="text-xs font-medium text-purple-800 block mb-2">
           Выберите конфигурацию автоматов:
         </label>
-        <select
+        <Select
           value={cell.breaker || ''}
           onChange={(e) => cell.update('breaker', e.target.value)}
           className="w-full border border-purple-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -109,7 +110,7 @@ export default function MoldedCaseWithSwitchSwitchingDeviceLogic({
               {option.current}А - {option.count} шт
             </option>
           ))}
-        </select>
+        </Select>
         
         {availableOptions.length > 0 && (
           <div className="mt-2 text-xs text-purple-600">

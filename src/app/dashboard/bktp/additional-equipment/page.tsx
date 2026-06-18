@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import Breadcrumbs from '@/components/Breadcrumbs/Breadcrumbs';
+import PageLoader from '@/shared/loader/PageLoader';
 import AdditionalEquipmentTable from '@/components/FinalReview/AdditionalEquipmentTable';
 import EquipmentSection from './components/EquipmentSection';
 import { EQUIPMENT_CONFIGS } from './config/equipmentConfig';
@@ -283,12 +284,7 @@ export default function AdditionalEquipmentPage() {
         <div className="max-w-7xl mx-auto px-2 md:px-8 pt-6">
           <Breadcrumbs />
           <h1 className="text-3xl font-bold mb-8 text-gray-900">Дополнительное оборудование</h1>
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Загрузка данных...</p>
-            </div>
-          </div>
+          <PageLoader inline className="min-h-[calc(100vh-280px)]" />
         </div>
       </div>
     );
@@ -409,7 +405,7 @@ export default function AdditionalEquipmentPage() {
                   open[cat.key] ? 'max-h-[2000px] py-4' : 'max-h-0 py-0'
                 }`}
               >
-                <div className="space-y-4 px-4">
+                <div className="grid grid-cols-1 gap-4 px-4 lg:grid-cols-2">
                   {cat.items.length === 0 && (
                     <div className="text-gray-400 italic">Нет позиций</div>
                   )}

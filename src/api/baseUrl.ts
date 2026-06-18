@@ -1,1 +1,2 @@
-export const api = 'https://aetz-server-production.up.railway.app';
+export const api =
+  process.env.NEXT_PUBLIC_API_URL;

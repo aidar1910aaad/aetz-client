@@ -1,16 +1,15 @@
 'use client';
 
-import { RefreshCw, Calendar, Search, Filter } from 'lucide-react';
+import { RefreshCw, Search } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useDebounce } from '@/hooks/useDebounce';
+import { AuditActionType, AuditEntityType } from '@/api/auditLogs';
+import { Select } from '@/components/ui/select';
 
 export interface HistoryFiltersState {
-  search: string;
-  materialId: string;
-  fieldChanged: string;
+  entityType: '' | AuditEntityType;
+  action: '' | AuditActionType;
   changedBy: string;
-  dateFrom: string;
-  dateTo: string;
 }
 
 interface HistoryFiltersProps {
@@ -20,16 +19,18 @@ interface HistoryFiltersProps {
   loading: boolean;
 }
 
-const fieldOptions = [
-  { value: '', label: 'Все поля' },
-  { value: 'price', label: 'Цена' },
-  { value: 'name', label: 'Название' },
-  { value: 'code', label: 'Код' },
-  { value: 'unit', label: 'Единица измерения' },
-  { value: 'categoryId', label: 'Категория' },
-  { value: 'description', label: 'Описание' },
-  { value: 'manufacturer', label: 'Производитель' },
-  { value: 'supplier', label: 'Поставщик' },
+const entityOptions: Array<{ value: '' | AuditEntityType; label: string }> = [
+  { value: '', label: 'Все сущности' },
+  { value: 'material', label: 'Материал' },
+  { value: 'calculation', label: 'Калькуляция' },
+  { value: 'currency_settings', label: 'Курсы валют' },
+];
+
+const actionOptions: Array<{ value: '' | AuditActionType; label: string }> = [
+  { value: '', label: 'Все действия' },
+  { value: 'CREATE', label: 'Создание' },
+  { value: 'UPDATE', label: 'Изменение' },
+  { value: 'DELETE', label: 'Удаление' },
 ];
 
 export default function HistoryFilters({
@@ -38,147 +39,96 @@ export default function HistoryFilters({
   onRefresh,
   loading,
 }: HistoryFiltersProps) {
-  const [localSearch, setLocalSearch] = useState(filters.search);
-  const debouncedSearch = useDebounce(localSearch, 500);
+  const [localChangedBy, setLocalChangedBy] = useState(filters.changedBy);
+  const debouncedChangedBy = useDebounce(localChangedBy, 500);
 
-  // Синхронизируем локальное состояние с пропсами
   useEffect(() => {
-    setLocalSearch(filters.search);
-  }, [filters.search]);
+    setLocalChangedBy(filters.changedBy);
+  }, [filters.changedBy]);
 
-  // Обновляем фильтры при изменении debouncedSearch
   useEffect(() => {
-    if (debouncedSearch !== filters.search) {
-      onFiltersChange({ ...filters, search: debouncedSearch });
+    if (debouncedChangedBy !== filters.changedBy) {
+      onFiltersChange({ ...filters, changedBy: debouncedChangedBy });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch]);
+  }, [debouncedChangedBy]);
 
   const handleFilterChange = (key: keyof HistoryFiltersState, value: string) => {
     onFiltersChange({ ...filters, [key]: value });
   };
 
   const clearFilters = () => {
-    const clearedFilters: HistoryFiltersState = {
-      search: '',
-      materialId: '',
-      fieldChanged: '',
-      changedBy: '',
-      dateFrom: '',
-      dateTo: '',
-    };
-    setLocalSearch('');
-    onFiltersChange(clearedFilters);
+    setLocalChangedBy('');
+    onFiltersChange({ entityType: '', action: '', changedBy: '' });
   };
 
-  const hasActiveFilters =
-    filters.search ||
-    filters.materialId ||
-    filters.fieldChanged ||
-    filters.changedBy ||
-    filters.dateFrom ||
-    filters.dateTo;
+  const hasActiveFilters = filters.entityType || filters.action || filters.changedBy;
 
   return (
-    <div className="mb-6 space-y-4">
-      {/* Основные фильтры */}
-      <div className="flex flex-wrap justify-between items-center gap-4">
-        <div className="flex flex-wrap gap-4 items-center flex-1">
-          {/* Поиск */}
-          <div className="relative flex-1 min-w-[250px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+    <div className="mb-5 rounded-lg border border-[#8eba1e]/20 bg-white p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
+          <Select
+            value={filters.entityType}
+            onChange={(e) =>
+              handleFilterChange('entityType', e.target.value as HistoryFiltersState['entityType'])
+            }
+            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-[#8eba1e] focus:outline-none focus:ring-1 focus:ring-[#8eba1e]"
+          >
+            {entityOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+
+          <Select
+            value={filters.action}
+            onChange={(e) =>
+              handleFilterChange('action', e.target.value as HistoryFiltersState['action'])
+            }
+            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-[#8eba1e] focus:outline-none focus:ring-1 focus:ring-[#8eba1e]"
+          >
+            {actionOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+
+          <div className="relative min-w-[240px] flex-1 sm:max-w-xs">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              value={localSearch}
-              onChange={(e) => setLocalSearch(e.target.value)}
-              placeholder="Поиск по названию материала..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e] transition-all duration-200"
-            />
-          </div>
-
-          {/* ID материала */}
-          <div className="relative">
-            <input
-              type="number"
-              value={filters.materialId}
-              onChange={(e) => handleFilterChange('materialId', e.target.value)}
-              placeholder="ID материала"
-              className="w-32 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e] transition-all duration-200"
-            />
-          </div>
-
-          {/* Поле */}
-          <div className="relative">
-            <select
-              value={filters.fieldChanged}
-              onChange={(e) => handleFilterChange('fieldChanged', e.target.value)}
-              className="appearance-none w-48 cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-2 pr-10 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e] transition-all duration-200"
-            >
-              {fieldOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-xs">
-              ▼
-            </div>
-          </div>
-
-          {/* Автор изменения */}
-          <div className="relative">
-            <input
-              type="text"
-              value={filters.changedBy}
-              onChange={(e) => handleFilterChange('changedBy', e.target.value)}
-              placeholder="Изменил"
-              className="w-40 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e] transition-all duration-200"
-            />
-          </div>
-
-          {/* Даты */}
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-[#8eba1e]" />
-            <input
-              type="date"
-              value={filters.dateFrom}
-              onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e] transition-all duration-200"
-              placeholder="От даты"
-            />
-            <span className="text-gray-500">—</span>
-            <input
-              type="date"
-              value={filters.dateTo}
-              onChange={(e) => handleFilterChange('dateTo', e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e] transition-all duration-200"
-              placeholder="До даты"
+              value={localChangedBy}
+              onChange={(e) => setLocalChangedBy(e.target.value)}
+              placeholder="Поиск по ФИО или email..."
+              className="w-full rounded-lg border border-gray-200 py-2 pl-10 pr-3 text-sm focus:border-[#8eba1e] focus:outline-none focus:ring-1 focus:ring-[#8eba1e]"
             />
           </div>
         </div>
 
-        {/* Кнопки */}
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           {hasActiveFilters && (
             <button
+              type="button"
               onClick={clearFilters}
-              className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl transition-all duration-200"
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 transition-colors hover:border-[#8eba1e] hover:text-[#8eba1e]"
             >
-              <Filter className="w-4 h-4" />
               Сбросить
             </button>
           )}
           <button
+            type="button"
             onClick={onRefresh}
             disabled={loading}
-            className="flex items-center gap-2 bg-gray-100 hover:bg-[#8eba1e] text-gray-700 hover:text-white px-4 py-2 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 rounded-lg bg-[#8eba1e] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#7aa31a] disabled:opacity-50"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            {loading ? 'Обновление...' : 'Обновить'}
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Обновить
           </button>
         </div>
       </div>
     </div>
   );
 }
-

@@ -199,23 +199,6 @@ export default function CalculationDisplay({
         </div>
       )}
 
-      
-      {/* Отладочная информация */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-          <div className="text-yellow-700">
-            <div><strong>Отладка:</strong></div>
-            <div>Тип материала: {materialType}</div>
-            <div>Значение ячейки: {materialType === 'withdrawable_breaker' ? cell.breaker : cell.meterType}</div>
-            <div>Найден материал: {selectedMaterial ? 'Да' : 'Нет'}</div>
-            {selectedMaterial && <div>Название материала: {selectedMaterial.name}</div>}
-            <div>Цена материала: {materialTotal.toLocaleString()} ₸</div>
-            <div>Трансформатор: {currentTransformer ? `${currentTransformer.name} (${currentTransformer.quantity}шт)` : 'Нет'}</div>
-            <div>Итоговая цена: {finalPrice.toLocaleString()} ₸</div>
-          </div>
-        </div>
-      )}
-
       {/* Детализация стоимости */}
       <div className="space-y-1 text-xs">
         <div className="flex justify-between">

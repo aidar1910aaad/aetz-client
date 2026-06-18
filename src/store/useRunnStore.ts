@@ -79,7 +79,7 @@ export interface RunnBusbarSummary {
 interface RunnState {
   global: RunnGlobalOptions;
   cellConfigs: RunnCell[];
-  // Добавляем поля для сводок как в РУСН
+  // UI snapshot only. Backend remains authoritative for final totals.
   cellSummaries: RunnCellSummary[];
   busbarSummary: RunnBusbarSummary | null;
   busBridgeSummary: RunnBusbarSummary | null;
@@ -95,6 +95,7 @@ interface RunnState {
   setBusBridges: (bridges: BusbarBridge[]) => void;
   toggleBusbar: (enabled: boolean) => void;
   toggleBusBridge: (enabled: boolean) => void;
+  clearAllCells: () => void;
   reset: () => void;
   
   // Методы для управления сводками
@@ -102,8 +103,12 @@ interface RunnState {
   removeCellSummary: (cellId: string) => void;
   clearCellSummaries: () => void;
   setBusbarSummary: (summary: RunnBusbarSummary) => void;
-  setBusBridgeSummary: (summary: RunnBusbarSummary) => void;
-  setBusBridgeSummaries: (summaries: RunnBusbarSummary[]) => void;
+  setBusBridgeSummary: (summary: RunnBusbarSummary | null) => void;
+  setBusBridgeSummaries: (
+    summaries:
+      | RunnBusbarSummary[]
+      | ((currentSummaries: RunnBusbarSummary[]) => RunnBusbarSummary[])
+  ) => void;
 }
 
 export const useRunnStore = create<RunnState>()(
@@ -124,6 +129,13 @@ export const useRunnStore = create<RunnState>()(
           enabled: false,
           material: null,
           bridges: [],
+        },
+        zeroBusbar: {
+          enabled: false,
+          material: null,
+          configuration: '',
+          weight: 0,
+          pricePerKg: 0,
         },
       },
       cellConfigs: [],
@@ -213,9 +225,13 @@ export const useRunnStore = create<RunnState>()(
           },
         })),
 
+      clearAllCells: () =>
+        set({
+          cellConfigs: [],
+          cellSummaries: [],
+        }),
+
       reset: () => {
-        console.log('🔄 RunnStore reset called - очистка всех данных РУНН');
-        
         // Очищаем localStorage для шинных мостов и самого store
         if (typeof window !== 'undefined') {
           localStorage.removeItem('busbar-bridges');

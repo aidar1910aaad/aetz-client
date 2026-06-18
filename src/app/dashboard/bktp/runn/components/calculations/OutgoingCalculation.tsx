@@ -2,10 +2,9 @@ import { RunnCell } from '@/store/useRunnStore';
 import { calculateCost } from '@/utils/calculationUtils';
 import { autoAddFusesToRubilniki } from '@/utils/fuseUtils';
 import { Material } from '@/api/material';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { useTransformerStore } from '@/store/useTransformerStore';
-import { useRunnMaterials } from '@/hooks/useRunnMaterials';
 import { extractCurrentFromRubilnikName, extractCurrentFromBreakerName, findMatchingCurrentTransformer } from '@/utils/panelNameUtils';
 import { useMaterialPrices } from '@/hooks/useMaterialPrices';
 import { getRpsMaterial, getAutomatonMaterial, getWithdrawableAutomatonMaterial } from '@/config/rpsConfig';
@@ -20,6 +19,7 @@ interface OutgoingCalculationProps {
   additionalRubilnikMaterials?: Material[];
   rpsLeftMaterials?: Material[];
   categoryMaterials?: Material[];
+  currentTransformerMaterials?: Material[];
   onCalculationResult?: (cellId: string, type: 'main' | 'meter', price: number) => void;
 }
 
@@ -33,11 +33,11 @@ export default function OutgoingCalculation({
   additionalRubilnikMaterials = [],
   rpsLeftMaterials = [],
   categoryMaterials = [],
+  currentTransformerMaterials = [],
   onCalculationResult,
 }: OutgoingCalculationProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const { selectedTransformer } = useTransformerStore();
-  const { materials: runnMaterials } = useRunnMaterials();
   const { aluminum: aluminumPrice, copper: copperPrice } = useMaterialPrices();
   
   // Получаем материал трансформатора
@@ -428,7 +428,7 @@ export default function OutgoingCalculation({
       !isMeterCalculation && 
       cell.rubilniki && 
       cell.rubilniki.filter(r => r && r.trim() !== '').length > 0 &&
-      runnMaterials.currentTransformer.length > 0) {
+      currentTransformerMaterials.length > 0) {
     
     const selectedRubilniki = cell.rubilniki.filter(r => r && r.trim() !== '');
     
@@ -444,7 +444,10 @@ export default function OutgoingCalculation({
     
     // Для каждого уникального тока находим трансформатор и добавляем по 3 шт на каждый рубильник
     rubilnikiByCurrent.forEach((rubilnikiCount, current) => {
-      const matchingTransformer = findMatchingCurrentTransformer(current, runnMaterials.currentTransformer);
+      const matchingTransformer = findMatchingCurrentTransformer(
+        current,
+        currentTransformerMaterials
+      );
       if (matchingTransformer) {
         const transformerPrice = typeof matchingTransformer.price === 'string' 
           ? parseFloat(matchingTransformer.price) 
@@ -468,7 +471,7 @@ export default function OutgoingCalculation({
       !isMeterCalculation && 
       cell.rubilniki && 
       cell.rubilniki.filter(r => r && r.trim() !== '').length > 0 &&
-      runnMaterials.currentTransformer.length > 0) {
+      currentTransformerMaterials.length > 0) {
     
     const selectedAutomatons = cell.rubilniki.filter(r => r && r.trim() !== '');
     
@@ -484,7 +487,10 @@ export default function OutgoingCalculation({
     
     // Для каждого уникального тока находим трансформатор и добавляем по 3 шт на каждый автомат
     automatonsByCurrent.forEach((automatonsCount, current) => {
-      const matchingTransformer = findMatchingCurrentTransformer(current, runnMaterials.currentTransformer);
+      const matchingTransformer = findMatchingCurrentTransformer(
+        current,
+        currentTransformerMaterials
+      );
       if (matchingTransformer) {
         const transformerPrice = typeof matchingTransformer.price === 'string' 
           ? parseFloat(matchingTransformer.price) 
@@ -508,12 +514,15 @@ export default function OutgoingCalculation({
       !isMeterCalculation && 
       cell.breaker && 
       cell.breaker.trim() !== '' &&
-      runnMaterials.currentTransformer.length > 0) {
+      currentTransformerMaterials.length > 0) {
     
     // Извлекаем ток из названия выкатного автомата
     const current = extractCurrentFromBreakerName(cell.breaker);
     if (current) {
-      const matchingTransformer = findMatchingCurrentTransformer(current, runnMaterials.currentTransformer);
+      const matchingTransformer = findMatchingCurrentTransformer(
+        current,
+        currentTransformerMaterials
+      );
       if (matchingTransformer) {
         const transformerPrice = typeof matchingTransformer.price === 'string' 
           ? parseFloat(matchingTransformer.price) 
@@ -572,13 +581,25 @@ export default function OutgoingCalculation({
     }
   };
 
-  // Передаем результат калькуляции в родительский компонент
+  // Передаем результат калькуляции в родительский компонент (только при изменении цены)
+  const lastReportedPriceRef = useRef<number | null>(null);
   useEffect(() => {
-    if (onCalculationResult && calculationResult && calculationResult.finalPrice) {
-      const finalPrice = calculationResult.finalPrice;
-      onCalculationResult(cell.id, isMeterCalculation ? 'meter' : 'main', finalPrice);
+    const finalPrice = calculationResult?.finalPrice;
+    if (
+      !onCalculationResult ||
+      !finalPrice ||
+      lastReportedPriceRef.current === finalPrice
+    ) {
+      return;
     }
-  }, [onCalculationResult, cell.id, isMeterCalculation, calculationResult?.finalPrice]);
+    lastReportedPriceRef.current = finalPrice;
+    onCalculationResult(cell.id, isMeterCalculation ? 'meter' : 'main', finalPrice);
+  }, [
+    onCalculationResult,
+    cell.id,
+    isMeterCalculation,
+    calculationResult?.finalPrice,
+  ]);
 
   // Все условные return должны быть ПОСЛЕ всех хуков
   
@@ -623,62 +644,6 @@ export default function OutgoingCalculation({
       
       {isExpanded && (
         <>
-      
-      {/* Отладочная информация о ценах */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-          <div className="text-yellow-700">
-            <div>Расчетная цена: {(calculationResult.finalPrice || 0).toLocaleString()} ₸</div>
-            <div>Цена из API: {(calculation.data.finalPrice || calculation.data.totalPrice || 0).toLocaleString()} ₸</div>
-            <div>Разница: {Math.abs((calculationResult.finalPrice || 0) - (calculation.data.finalPrice || calculation.data.totalPrice || 0)).toLocaleString()} ₸</div>
-            <div>materialsTotal: {materialsTotal.toLocaleString()} ₸</div>
-            <div>selectedMaterialsTotal: {selectedMaterialsTotal.toLocaleString()} ₸</div>
-            <div>additionalMaterialsCost: {additionalMaterialsCost.toLocaleString()} ₸</div>
-            <div>fusesPnTotal: {fusesPnTotal.toLocaleString()} ₸</div>
-            <div>meterTotal: {meterTotal.toLocaleString()} ₸</div>
-            <div>selectedAutomatonsCost: {selectedAutomatonsCost.toLocaleString()} ₸</div>
-            <div>rubilnikTotal: {rubilnikTotal.toLocaleString()} ₸</div>
-            <div>rpsMaterialConsumptionTotal: {rpsMaterialConsumptionTotal.toLocaleString()} ₸</div>
-            {rpsMaterialConsumptionList.length > 0 && (
-              <>
-                {rpsMaterialConsumptionList.map((item, idx) => (
-                  <div key={idx}>
-                    Расход {item.material} для РПС {item.current}А: {item.consumption}кг × {item.pricePerKg.toLocaleString()}₸/кг = {item.total.toLocaleString()}₸
-                  </div>
-                ))}
-              </>
-            )}
-            <div>automatonMaterialConsumptionTotal: {automatonMaterialConsumptionTotal.toLocaleString()} ₸</div>
-            {automatonMaterialConsumptionList.length > 0 && (
-              <>
-                {automatonMaterialConsumptionList.map((item, idx) => (
-                  <div key={idx}>
-                    Расход {item.material} для автомата {typeof item.current === 'string' ? item.current : `${item.current}А`}: {item.consumption}кг × {item.pricePerKg.toLocaleString()}₸/кг = {item.total.toLocaleString()}₸
-                  </div>
-                ))}
-              </>
-            )}
-            <div>withdrawableAutomatonMaterialConsumptionTotal: {withdrawableAutomatonMaterialConsumptionTotal.toLocaleString()} ₸</div>
-            {withdrawableAutomatonMaterialConsumptionList.length > 0 && (
-              <>
-                {withdrawableAutomatonMaterialConsumptionList.map((item, idx) => (
-                  <div key={idx}>
-                    Расход {item.material} для выкатного автомата {item.current}А: {item.consumption}кг × {item.pricePerKg.toLocaleString()}₸/кг = {item.total.toLocaleString()}₸
-                  </div>
-                ))}
-              </>
-            )}
-            <div>isMeterCalculation: {isMeterCalculation ? 'Да' : 'Нет'}</div>
-            <div>calculation.name: {calculation?.name}</div>
-            <div>cell.meterType: {cell.meterType}</div>
-            <div>cell.switchingDevice: {cell.switchingDevice}</div>
-            <div>calculation.data.categories: {calculation?.data?.categories?.length || 0} категорий</div>
-            {calculation?.data?.categories?.map((cat: any, idx: number) => (
-              <div key={idx}>Категория {idx}: {cat.name} - {cat.items?.reduce((sum: number, item: any) => sum + (item.price || 0) * (item.quantity || 0), 0) || 0} ₸</div>
-            ))}
-          </div>
-        </div>
-      )}
       
       {/* Информация о ячейке */}
       <div className="mb-3 p-2 bg-indigo-50 border border-indigo-200 rounded text-xs">
@@ -840,21 +805,6 @@ export default function OutgoingCalculation({
          !isMeterCalculation && 
          cell.rubilniki && cell.rubilniki.filter(r => r && r.trim() !== '').length > 0 && (
           <>
-            {/* Отладочная информация для рубильников и предохранителей */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
-                <div className="text-blue-700">
-                  <div>Отладка рубильников:</div>
-                  <div>Выбранные: {cell.rubilniki.filter(r => r && r.trim() !== '').join(', ')}</div>
-                  <div>Доступные в калькуляции: {(materials as any)?.rps?.map((m: any) => m.name).join(', ') || 'Нет'}</div>
-                  <div>Доступные РПС материалы: {fusesPnMaterials.length} шт</div>
-                  <div>Стоимость рубильников: {(cell.switchingDevice === 'РПС' ? rpsRubilnikiTotal : selectedAutomatonsCost).toLocaleString()} ₸</div>
-                  <div>Доступные предохранители ПН: {fusesPnMaterials.length} шт</div>
-                  <div>Стоимость предохранителей ПН: {fusesPnTotal.toLocaleString()} ₸</div>
-                </div>
-              </div>
-            )}
-            
             {/* Показываем все выбранные рубильники с ценами */}
             {cell.rubilniki.filter(r => r && r.trim() !== '').map((rubilnik, index) => {
               let price = 0;

@@ -14,7 +14,7 @@ export default function SidebarGroup({
 }: {
   item: {
     label: string;
-    icon: LucideIcon; // теперь это компонент, а не строка
+    icon: LucideIcon;
     submenu?: { label: string; href: string }[];
   };
   collapsed: boolean;
@@ -29,49 +29,38 @@ export default function SidebarGroup({
   return (
     <div>
       <button
+        type="button"
         onClick={onToggle}
         className={clsx(
-          'flex items-center w-full gap-3 rounded-xl px-3 py-3 transition-all duration-200 group',
-          'hover:bg-gray-100 hover:shadow-md hover:scale-[1.02]',
-          isAnySubActive && !collapsed && 'bg-[#8eba1e] text-white shadow-lg',
-          isAnySubActive && collapsed && 'bg-gray-100 shadow-md'
+          'group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-colors duration-150',
+          isAnySubActive
+            ? 'bg-[#8eba1e] text-white hover:bg-[#7aa31a]'
+            : 'text-gray-700 hover:bg-[#8eba1e]/10 hover:text-[#6b8f16]'
         )}
       >
-        {collapsed && isAnySubActive ? (
-          <Icon className="w-5 h-5 text-[#8eba1e]" />
-        ) : (
-          <div className={clsx(
-            'p-2 rounded-lg transition-all duration-200',
-            !collapsed && isAnySubActive ? 'bg-white/20' : 'bg-gray-100 group-hover:bg-[#8eba1e]'
-          )}>
-            <Icon className={clsx(
-              'w-5 h-5 transition-colors duration-200',
-              !collapsed && isAnySubActive ? 'text-white' : 'text-[#8eba1e] group-hover:text-white'
-            )} />
-          </div>
-        )}
+        <Icon
+          className={clsx(
+            'h-5 w-5 shrink-0 transition-colors duration-150',
+            isAnySubActive ? 'text-white' : 'text-[#8eba1e] group-hover:text-[#7aa31a]'
+          )}
+        />
         {!collapsed && (
           <>
-            <span className={clsx(
-              'flex-1 text-left font-medium transition-colors duration-200',
-              isAnySubActive ? 'text-white' : 'text-gray-700 group-hover:text-[#8eba1e]'
-            )}>
-              {item.label}
-            </span>
-            <ChevronDown 
-              size={18} 
+            <span className="flex-1 text-left font-medium">{item.label}</span>
+            <ChevronDown
+              size={18}
               className={clsx(
-                'transition-all duration-300',
+                'shrink-0 transition-transform duration-200',
                 isOpen && 'rotate-180',
-                isAnySubActive ? 'text-white' : 'text-[#8eba1e] group-hover:text-white'
-              )} 
+                isAnySubActive ? 'text-white/90' : 'text-[#8eba1e] group-hover:text-[#7aa31a]'
+              )}
             />
           </>
         )}
       </button>
 
       {isOpen && !collapsed && (
-        <div className="ml-8 mt-3 space-y-2 bg-gray-50 rounded-xl p-3 border border-gray-200">
+        <div className="ml-4 mt-1 space-y-0.5 border-l-2 border-[#8eba1e]/20 py-1 pl-3">
           {item.submenu?.map((sub, subIndex) => {
             const isActive = pathname === sub.href;
             return (
@@ -79,8 +68,10 @@ export default function SidebarGroup({
                 key={subIndex}
                 href={sub.href}
                 className={clsx(
-                  'block text-sm px-4 py-2 rounded-lg transition-all duration-200 hover:bg-gray-100 hover:shadow-sm',
-                  isActive && 'bg-[#8eba1e] text-white shadow-md font-medium'
+                  'block rounded-md px-3 py-2 text-sm transition-colors duration-150',
+                  isActive
+                    ? 'bg-[#8eba1e] font-medium text-white hover:bg-[#7aa31a]'
+                    : 'text-gray-600 hover:bg-[#8eba1e]/10 hover:text-[#6b8f16]'
                 )}
               >
                 {sub.label}

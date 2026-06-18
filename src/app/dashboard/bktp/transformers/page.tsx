@@ -14,11 +14,13 @@ import { TransformerLoading } from '@/components/Transformers/TransformerLoading
 import { getCalculationsByGroup, Calculation } from '@/api/calculations';
 import { useAuth } from '@/hooks/useAuth';
 import { BusbarConfiguration } from '@/components/Transformers/BusbarConfiguration';
+import { useRealtimeCalculationStore } from '@/store/useRealtimeCalculationStore';
 
 export default function TransformerConfigurator() {
   const router = useRouter();
   const { token } = useAuth();
   const { selectedTransformer, setTransformer, skipTransformer } = useTransformerStore();
+  const { data: realtimeData, isCalculating } = useRealtimeCalculationStore();
   const [transformers, setTransformers] = useState<Transformer[]>([]);
   const [loading, setLoading] = useState(true);
   const [calculations, setCalculations] = useState<Calculation[]>([]);
@@ -197,6 +199,44 @@ export default function TransformerConfigurator() {
       t.power === selected.power &&
       t.manufacturer === selected.manufacturer
   );
+
+  // Синхронизируем выбранный трансформатор в store в реальном времени,
+  // чтобы backend realtime calculation видел актуальные данные страницы до submit.
+  useEffect(() => {
+    if (skip) {
+      skipTransformer();
+      return;
+    }
+
+    if (!isComplete || !matched) {
+      return;
+    }
+
+    setTransformer({
+      id: matched.id,
+      model: matched.model,
+      voltage: matched.voltage,
+      type: matched.type,
+      power: matched.power,
+      manufacturer: matched.manufacturer,
+      price: matched.price,
+      quantity,
+      busbars: selected.busbars,
+      ustCalculation: selectedUstCalculations[0] || null,
+      ustCalculations: selectedUstCalculations,
+      busbarUstData: busbarUstData,
+    });
+  }, [
+    skip,
+    isComplete,
+    matched,
+    quantity,
+    selected.busbars,
+    selectedUstCalculations,
+    busbarUstData,
+    setTransformer,
+    skipTransformer,
+  ]);
 
   // Автоматическое подтягивание УСТ-0.4кВ когда все параметры выбраны
   useEffect(() => {
@@ -406,6 +446,9 @@ export default function TransformerConfigurator() {
                     busbars={selected.busbars}
                     ustCalculations={selectedUstCalculations}
                     busbarUstData={busbarUstData}
+                    onlineRows={realtimeData?.snapshot?.transformer?.rows || null}
+                    onlineTotal={Number(realtimeData?.snapshot?.totals?.transformerTotal || 0)}
+                    isOnlineCalculating={isCalculating}
                   />
                 </>
               )}

@@ -3,6 +3,7 @@ export interface CurrencySettings {
   usdRate: string;
   eurRate: string;
   rubRate: string;
+  cnyRate: string;
   kztRate: string;
   defaultCurrency: string;
   hourlyWage: string;
@@ -18,6 +19,7 @@ export interface UpdateCurrencySettingsRequest {
   usdRate?: number;
   eurRate?: number;
   rubRate?: number;
+  cnyRate?: number;
   kztRate?: number;
   defaultCurrency?: string;
   hourlyWage?: number;

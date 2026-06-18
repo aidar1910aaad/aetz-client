@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { Select } from '@/components/ui/select';
 
 interface SwitchgearFiltersProps {
   filters: {
@@ -26,7 +27,7 @@ export function SwitchgearFilters({
     <div className="mb-6 grid grid-cols-3 gap-4">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Тип</label>
-        <select
+        <Select
           value={filters.type}
           onChange={(e) => onFilterChange({ ...filters, type: e.target.value })}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -37,12 +38,12 @@ export function SwitchgearFilters({
               {type}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Ток</label>
-        <select
+        <Select
           value={filters.amperage}
           onChange={(e) => onFilterChange({ ...filters, amperage: e.target.value })}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -53,12 +54,12 @@ export function SwitchgearFilters({
               {amperage}А
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Группа</label>
-        <select
+        <Select
           value={filters.group}
           onChange={(e) => onFilterChange({ ...filters, group: e.target.value })}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -69,7 +70,7 @@ export function SwitchgearFilters({
               {group}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
     </div>
   );

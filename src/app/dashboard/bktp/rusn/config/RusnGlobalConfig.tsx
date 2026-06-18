@@ -7,6 +7,7 @@ import { useCalculationGroups } from '@/hooks/useCalculationGroups';
 import CameraTypeSelector from './CameraTypeSelector';
 import EquipmentSelector from './EquipmentSelector';
 import { useState, ReactNode, useEffect, useRef } from 'react';
+import { Select } from '@/components/ui/select';
 
 // Компонент SelectWithLabel
 interface Option {
@@ -41,7 +42,7 @@ function SelectWithLabel({ label, value, onChange, options }: SelectWithLabelPro
         </div>
       </div>
       <div className="px-4 py-3">
-        <select
+        <Select
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className={`w-full border rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 focus:outline-none ${
@@ -56,7 +57,7 @@ function SelectWithLabel({ label, value, onChange, options }: SelectWithLabelPro
               {opt.label}
             </option>
           ))}
-        </select>
+        </Select>
         {isSelected && (
           <div className="mt-2 text-xs text-[#8eba1e] font-medium">
             ✓ Выбрано
@@ -122,13 +123,6 @@ export default function RusnGlobalConfig() {
   const { rusnSettings, loading, error } = useRusnSettings();
   const { selectedTransformer } = useTransformerStore();
   const { groups } = useCalculationGroups();
-  
-  const [isDebugEnabled, setIsDebugEnabled] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('debug-panels-enabled') === 'true';
-    }
-    return false;
-  });
   
   // Отслеживаем изменения напряжения трансформатора
   const prevVoltageRef = useRef(selectedTransformer?.voltage || '10');
@@ -206,14 +200,6 @@ export default function RusnGlobalConfig() {
     setGlobal(key as keyof typeof global, value);
   };
 
-  const handleDebugToggle = () => {
-    const newDebugState = !isDebugEnabled;
-    setIsDebugEnabled(newDebugState);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('debug-panels-enabled', newDebugState.toString());
-    }
-  };
-
   if (loading) {
     return <div className="text-sm text-gray-600">Загрузка настроек...</div>;
   }
@@ -224,24 +210,6 @@ export default function RusnGlobalConfig() {
 
   return (
     <div className="space-y-6">
-      {/* Кнопка отладки */}
-      <div className="flex justify-end">
-        <button
-          onClick={handleDebugToggle}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-            isDebugEnabled
-              ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border border-yellow-300'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
-          }`}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          {isDebugEnabled ? 'Отключить отладку' : 'Включить отладку'}
-        </button>
-      </div>
-
       {/* Тип ячеек */}
       <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
         <div className="flex items-center gap-3 mb-4">

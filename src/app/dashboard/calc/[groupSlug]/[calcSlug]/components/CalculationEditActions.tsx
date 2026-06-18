@@ -8,17 +8,18 @@ interface Props {
 
 export default function CalculationEditActions({ onCancel, onSave, onFinishEditing, isSaveDisabled, saveDisabledMessage }: Props) {
   return (
-    <div className="flex justify-end space-x-4 mt-8">
+    <div className="rounded-xl border border-[#8eba1e]/20 bg-white p-4 space-y-3">
+      <h4 className="text-sm font-semibold text-gray-900">Действия</h4>
       <button
         onClick={onCancel}
-        className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
+        className="w-full px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus:outline-none transition-colors"
       >
         Отмена
       </button>
       {onFinishEditing && (
         <button
           onClick={onFinishEditing}
-          className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+          className="w-full px-4 py-2.5 bg-white text-[#8eba1e] border border-[#8eba1e]/40 rounded-lg hover:bg-[#8eba1e]/10 focus:outline-none transition-colors"
         >
           Завершить редактирование
         </button>
@@ -26,10 +27,10 @@ export default function CalculationEditActions({ onCancel, onSave, onFinishEditi
       <button
         onClick={onSave}
         disabled={isSaveDisabled}
-        className={`px-6 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors ${
+        className={`w-full px-4 py-2.5 rounded-lg focus:outline-none transition-colors ${
           isSaveDisabled
             ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            : 'bg-[#3A55DF] text-white hover:bg-[#2A45CF] focus:ring-[#3A55DF]'
+            : 'bg-[#8eba1e] text-white hover:bg-[#7aa31a]'
         }`}
         title={isSaveDisabled ? saveDisabledMessage : 'Сохранить изменения'}
       >
@@ -38,7 +39,7 @@ export default function CalculationEditActions({ onCancel, onSave, onFinishEditi
       
       {/* Показываем сообщение о причине отключения кнопки */}
       {isSaveDisabled && saveDisabledMessage && (
-        <div className="absolute -top-8 right-0 text-sm text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200">
+        <div className="text-xs text-red-600 bg-red-50 px-2.5 py-1.5 rounded border border-red-200">
           {saveDisabledMessage}
         </div>
       )}

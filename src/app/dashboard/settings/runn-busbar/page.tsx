@@ -7,6 +7,7 @@ import { showToast } from '@/shared/modals/ToastProvider';
 import { getAllCalculationGroups } from '@/api/calculations';
 import RoleGuard from '@/components/common/RoleGuard';
 import { UserRole } from '@/types/user';
+import PageLoader from '@/shared/loader/PageLoader';
 
 interface NewSwitchgearConfig {
   type: string;
@@ -54,8 +55,8 @@ export default function RunnBusbarSettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3A55DF]"></div>
+      <div className="h-[calc(100vh-64px)]">
+        <PageLoader inline />
       </div>
     );
   }

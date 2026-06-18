@@ -16,6 +16,7 @@ import { useRusnSettingsOld } from '@/hooks/useRusnSettings';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import RoleGuard from '@/components/common/RoleGuard';
 import { UserRole } from '@/types/user';
+import PageLoader from '@/shared/loader/PageLoader';
 
 export default function RusnSettingsPage() {
   const router = useRouter();
@@ -32,8 +33,8 @@ export default function RusnSettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3A55DF]"></div>
+      <div className="h-[calc(100vh-64px)]">
+        <PageLoader inline />
       </div>
     );
   }

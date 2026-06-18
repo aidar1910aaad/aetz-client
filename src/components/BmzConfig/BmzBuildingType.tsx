@@ -2,10 +2,11 @@
 
 import React from 'react';
 import { Building2, Zap, X } from 'lucide-react';
+import type { BmzBuildingType } from '@/store/useBmzStore';
 
 interface BmzBuildingTypeProps {
   onChange: (type: 'bmz' | 'tp' | 'none') => void;
-  selectedType?: 'bmz' | 'tp' | 'none';
+  selectedType?: BmzBuildingType;
 }
 
 const BmzBuildingType: React.FC<BmzBuildingTypeProps> = ({ onChange, selectedType }) => {

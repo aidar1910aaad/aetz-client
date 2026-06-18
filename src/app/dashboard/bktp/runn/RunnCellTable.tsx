@@ -1,7 +1,6 @@
 'use client';
 
 import { useRunnStore, type RunnCellSummary } from '@/store/useRunnStore';
-import { useCellSummariesStore } from '@/store/useCellSummariesStore';
 import { useTransformerStore } from '@/store/useTransformerStore';
 import TogglerWithInput from './TogglerWithInput';
 import OutgoingCellSection from './components/cells/OutgoingCellSection';
@@ -9,7 +8,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { RunnCell } from '@/store/useRunnStore';
 import { Material } from '@/api/material';
 import { useRunnBreakerCalculation, useRunnCounterCalculation, useRunnSectionSwitchCalculation, useRunnOutgoingCalculation, useRunnTorcevaiaCalculation } from '@/hooks/useRunnInputCalculation';
-import { useRunnMaterials } from '@/hooks/useRunnMaterials';
+import { EMPTY_RUNN_MATERIALS, type RunnMaterials } from '@/hooks/useRunnMaterials';
 import { useCalculationResultsStore } from '@/store/useCalculationResultsStore';
 import CalculationDisplay from './components/calculations/CalculationDisplay';
 import SectionSwitchCalculation from './components/calculations/SectionSwitchCalculation';
@@ -17,6 +16,9 @@ import OutgoingCalculation from './components/calculations/OutgoingCalculation';
 import { calculateCost } from '@/utils/calculationUtils';
 import { getPanelNameForBreaker, extractCurrentFromBreakerName } from '@/utils/panelNameUtils';
 import RunnCellSummaryTable from './components/summary/RunnCellSummaryTable';
+import CellFormGrid from '@/components/bktp/shared/CellFormGrid';
+import { CellFormField, inputClassName } from '@/components/bktp/shared/CellFormField';
+import { Select } from '@/components/ui/select';
 
 const cellTypes = ['Ввод', 'Секционный выключатель', 'Торцевая панель'];
 
@@ -29,6 +31,7 @@ interface RunnCellTableProps {
   rpsLeftMaterials?: Material[];
   fusesPnMaterials?: Material[];
   avtomatLityMaterials?: Material[];
+  runnMaterials?: RunnMaterials;
 }
 
 export default function RunnCellTable({
@@ -40,12 +43,11 @@ export default function RunnCellTable({
   rpsLeftMaterials = [],
   fusesPnMaterials = [],
   avtomatLityMaterials = [],
+  runnMaterials = EMPTY_RUNN_MATERIALS,
 }: RunnCellTableProps = {}) {
-  const { cellConfigs, addCell, updateCell, removeCell } = useRunnStore();
-  const { setCellSummary, removeCellSummary, clearCellSummaries } = useCellSummariesStore();
+  const { cellConfigs, addCell, updateCell, removeCell, setCellSummary, removeCellSummary } = useRunnStore();
   const { selectedTransformer } = useTransformerStore();
   const [openCellMap, setOpenCellMap] = useState<Record<string, string>>({});
-  const { materials: runnMaterials } = useRunnMaterials();
   const { results: calculationResults, updateCellResult } = useCalculationResultsStore();
 
 
@@ -526,7 +528,7 @@ export default function RunnCellTable({
   useEffect(() => {
     // Используем ref для отслеживания предыдущих значений и предотвращения лишних обновлений
     const updateSummaries = () => {
-      const { cellSummaries } = useCellSummariesStore.getState();
+      const { cellSummaries } = useRunnStore.getState();
       const summariesToUpdate: RunnCellSummary[] = [];
       const summariesToRemove: string[] = [];
 
@@ -759,22 +761,27 @@ export default function RunnCellTable({
     options: string[],
     isLoading: boolean = false
   ) => (
-    <div className="flex flex-col gap-1 min-w-[120px]">
-      <span className="text-xs font-medium text-[#3A55DF]">{label}</span>
-      <select
+    <CellFormField label={label}>
+      <Select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
+        className={inputClassName}
         disabled={isLoading}
+        title={value || undefined}
       >
-        <option value="">—</option>
+        <option value="">— Не выбрано —</option>
         {options.map((opt, index) => (
-          <option key={`${opt}-${index}`} value={opt}>
+          <option key={`${opt}-${index}`} value={opt} title={opt}>
             {opt}
           </option>
         ))}
-      </select>
-    </div>
+      </Select>
+      {value && (
+        <p className="mt-1 text-[10px] text-gray-500 line-clamp-2" title={value}>
+          {value}
+        </p>
+      )}
+    </CellFormField>
   );
 
   const renderCellConfig = (
@@ -787,7 +794,19 @@ export default function RunnCellTable({
   ) => {
 
     return (
-      <div className="flex flex-wrap gap-4 items-end p-4 rounded bg-white border border-gray-100">
+      <CellFormGrid
+        footer={
+          title.includes('Отходящая') ? (
+            <button
+              type="button"
+              onClick={() => cell.remove()}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+            >
+              Удалить ячейку
+            </button>
+          ) : undefined
+        }
+      >
         {/* Показываем селектор автомата выкатного для всех ячеек, кроме отходящих и торцевой панели */}
         {!title.includes('Отходящая') && title !== 'Торцевая панель' && renderSelectBlock(
           'Автомат выкатной',
@@ -808,71 +827,58 @@ export default function RunnCellTable({
 
         {/* АВР показываем только для секционного выключателя */}
         {title === 'Секционный выключатель' && (
-          <div className="flex flex-col gap-1 min-w-[120px]">
-            <span className="text-xs font-medium text-[#3A55DF]">АВР</span>
-            <select
+          <CellFormField label="АВР" className="sm:max-w-[120px]">
+            <Select
               value={cell.hasAVR !== false ? 'Да' : 'Нет'}
               onChange={(e) => {
                 const hasAVR = e.target.value === 'Да';
                 updateCell(cell.id, 'hasAVR', hasAVR);
               }}
-              className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
+              className={inputClassName}
             >
               <option value="Да">Да</option>
               <option value="Нет">Нет</option>
-            </select>
-          </div>
+            </Select>
+          </CellFormField>
         )}
 
         {/* Дополнительные поля для РУНН-ДГУ */}
         {isRunnDgu && (
           <>
-            <div className="flex flex-col gap-1 min-w-[120px]">
-              <span className="text-xs font-medium text-[#3A55DF]">Номинальная мощность (кВт)</span>
+            <CellFormField label="Номинальная мощность (кВт)">
               <input
                 type="number"
                 min={0}
                 step={0.1}
                 value={cell.nominalPower || ''}
                 onChange={(e) => cell.update('nominalPower', Number(e.target.value) || 0)}
-                className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
+                className={inputClassName}
                 placeholder="0"
               />
-            </div>
-
-            <div className="flex flex-col gap-1 min-w-[120px]">
-              <span className="text-xs font-medium text-[#3A55DF]">Цена (₸)</span>
+            </CellFormField>
+            <CellFormField label="Цена (₸)">
               <input
                 type="number"
                 min={0}
                 value={cell.price || ''}
                 onChange={(e) => cell.update('price', Number(e.target.value) || 0)}
-                className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
+                className={inputClassName}
                 placeholder="0"
               />
-            </div>
+            </CellFormField>
           </>
         )}
 
-        <div className="flex flex-col gap-1 min-w-[100px]">
-          <span className="text-xs font-medium text-[#3A55DF]">Кол-во</span>
+        <CellFormField label="Кол-во" className="sm:max-w-[120px]">
           <input
             type="number"
             min={1}
             value={cell.quantity || 1}
-            onChange={(e) => cell.update('quantity', Number(e.target.value))}
-            className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
+            onChange={(e) => cell.update('quantity', Math.max(1, Number(e.target.value) || 1))}
+            className={inputClassName}
           />
-        </div>
-
-        <button
-          onClick={cell.remove}
-          className="text-red-600 hover:text-red-800 text-sm font-bold ml-auto"
-          title="Удалить ячейку"
-        >
-          ✕
-        </button>
-      </div>
+        </CellFormField>
+      </CellFormGrid>
     );
   };
 
@@ -1153,6 +1159,7 @@ export default function RunnCellTable({
         rpsLeftMaterials={rpsLeftMaterials}
         fusesPnMaterials={fusesPnMaterials}
         avtomatLityMaterials={avtomatLityMaterials}
+        currentTransformerMaterials={runnMaterials.currentTransformer}
         inputCell={inputCell}
         onCalculationResult={updateCellResult}
       />

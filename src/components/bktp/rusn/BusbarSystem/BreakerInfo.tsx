@@ -10,15 +10,15 @@ interface BreakerInfoProps {
 export const BreakerInfo: React.FC<BreakerInfoProps> = ({ selectedBreaker, getBreakerCurrent }) => {
   if (!selectedBreaker) return null;
 
+  const current = getBreakerCurrent(selectedBreaker.name);
+
   return (
-    <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-      <div className="flex items-center space-x-3">
-        <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-        <span className="text-sm font-medium text-gray-700">Выбранный выключатель:</span>
-        <span className="font-semibold text-blue-900">
-          {selectedBreaker.name} ({getBreakerCurrent(selectedBreaker.name)}А)
-        </span>
-      </div>
+    <div className="rounded-xl border border-[#8eba1e]/25 bg-[#8eba1e]/5 px-4 py-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Выключатель</p>
+      <p className="mt-1 text-sm font-semibold text-gray-900">
+        {selectedBreaker.name}
+        {current != null && <span className="font-normal text-gray-600"> · {current} А</span>}
+      </p>
     </div>
   );
 };

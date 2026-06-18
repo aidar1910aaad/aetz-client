@@ -75,6 +75,7 @@ export interface RusnCell {
   };
   count: number;
   calculationId?: number;
+  bhaMode?: boolean;
   totalPrice: number; // Итоговая цена ячейки (Отпускная расчетная цена)
   calculationBreakdown?: {
     main: {
@@ -128,6 +129,7 @@ interface RusnState {
   busbarSummary: RusnBusbarSummary | null;
   busBridgeSummary: RusnBusbarSummary | null;
   busBridgeSummaries: RusnBusbarSummary[];
+  // UI snapshot only. Backend is the source of truth for persisted totals.
   cellSummaries: RusnCellSummary[];
   setBusbarSummary: (summary: RusnBusbarSummary) => void;
   setBusBridgeSummary: (summary: RusnBusbarSummary) => void;

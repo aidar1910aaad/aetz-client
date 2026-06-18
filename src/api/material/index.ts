@@ -1,4 +1,5 @@
 import { api } from '../baseUrl';
+import { ApiError } from '@/shared/errors/ApiError';
 
 
 export interface Material {
@@ -7,6 +8,11 @@ export interface Material {
   name: string;
   unit: string;
   price: number | string;
+  currency?: 'KZT' | 'RUB' | 'USD' | 'EUR' | 'CNY';
+  priceInCurrency?: number | string;
+  currentPriceKzt?: number | string;
+  priceKztAtCreation?: number | string;
+  rateAtCreation?: number | string;
   category: {
     id: number;
     name: string;
@@ -27,8 +33,11 @@ export interface GetMaterialsParams {
 export interface CreateMaterialRequest {
   name: string;
   unit: string;
-  price: number;
-  categoryId: number;
+  code?: string;
+  categoryId?: number;
+  currency: 'KZT' | 'RUB' | 'USD' | 'EUR' | 'CNY';
+  priceInCurrency: number;
+  price?: number;
 }
 
 export interface UpdateMaterialRequest extends CreateMaterialRequest {
@@ -155,16 +164,12 @@ export const getAllMaterials = async (
 
 // ✅ Получить материал по ID
 export async function getMaterialById(id: number, token: string): Promise<Material> {
-  // Валидация ID
   if (!id || isNaN(id) || id <= 0) {
-    throw new Error('Некорректный ID материала');
+    throw new ApiError('Некорректный ID материала', 400);
   }
 
-  console.log('[getMaterialById] id:', id, 'token:', !!token);
-  
-  // Убеждаемся, что ID - это целое число
   const materialId = Math.floor(id);
-  
+
   const response = await fetch(`${api}/materials/${materialId}`, {
     method: 'GET',
     headers: {
@@ -175,7 +180,7 @@ export async function getMaterialById(id: number, token: string): Promise<Materi
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     const errorMessage = error.message || error.error || 'Ошибка при получении материала по ID';
-    throw new Error(errorMessage);
+    throw new ApiError(errorMessage, response.status);
   }
 
   return response.json();
@@ -235,19 +240,39 @@ export async function deleteMaterial(id: number, token: string): Promise<void> {
   }
 }
 
+// ✅ Удалить несколько материалов
+export async function deleteMaterialsBatch(
+  ids: number[],
+  token: string
+): Promise<{ deleted: number }> {
+  const response = await fetch(`${api}/materials/batch`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(ids),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || 'Ошибка при массовом удалении материалов');
+  }
+
+  return response.json();
+}
+
 // ✅ История изменений
 export async function getMaterialHistory(
   id: number,
   token: string
 ): Promise<MaterialHistoryItem[]> {
-  // Валидация ID
   if (!id || isNaN(id) || id <= 0) {
-    throw new Error('Некорректный ID материала');
+    throw new ApiError('Некорректный ID материала', 400);
   }
 
-  // Убеждаемся, что ID - это целое число
   const materialId = Math.floor(id);
-  
+
   const response = await fetch(`${api}/materials/${materialId}/history`, {
     method: 'GET',
     headers: {
@@ -258,7 +283,7 @@ export async function getMaterialHistory(
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     const errorMessage = error.message || error.error || 'Ошибка при получении истории материала';
-    throw new Error(errorMessage);
+    throw new ApiError(errorMessage, response.status);
   }
 
   return response.json();

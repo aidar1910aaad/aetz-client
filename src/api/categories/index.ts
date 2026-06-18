@@ -1,9 +1,10 @@
 import { api } from '../baseUrl/index';
 
 interface CreateCategoryRequest {
+  id?: number;
   name: string;
-  description: string;
-  code: string;
+  description?: string;
+  code?: string;
 }
 
 interface CreateCategoryResponse {
@@ -73,6 +74,7 @@ export async function getAllCategories(token: string): Promise<Category[]> {
 }
 
 interface UpdateCategoryRequest {
+  id?: number;
   name?: string;
   description?: string;
   code?: string;
@@ -82,7 +84,7 @@ export async function updateCategory(
   id: number,
   data: UpdateCategoryRequest,
   token: string
-): Promise<void> {
+): Promise<Category> {
   console.log('Updating category:', { id, data });
 
   const response = await fetch(`${api}/categories/${id}`, {
@@ -102,7 +104,9 @@ export async function updateCategory(
     throw new Error(error.message || 'Ошибка при обновлении категории');
   }
 
+  const updated = await response.json();
   console.log('Category updated successfully');
+  return updated;
 }
 
 export async function deleteCategory(id: number, token: string): Promise<void> {
@@ -115,7 +119,11 @@ export async function deleteCategory(id: number, token: string): Promise<void> {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || 'Ошибка при удалении категории');
+    const message =
+      response.status === 403
+        ? 'Недостаточно прав для удаления категории'
+        : error.message || 'Ошибка при удалении категории';
+    throw new Error(message);
   }
 }
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Settings } from 'lucide-react';
+import { BusAlert, BusAccentButton, BusEmptyState } from '@/components/shared/busUi';
 import { useTransformerStore } from '@/store/useTransformerStore';
 import { useRunnStore } from '@/store/useRunnStore';
 import { useRunnBusbarCalculation } from '@/hooks/useRunnBusbarCalculation';
@@ -564,81 +565,79 @@ export const BusbarBridgeCalculation: React.FC = () => {
   const totalPrice = calculateTotalPrice();
 
   return (
-    <div className="bg-white border border-gray-300 shadow-sm">
-      <div className="bg-gradient-to-r from-purple-50 to-violet-50 px-6 py-4 border-b border-purple-200">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-violet-600 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-purple-700">Шинный мост РУНН</h3>
-              <p className="text-sm text-purple-600">Расчет шинных мостов</p>
-            </div>
+    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 px-5 py-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white"
+            style={{ backgroundColor: '#8eba1e' }}
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
+            </svg>
           </div>
-          <div className="flex gap-2">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">Шинные мосты</h3>
+            <p className="text-sm text-gray-500">Пары 0,4 кВ + N, расчёт по длине</p>
+          </div>
+          {matchingConfig && (
+            <span className="hidden rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 sm:inline">
+              Группа {matchingConfig.group}
+            </span>
+          )}
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            onClick={() => setIsEditing(!isEditing)}
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-[#8eba1e]/40 hover:bg-[#8eba1e]/5"
+          >
+            <Settings className="h-4 w-4" />
+            {isEditing ? 'Готово' : 'Редактировать'}
+          </button>
+          {bridges.length > 0 && (
             <button
-              onClick={() => setIsEditing(!isEditing)}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors duration-200"
+              type="button"
+              onClick={clearAllBridges}
+              className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
             >
-              <Settings className="w-4 h-4" />
-              {isEditing ? 'Отменить' : 'Редактировать'}
+              <Trash2 className="h-4 w-4" />
+              Очистить
             </button>
-            {bridges.length > 0 && (
-              <button
-                onClick={clearAllBridges}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors duration-200"
-              >
-                <Trash2 className="w-4 h-4" />
-                Очистить все
-              </button>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
-      <div className="p-6 space-y-6">
-        {/* Информация о материале */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
-          <h4 className="text-sm font-semibold text-gray-700 mb-2">Материал шинного моста</h4>
-          <div className="text-sm text-gray-600">
-            <p><span className="font-medium">Тип материала:</span> {materialType}</p>
-            <p className="text-xs text-gray-500 mt-1">
-              {matchingConfig ? 
-                `Определяется автоматически из конфигурации "${matchingConfig.type}" (группа: ${matchingConfig.group})` : 
-                'Выбирается автоматически на основе выбора в трансформаторе'
-              }
-            </p>
-          </div>
+      <div className="space-y-5 p-5">
+        <div className="rounded-xl border border-[#8eba1e]/20 bg-[#8eba1e]/5 px-4 py-3 text-sm text-gray-700">
+          <span className="font-medium text-gray-900">Материал:</span> {materialType}
+          {matchingConfig ? (
+            <span className="text-gray-500">
+              {' '}
+              · из «{matchingConfig.type}» (группа {matchingConfig.group})
+            </span>
+          ) : (
+            <span className="text-gray-500"> · по настройкам трансформатора</span>
+          )}
         </div>
 
-        {/* Параметры расчета */}
-        <div className="bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl p-4 border border-gray-200">
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">Параметры расчета</h4>
-          
+        <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
+          <h4 className="mb-3 text-sm font-semibold text-gray-800">Параметры расчёта</h4>
+
           {!matchingConfig ? (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 bg-yellow-500 rounded-full flex items-center justify-center">
-                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                </div>
-                <div>
-                  <h5 className="text-sm font-medium text-yellow-800">Шинный мост не предусмотрен</h5>
-                  <p className="text-sm text-yellow-700 mt-1">
-                    Для выбранной конфигурации "{matchingConfig?.type}" шинный мост не предусмотрен.
-                  </p>
-                </div>
-              </div>
-            </div>
+            <BusAlert variant="warning" title="Конфигурация не найдена">
+              Не найдена подходящая конфигурация для выбранного выключателя и материала. Сначала
+              настройте сборные шины и ячейки РУНН.
+            </BusAlert>
           ) : (
-            <div className="space-y-4">
-              {/* Множитель группы */}
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-                <h5 className="text-sm font-medium text-purple-800 mb-2">Множитель группы</h5>
+            <div className="space-y-3">
+              <div className="rounded-xl border border-gray-200 bg-white p-3">
+                <h5 className="mb-2 text-sm font-medium text-gray-800">Множитель группы</h5>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                   <div>
                     <span className="text-gray-600">Группа:</span>
@@ -655,9 +654,8 @@ export const BusbarBridgeCalculation: React.FC = () => {
                 </div>
               </div>
 
-              {/* Обычные мосты 0.4 */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <h5 className="text-sm font-medium text-blue-800 mb-2">Шинные мосты 0.4</h5>
+              <div className="rounded-xl border border-gray-200 bg-white p-3">
+                <h5 className="mb-2 text-sm font-medium text-gray-800">Шинные мосты 0,4 кВ</h5>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                   <div>
                     <span className="text-gray-600">Коэффициент веса (quantity):</span>
@@ -674,9 +672,8 @@ export const BusbarBridgeCalculation: React.FC = () => {
                 </div>
               </div>
 
-              {/* Мосты типа N */}
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                <h5 className="text-sm font-medium text-green-800 mb-2">Шинные мосты N</h5>
+              <div className="rounded-xl border border-gray-200 bg-white p-3">
+                <h5 className="mb-2 text-sm font-medium text-gray-800">Шинные мосты N</h5>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                   <div>
                     <span className="text-gray-600">Вес на метр:</span>
@@ -703,14 +700,11 @@ export const BusbarBridgeCalculation: React.FC = () => {
 
         {/* Кнопки добавления */}
         {isEditing && matchingConfig && (
-          <div className="flex justify-center gap-4">
-            <button
-              onClick={addBridge}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg text-sm font-medium transition-colors duration-200"
-            >
-              <Plus className="w-4 h-4" />
-              Добавить шинный мост (0.4 + N)
-            </button>
+          <div className="flex justify-center">
+            <BusAccentButton onClick={addBridge}>
+              <Plus className="h-4 w-4" />
+              Добавить мост (0,4 + N)
+            </BusAccentButton>
           </div>
         )}
 
@@ -745,9 +739,9 @@ export const BusbarBridgeCalculation: React.FC = () => {
               }
               
               return displayBridges.map(({ primary, paired }) => (
-                <div 
-                  key={primary.id} 
-                  className="rounded-lg p-4 border bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200"
+                <div
+                  key={primary.id}
+                  className="rounded-xl border border-gray-200 bg-gray-50/50 p-4"
                 >
                   {/* Заголовок блока с парой */}
                   <div className="flex items-center justify-between mb-3">
@@ -777,7 +771,7 @@ export const BusbarBridgeCalculation: React.FC = () => {
                         value={primary.length}
                         onChange={(e) => updateBridgeLength(primary.id, parseFloat(e.target.value) || 0.1)}
                         disabled={!isEditing}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-100"
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-[#8eba1e] focus:ring-2 focus:ring-[#8eba1e]/20 disabled:bg-gray-100"
                       />
                     </div>
                     <div>
@@ -788,7 +782,7 @@ export const BusbarBridgeCalculation: React.FC = () => {
                         value={primary.quantity}
                         onChange={(e) => updateBridgeQuantity(primary.id, parseInt(e.target.value) || 1)}
                         disabled={!isEditing}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-100"
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-[#8eba1e] focus:ring-2 focus:ring-[#8eba1e]/20 disabled:bg-gray-100"
                       />
                     </div>
                   </div>
@@ -796,8 +790,8 @@ export const BusbarBridgeCalculation: React.FC = () => {
                   {/* Два моста в ряд */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     {/* Мост 0.4 */}
-                    <div className="bg-white rounded-lg p-3 border border-blue-200">
-                      <h6 className="font-semibold text-blue-700 mb-2">Шинный мост 0.4</h6>
+                    <div className="rounded-lg border border-gray-200 bg-white p-3">
+                      <h6 className="mb-2 text-sm font-semibold text-gray-900">Мост 0,4 кВ</h6>
                       <div className="text-sm text-gray-600 space-y-1">
                         <div className="flex justify-between">
                           <span>Введенная длина:</span>
@@ -815,17 +809,17 @@ export const BusbarBridgeCalculation: React.FC = () => {
                           <span>× Коэфф. веса:</span>
                           <span className="font-medium">×{getCurrentWeightMultiplier(primary)} = {getCalculatedLength(primary).toFixed(2)} кг</span>
                         </div>
-                        <div className="flex justify-between pt-1 border-t border-blue-100">
+                        <div className="flex justify-between border-t border-gray-100 pt-1">
                           <span>Итого (кг):</span>
-                          <span className="font-bold text-blue-700">{getCalculatedLength(primary).toFixed(2)} кг</span>
+                          <span className="font-bold text-[#8eba1e]">{getCalculatedLength(primary).toFixed(2)} кг</span>
                         </div>
                       </div>
                     </div>
                     
                     {/* Мост N */}
                     {paired && (
-                      <div className="bg-white rounded-lg p-3 border border-green-200">
-                        <h6 className="font-semibold text-green-700 mb-2">Шинный мост N</h6>
+                      <div className="rounded-lg border border-gray-200 bg-white p-3">
+                        <h6 className="mb-2 text-sm font-semibold text-gray-900">Мост N</h6>
                         <div className="text-sm text-gray-600 space-y-1">
                           <div className="flex justify-between">
                             <span>Введенная длина:</span>
@@ -843,9 +837,9 @@ export const BusbarBridgeCalculation: React.FC = () => {
                             <span>× Коэфф. веса:</span>
                             <span className="font-medium">×{zeroBridgeWeightMultiplier} = {getCalculatedLength(paired).toFixed(2)} кг</span>
                           </div>
-                          <div className="flex justify-between pt-1 border-t border-green-100">
+                          <div className="flex justify-between border-t border-gray-100 pt-1">
                             <span>Итого (кг):</span>
-                            <span className="font-bold text-green-700">{getCalculatedLength(paired).toFixed(2)} кг</span>
+                            <span className="font-bold text-[#8eba1e]">{getCalculatedLength(paired).toFixed(2)} кг</span>
                           </div>
                         </div>
                       </div>
@@ -854,11 +848,11 @@ export const BusbarBridgeCalculation: React.FC = () => {
                   
                   {/* Итоговая стоимость с детализацией */}
                   {paired ? (
-                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200 mt-3">
+                    <div className="mt-3 rounded-xl border border-[#8eba1e]/25 bg-[#8eba1e]/5 p-3">
                       <details>
                         <summary className="cursor-pointer text-sm font-semibold text-gray-700 mb-2 flex justify-between items-center">
                           <span>Общая стоимость пары:</span>
-                          <span className="text-lg font-bold text-green-700">
+                          <span className="text-lg font-bold text-[#8eba1e]">
                             {(() => {
                               const pairCalc = calculateBridgePairPrice(primary, paired);
                               return pairCalc.totalWithNds.toLocaleString();
@@ -927,7 +921,7 @@ export const BusbarBridgeCalculation: React.FC = () => {
                       </details>
                     </div>
                   ) : (
-                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200 mt-3">
+                    <div className="mt-3 rounded-xl border border-[#8eba1e]/25 bg-[#8eba1e]/5 p-3">
                       <div className="flex justify-between items-center">
                         <span className="text-sm font-semibold text-gray-700">Стоимость:</span>
                         <span className="text-lg font-bold text-green-700">
@@ -947,8 +941,8 @@ export const BusbarBridgeCalculation: React.FC = () => {
 
         {/* Результаты расчета */}
         {bridges.length > 0 && (
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
-            <h4 className="text-sm font-semibold text-gray-700 mb-3">Результаты расчета</h4>
+          <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
+            <h4 className="mb-3 text-sm font-semibold text-gray-800">Итоги по всем мостам</h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
               <div>
                 <span className="text-gray-600">Общий вес:</span>
@@ -971,57 +965,21 @@ export const BusbarBridgeCalculation: React.FC = () => {
         )}
 
         {/* Сообщение, если нет мостов */}
-        {bridges.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            <p>Добавьте шинные мосты для расчета</p>
-            <p className="text-sm">Нажмите "Редактировать" и "Добавить шинный мост"</p>
-          </div>
+        {bridges.length === 0 && matchingConfig && (
+          <BusEmptyState
+            title="Нет добавленных шинных мостов"
+            description='Включите «Редактировать» и нажмите «Добавить мост»'
+          />
         )}
 
-        {/* Debug: Показываем JSON данных */}
-        {busbarCalculationFromApi && (
-          <div className="bg-blue-50 border border-blue-300 rounded-xl p-4 mt-4">
-            <h4 className="text-sm font-semibold text-blue-800 mb-3">🔍 Debug: JSON данных калькуляции</h4>
-            <details className="mt-2">
-              <summary className="cursor-pointer text-sm font-medium text-blue-700 hover:text-blue-900">
-                Показать весь JSON (busbarCalculationFromApi)
-              </summary>
-              <pre className="mt-2 p-3 bg-gray-900 text-green-400 rounded text-xs overflow-x-auto max-h-96 overflow-y-auto">
-                {JSON.stringify(busbarCalculationFromApi, null, 2)}
-              </pre>
-            </details>
-            <details className="mt-2">
-              <summary className="cursor-pointer text-sm font-medium text-blue-700 hover:text-blue-900">
-                Показать конфигурации коммутационных аппаратов
-              </summary>
-              <pre className="mt-2 p-3 bg-gray-900 text-green-400 rounded text-xs overflow-x-auto max-h-96 overflow-y-auto">
-                {JSON.stringify(switchgearConfigs, null, 2)}
-              </pre>
-            </details>
-            <details className="mt-2">
-              <summary className="cursor-pointer text-sm font-medium text-blue-700 hover:text-blue-900">
-                Показать выбранную конфигурацию для фазных шин (matchingConfig)
-              </summary>
-              <pre className="mt-2 p-3 bg-gray-900 text-green-400 rounded text-xs overflow-x-auto max-h-96 overflow-y-auto">
-                {JSON.stringify(matchingConfig, null, 2)}
-              </pre>
-            </details>
-            <details className="mt-2">
-              <summary className="cursor-pointer text-sm font-medium text-blue-700 hover:text-blue-900">
-                Показать конфигурацию для нулевых шин (zeroMatchingConfig)
-              </summary>
-              <pre className="mt-2 p-3 bg-gray-900 text-green-400 rounded text-xs overflow-x-auto max-h-96 overflow-y-auto">
-                {JSON.stringify(zeroMatchingConfig, null, 2)}
-              </pre>
-            </details>
-          </div>
-        )}
-
-        {/* Таблица весов ошиновки по типам */}
-        <div className="bg-white border border-gray-300 rounded-xl p-4 overflow-x-auto">
-          <table className="w-full text-sm border-collapse min-w-[900px]">
+        <details className="rounded-xl border border-gray-200 bg-white">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-gray-700 hover:text-gray-900">
+            Справочная таблица весов ошиновки
+          </summary>
+          <div className="overflow-x-auto border-t border-gray-100 p-4">
+          <table className="w-full min-w-[900px] border-collapse text-sm">
             <thead>
-              <tr className="bg-orange-500 text-white font-bold">
+              <tr className="bg-[#8eba1e] font-bold text-white">
                 <th colSpan={4} className="px-3 py-2 border-r border-gray-400">ABC</th>
                 <th className="px-3 py-2 border-r border-gray-400 bg-white text-gray-900">ошиновка</th>
                 <th colSpan={4} className="px-3 py-2">N</th>
@@ -1052,7 +1010,7 @@ export const BusbarBridgeCalculation: React.FC = () => {
                   '160x10': { abc: [177.47, 354.93, 532.40, 709.86], n: [88.16, 176.33, 264.49, 352.66] }
                 };
                 const data = mtData[size as keyof typeof mtData];
-                const bgColor = index % 3 === 0 ? 'bg-white' : index % 3 === 1 ? 'bg-green-50' : 'bg-yellow-50';
+                const bgColor = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
                 
                 return (
                   <tr key={`mt-${size}`} className={bgColor}>
@@ -1082,7 +1040,7 @@ export const BusbarBridgeCalculation: React.FC = () => {
                   '160х10': { abc: [56.16, 112.32, 168.48, 224.64], n: [27.90, 55.80, 83.70, 111.60] }
                 };
                 const data = adData[size as keyof typeof adData];
-                const bgColor = index % 3 === 0 ? 'bg-white' : index % 3 === 1 ? 'bg-green-50' : 'bg-yellow-50';
+                const bgColor = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
                 
                 return (
                   <tr key={`ad-${size}`} className={bgColor}>
@@ -1100,7 +1058,8 @@ export const BusbarBridgeCalculation: React.FC = () => {
               })}
             </tbody>
           </table>
-        </div>
+          </div>
+        </details>
       </div>
     </div>
   );

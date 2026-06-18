@@ -2,9 +2,13 @@
 
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import { getMaterialById, getMaterialHistory, MaterialHistoryItem, Material } from '@/api/material/exports';
 import PageLoader from '@/shared/loader/PageLoader';
 import PriceHistoryChart from '@/shared/charts/PriceHistoryChart';
+import EntityNotFound from '@/components/common/EntityNotFound';
+import { showToast } from '@/shared/modals/ToastProvider';
+import { isNotFoundError } from '@/shared/errors/ApiError';
 import { ChevronDown, X } from 'lucide-react';
 
 export default function MaterialHistoryPage() {
@@ -13,6 +17,7 @@ export default function MaterialHistoryPage() {
   const [history, setHistory] = useState<MaterialHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
   
   // Фильтры и сортировка
   const [filterField, setFilterField] = useState<string>('all');
@@ -31,10 +36,21 @@ export default function MaterialHistoryPage() {
   const [fieldSearch, setFieldSearch] = useState('');
   const [authorSearch, setAuthorSearch] = useState('');
 
+  const isPriceField = (field: string) => field === 'price' || field === 'priceInCurrency';
+
+  const formatHistoryValue = (field: string, value: string) => {
+    if (isPriceField(field)) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? `${parsed.toLocaleString('ru-RU')} ₸` : value;
+    }
+    return value;
+  };
+
   // Функция для получения названия поля
   const getFieldLabel = (field: string) => {
     const fieldLabels: Record<string, string> = {
       price: 'Цена',
+      priceInCurrency: 'Цена',
       name: 'Название',
       code: 'Код',
       unit: 'Ед. изм.',
@@ -128,24 +144,39 @@ export default function MaterialHistoryPage() {
 
       try {
         setError(null);
+        setNotFound(false);
         setLoading(true);
         const token = localStorage.getItem('token') || '';
-        
+
         if (!token) {
           setError('Токен авторизации не найден');
           setLoading(false);
           return;
         }
 
-        const [materialData, historyData] = await Promise.all([
-          getMaterialById(materialId, token),
-          getMaterialHistory(materialId, token),
-        ]);
+        const materialData = await getMaterialById(materialId, token);
         setMaterial(materialData);
-        setHistory(historyData);
-      } catch (err: any) {
-        console.error('Ошибка при загрузке истории материала:', err);
-        setError(err.message || 'Ошибка при загрузке данных');
+
+        try {
+          const historyData = await getMaterialHistory(materialId, token);
+          setHistory(historyData);
+        } catch (historyErr: unknown) {
+          if (isNotFoundError(historyErr)) {
+            setHistory([]);
+          } else {
+            throw historyErr;
+          }
+        }
+      } catch (err: unknown) {
+        if (isNotFoundError(err)) {
+          setNotFound(true);
+          showToast('Материал не найден или был удалён', 'error');
+          return;
+        }
+
+        const message = err instanceof Error ? err.message : 'Ошибка при загрузке данных';
+        setError(message);
+        showToast(message, 'error');
       } finally {
         setLoading(false);
       }
@@ -156,23 +187,48 @@ export default function MaterialHistoryPage() {
 
   if (loading) return <PageLoader />;
 
+  if (notFound) {
+    return (
+      <EntityNotFound
+        title="Материал не найден"
+        description={`Материал #${id} не существует, был удалён или у вас нет к нему доступа.`}
+        backHref="/dashboard/materials"
+        backLabel="К каталогу материалов"
+        secondaryHref="/dashboard/history"
+        secondaryLabel="Единый журнал"
+      />
+    );
+  }
+
   if (error) {
     return (
-      <div className="p-6 h-[calc(100vh-65px)] overflow-y-auto bg-gradient-to-br from-white via-gray-50/30 to-blue-50/20">
-        <div className="flex flex-col items-center justify-center h-full">
-          <div className="text-center">
-            <div className="text-red-500 text-6xl mb-4">⚠️</div>
-            <p className="text-red-600 text-lg mb-2">Ошибка загрузки</p>
-            <p className="text-gray-600">{error}</p>
+      <div className="flex min-h-[calc(100vh-64px)] items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-md rounded-lg border border-red-200 bg-white p-8 text-center">
+          <h1 className="text-lg font-semibold text-gray-900">Не удалось загрузить данные</h1>
+          <p className="mt-2 text-sm text-gray-500">{error}</p>
+          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-lg bg-[#8eba1e] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#7aa31a]"
+            >
+              Повторить
+            </button>
+            <Link
+              href="/dashboard/materials"
+              className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:border-[#8eba1e] hover:text-[#8eba1e]"
+            >
+              К материалам
+            </Link>
           </div>
         </div>
       </div>
     );
   }
 
-  // Получаем историю изменений цены
+  // Получаем историю изменений цены (price и priceInCurrency — одно и то же для графика)
   const priceChanges = history
-    .filter((h) => h.fieldChanged === 'price')
+    .filter((h) => isPriceField(h.fieldChanged))
     .map((h) => ({
       date: new Date(h.changedAt),
       oldPrice: Number(h.oldValue),
@@ -207,21 +263,21 @@ export default function MaterialHistoryPage() {
     });
     
     // Добавляем текущую цену материала, если она есть и отличается от последней
-    if (material?.price && !isNaN(Number(material.price))) {
+    const currentPriceKzt = Number(material?.currentPriceKzt ?? material?.price);
+    if (!isNaN(currentPriceKzt) && currentPriceKzt > 0) {
       const lastPrice = priceHistory[priceHistory.length - 1]?.price;
-      const currentPrice = Number(material.price);
-      if (lastPrice !== currentPrice) {
+      if (lastPrice !== currentPriceKzt) {
         priceHistory.push({
           date: new Date(), // Текущая дата
-          price: currentPrice,
+          price: currentPriceKzt,
         });
       }
     }
-  } else if (material?.price && !isNaN(Number(material.price))) {
+  } else if (!isNaN(Number(material?.currentPriceKzt ?? material?.price))) {
     // Если нет истории изменений, но есть текущая цена - показываем только её
     priceHistory.push({
       date: new Date(),
-      price: Number(material.price),
+      price: Number(material?.currentPriceKzt ?? material?.price),
     });
   }
   
@@ -680,18 +736,14 @@ export default function MaterialHistoryPage() {
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                   <div className="text-sm font-medium text-gray-600 mb-1">Было</div>
                   <div className="text-sm font-semibold text-gray-800 break-words">
-                    {item.fieldChanged === 'price'
-                      ? `${Number(item.oldValue).toLocaleString('ru-RU')} ₸`
-                      : item.oldValue}
+                    {formatHistoryValue(item.fieldChanged, item.oldValue)}
                   </div>
                 </div>
                 
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                   <div className="text-sm font-medium text-gray-600 mb-1">Стало</div>
                   <div className="text-sm font-semibold text-gray-800 break-words">
-                    {item.fieldChanged === 'price'
-                      ? `${Number(item.newValue).toLocaleString('ru-RU')} ₸`
-                      : item.newValue}
+                    {formatHistoryValue(item.fieldChanged, item.newValue)}
                   </div>
                 </div>
               </div>

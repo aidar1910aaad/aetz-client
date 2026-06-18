@@ -10,6 +10,7 @@ import OutgoingCalculation from '../calculations/OutgoingCalculation';
 import { useState, useEffect, useMemo } from 'react';
 import { calculateCost } from '@/utils/calculationUtils';
 import { useTransformerStore } from '@/store/useTransformerStore';
+import { Select } from '@/components/ui/select';
 
 interface CellItemProps {
   cell: RunnCell;
@@ -25,6 +26,7 @@ interface CellItemProps {
   rpsLeftMaterials?: Material[];
   fusesPnMaterials?: Material[];
   avtomatLityMaterials?: Material[];
+  currentTransformerMaterials?: Material[];
   cellPrefix?: string; // Префикс для заголовка ячейки
   inputCell?: RunnCell; // Ячейка "Ввод" для получения информации о корпусе
   onCalculationResult?: (cellId: string, type: 'main' | 'meter', price: number) => void;
@@ -44,6 +46,7 @@ export default function CellItem({
   rpsLeftMaterials = [],
   fusesPnMaterials = [],
   avtomatLityMaterials = [],
+  currentTransformerMaterials = [],
   cellPrefix = "Отходящая",
   inputCell,
   onCalculationResult
@@ -337,8 +340,8 @@ export default function CellItem({
       if (!caseInfo.isValid) return null;
       
       const token = localStorage.getItem('token') || '';
-      const { getCalculationsByGroup } = await import('@/api/calculations');
-      const allCalculations = await getCalculationsByGroup('panel-sho-70', token);
+      const { loadRunnPanelCalculations } = await import('@/domain/runn/calculationLoader');
+      const allCalculations = await loadRunnPanelCalculations(token);
       
       // Получаем выбранные рубильники
       const selectedRubilniki = cell.rubilniki?.filter(r => r && r.trim() !== '') || [];
@@ -390,22 +393,25 @@ export default function CellItem({
   }, [cell.meterType]);
 
   return (
-    <div className="mb-4">
-      <div className="flex items-center justify-between mb-2">
-        <span className="block text-sm text-gray-500 font-medium">{cellPrefix} {idx + 1}</span>
+    <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="mb-4 flex items-center justify-between gap-3 border-b border-gray-100 pb-3">
+        <div>
+          <span className="block text-sm font-semibold text-gray-900">{cellPrefix} {idx + 1}</span>
+          <span className="text-xs text-gray-500">Настройка отходящей ячейки</span>
+        </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400">ID: {cell.id.slice(0, 8)}...</span>
+          <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-500">ID: {cell.id.slice(0, 8)}...</span>
         </div>
       </div>
 
 
       {/* Выпадающий список калькуляций для отходящих ячеек */}
       {cell.purpose.includes('Отходящая') && (
-        <div className="mb-3">
-          <label className="block text-xs text-gray-600 mb-1">
-            Выберите дополнительную калькуляцию отходящей ячейки:
+        <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Дополнительная калькуляция
           </label>
-          <select
+          <Select
             value={selectedOutgoingCalculation?.id || ''}
             onChange={(e) => {
               const calcId = e.target.value;
@@ -422,7 +428,7 @@ export default function CellItem({
                 updateCell(cell.id, 'selectedCalculationName', '');
               }
             }}
-            className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#8eba1e]/25"
             disabled={outgoingCalculationsLoading}
           >
             <option value="">
@@ -435,8 +441,8 @@ export default function CellItem({
                 {calc.name}
               </option>
             ))}
-          </select>
-          <p className="text-xs text-gray-500 mt-1">
+          </Select>
+          <p className="mt-2 text-xs text-gray-500">
             Базовая калькуляция "Панель ЩО 70 (линейная)" применяется автоматически
           </p>
         </div>
@@ -502,6 +508,7 @@ export default function CellItem({
                     additionalRubilnikMaterials={selectedOutgoingCalculation?.data?.cellConfig?.materials?.rubilnik || []}
                     rpsLeftMaterials={rpsLeftMaterials}
                     categoryMaterials={categoryMaterials}
+                    currentTransformerMaterials={currentTransformerMaterials}
                     onCalculationResult={onCalculationResult}
                   />
                 </div>
@@ -529,6 +536,7 @@ export default function CellItem({
                   additionalRubilnikMaterials={[]}
                   rpsLeftMaterials={rpsLeftMaterials}
                   categoryMaterials={categoryMaterials}
+                  currentTransformerMaterials={currentTransformerMaterials}
                   onCalculationResult={onCalculationResult}
                 />
               </div>
@@ -560,7 +568,7 @@ export default function CellItem({
                   <button 
                     onClick={() => {
                       setSelectedOutgoingCalculation(null);
-                      updateCell('selectedCalculationName', '');
+                      updateCell(cell.id, 'selectedCalculationName', '');
                     }}
                     className="px-2 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700"
                   >

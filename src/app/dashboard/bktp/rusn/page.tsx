@@ -7,37 +7,24 @@ import RusnFormFields from './layout/RusnFormFields';
 import { RusnNotConfigured } from '@/components/bktp/rusn/RusnNotConfigured';
 import { RusnNextStepButton } from '@/components/bktp/rusn/RusnNextStepButton';
 import RusnHeader from './layout/RusnHeader';
-import RusnModeSelector from './layout/RusnModeSelector';
-
-type RusnMode = 'configured' | 'not-configured';
+import RusnModeSelector, { type RusnMode } from './layout/RusnModeSelector';
 
 export default function RusnConfigurator() {
   const { selectedTransformer } = useTransformerStore();
   const { cellConfigs, clearAllCells } = useRusnStore();
   const voltage = selectedTransformer?.voltage || '10';
 
-  // Определяем режим на основе наличия конфигурации
-  const [mode, setMode] = useState<RusnMode>(
-    cellConfigs.length > 0 ? 'configured' : 'not-configured'
+  const [mode, setMode] = useState<RusnMode>(() =>
+    cellConfigs.length > 0 ? 'configured' : null
   );
 
-  // Синхронизируем режим с состоянием store при изменении cellConfigs
-  // НО только если режим еще не был установлен пользователем
   useEffect(() => {
-    const hasConfiguration = cellConfigs.length > 0;
-    // Переключаем режим только если:
-    // 1. Есть конфигурация и текущий режим "not-configured" (первая загрузка)
-    // 2. Нет конфигурации и пользователь явно выбрал "not-configured"
-    if (hasConfiguration && mode === 'not-configured') {
+    if (cellConfigs.length > 0 && mode === 'not-configured') {
       setMode('configured');
     }
-    // НЕ переключаем на "not-configured" автоматически при очистке ячеек
   }, [cellConfigs, mode]);
-  
-  // Текущая активная вкладка
-  const [currentTab, setCurrentTab] = useState<'main' | 'bus-bridge'>('main');
 
-  const handleModeChange = (newMode: RusnMode) => {
+  const handleModeChange = (newMode: Exclude<RusnMode, null>) => {
     setMode(newMode);
     if (newMode === 'not-configured') {
       // Очищаем конфигурацию при выборе "не предусмотрено"
@@ -59,7 +46,15 @@ export default function RusnConfigurator() {
 
         {/* Main Content */}
         <div className="space-y-6">
-          {mode === 'configured' ? (
+          {mode === null ? (
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-lg">
+              <div className="p-10 text-center">
+                <p className="text-gray-600">
+                  Выберите «Настроить РУСН» или «Не предусмотрено», чтобы продолжить.
+                </p>
+              </div>
+            </div>
+          ) : mode === 'configured' ? (
             <div className="space-y-6">
               {/* Configuration Form */}
               <div className="bg-white border border-gray-200 rounded-2xl shadow-lg">
@@ -74,7 +69,7 @@ export default function RusnConfigurator() {
                   </h2>
                 </div>
                 <div className="p-6">
-                  <RusnFormFields currentTab={currentTab} onTabChange={setCurrentTab} />
+                  <RusnFormFields />
                 </div>
               </div>
             </div>
@@ -91,13 +86,9 @@ export default function RusnConfigurator() {
 
           {/* Navigation */}
           <div className="mt-8 flex justify-start">
-            <RusnNextStepButton 
-              skip={mode === 'not-configured'} 
-              currentTab={currentTab}
-              onSwitchToBusbar={() => {
-                // Переключаемся на вкладку "Сборные шины"
-                setCurrentTab('bus-bridge');
-              }}
+            <RusnNextStepButton
+              skip={mode === 'not-configured'}
+              disabled={mode === null}
             />
           </div>
         </div>

@@ -1,16 +1,15 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { Montserrat, Climate_Crisis } from 'next/font/google';
+import { fontSans } from '@/lib/fonts';
 import ToastProvider from '@/shared/modals/ToastProvider';
 import ConfirmModalContainer from '@/shared/modals/ConfirmModal';
 import EditModalContainer from '@/shared/modals/EditModalContainer';
-import LoaderOverlay from '@/shared/loader/PageLoader';
 import { ConfirmDialog } from '@/components/ui/confirm';
 import { ToastContainer } from '@/components/ui/toast';
 
 export const metadata: Metadata = {
-  title: 'AETZ Client',
-  description: 'AETZ Client Application',
+  title: 'Вход | АЭТЗ',
+  description: 'Корпоративный портал Астанинского электротехнического завода',
   icons: {
     icon: '/favicon.ico',
     shortcut: '/favicon.ico',
@@ -18,29 +17,15 @@ export const metadata: Metadata = {
   },
 };
 
-const montserrat = Montserrat({
-  variable: '--font-montserrat',
-  subsets: ['latin', 'cyrillic'], // обязательно для русского
-  weight: ['400', '600', '700', '800'],
-  display: 'swap',
-});
-
-const climate = Climate_Crisis({
-  variable: '--font-climate',
-  subsets: ['latin'], // кириллицы нет
-  weight: ['400'], // у Climate Crisis только 1 вес
-});
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ru" className={`${montserrat.variable} ${climate.variable}`}>
-      <body className="antialiased">
+    <html lang="ru" className={fontSans.variable}>
+      <body className={`${fontSans.className} antialiased font-sans`}>
         <ConfirmModalContainer />
         <EditModalContainer />
         <ToastProvider />
         <ConfirmDialog />
         <ToastContainer />
-
         {children}
       </body>
     </html>

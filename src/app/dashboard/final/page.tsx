@@ -7,6 +7,7 @@ import { useBktpStore } from '@/store/useBktpStore';
 import { useUserStore } from '@/store/useUserStore';
 import { useRusnStore } from '@/store/useRusnStore';
 import { useRunnStore } from '@/store/useRunnStore';
+import { useDguStore } from '@/store/useDguStore';
 import Breadcrumbs from '@/components/Breadcrumbs/Breadcrumbs';
 import { useAdditionalEquipmentStore } from '@/store/useAdditionalEquipmentStore';
 import { useWorksStore } from '@/store/useWorksStore';
@@ -18,8 +19,18 @@ import type {
 } from '@/store/useAdditionalEquipmentStore';
 import type { WorkItem } from '@/store/useWorksStore';
 import { FinalReviewHeader, FinalReviewContent, FinalReviewTotal } from './components';
-import { bmzTableConfig, transformerTableConfig, rusnTableConfig, worksTableConfig, runnTableConfig, additionalEquipmentTableConfig, dguTableConfig } from '@/components/FinalReview/tableConfigs';
-import { Edit, X } from 'lucide-react';
+import { bmzTableConfig, transformerTableConfig, rusnTableConfig, worksTableConfig, runnTableConfig, additionalEquipmentTableConfig } from '@/components/FinalReview/tableConfigs';
+import { useMaterialPrices } from '@/hooks/useMaterialPrices';
+import { calculateBusbarUstCost, isUst04CalculationName } from '@/utils/busbarUstCost';
+import { useRealtimeCalculationStore } from '@/store/useRealtimeCalculationStore';
+
+const toNumber = (value: unknown): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const buildBktpFilename = (taskNumber: string, client: string, date: string) =>
+  `${taskNumber}-БКТП-${client}-${date}`;
 
 export default function FinalReview() {
   const { selectedTransformer } = useTransformerStore();
@@ -28,7 +39,16 @@ export default function FinalReview() {
   const { user } = useUserStore();
   const rusnStore: RusnState = useRusnStore();
   const runnStore = useRunnStore();
-  const filename = `${taskNumber}-БКТП-${client}-${date}`;
+  const dguEnabled = useDguStore((s) => s.enabled);
+  const dguCellSummaries = useDguStore((s) => s.cellSummaries);
+  const dguBusbarSummary = useDguStore((s) => s.busbarSummary);
+  const dguBusBridgeSummaries = useDguStore((s) => s.busBridgeSummaries);
+  const filename = buildBktpFilename(taskNumber, client, date);
+  const { aluminum: aluminumPrice, copper: copperPrice } = useMaterialPrices();
+  const busbarMaterialPrices = React.useMemo(
+    () => ({ aluminum: aluminumPrice, copper: copperPrice }),
+    [aluminumPrice, copperPrice],
+  );
 
   const selectedEquipment: AdditionalEquipmentState['selected'] = useAdditionalEquipmentStore(
     (s) => s.selected
@@ -40,12 +60,12 @@ export default function FinalReview() {
   const selectedWorks = useWorksStore((s) => s.selected);
   const worksList: WorkItem[] = useWorksStore((s) => s.worksList);
 
-  // Формируем полное имя пользователя
+  // Р¤РѕСЂРјРёСЂСѓРµРј РїРѕР»РЅРѕРµ РёРјСЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
   const fullName = user
     ? `${user.lastName || ''} ${user.firstName || ''}`.trim() || user.username
     : 'Пользователь';
 
-  // Командировочные берём с клиента, чтобы не было SSR рассинхрона
+  // РљРѕРјР°РЅРґРёСЂРѕРІРѕС‡РЅС‹Рµ Р±РµСЂС‘Рј СЃ РєР»РёРµРЅС‚Р°, С‡С‚РѕР±С‹ РЅРµ Р±С‹Р»Рѕ SSR СЂР°СЃСЃРёРЅС…СЂРѕРЅР°
   const [businessTravelTotal, setBusinessTravelTotal] = React.useState<number>(0);
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -54,11 +74,12 @@ export default function FinalReview() {
     if (!Number.isNaN(parsed)) setBusinessTravelTotal(parsed);
   }, []);
 
-  // Состояние для пользовательских строк в каждой таблице (должно быть объявлено до расчетов)
+  // РЎРѕСЃС‚РѕСЏРЅРёРµ РґР»СЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёС… СЃС‚СЂРѕРє РІ РєР°Р¶РґРѕР№ С‚Р°Р±Р»РёС†Рµ (РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РѕР±СЉСЏРІР»РµРЅРѕ РґРѕ СЂР°СЃС‡РµС‚РѕРІ)
   const [customRowsByTable, setCustomRowsByTable] = React.useState<Record<string, any[]>>({});
+  const { data: realtimeData, setFinalPricingInputs } = useRealtimeCalculationStore();
 
-  // === Расчет итоговых сумм (единый источник истины) ===
-  // БМЗ: считаем сумму из тех же строк, что в таблице БМЗ, плюс пользовательские строки
+  // === Р Р°СЃС‡РµС‚ РёС‚РѕРіРѕРІС‹С… СЃСѓРјРј (РµРґРёРЅС‹Р№ РёСЃС‚РѕС‡РЅРёРє РёСЃС‚РёРЅС‹) ===
+  // Р‘РњР—: СЃС‡РёС‚Р°РµРј СЃСѓРјРјСѓ РёР· С‚РµС… Р¶Рµ СЃС‚СЂРѕРє, С‡С‚Рѕ РІ С‚Р°Р±Р»РёС†Рµ Р‘РњР—, РїР»СЋСЃ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёРµ СЃС‚СЂРѕРєРё
   const bmzRows = React.useMemo(() => bmzTableConfig.dataMapper(bmzStore), [bmzStore]);
   const bmzCustomRows = React.useMemo(() => customRowsByTable[bmzTableConfig.id] || [], [customRowsByTable]);
   const bmzTotal = React.useMemo(() => {
@@ -67,12 +88,12 @@ export default function FinalReview() {
     return baseTotal + customTotal;
   }, [bmzRows, bmzCustomRows]);
 
-  // Трансформатор: учитываем УСТ калькуляции
+  // РўСЂР°РЅСЃС„РѕСЂРјР°С‚РѕСЂ: СѓС‡РёС‚С‹РІР°РµРј РЈРЎРў РєР°Р»СЊРєСѓР»СЏС†РёРё
   const transformerQuantity = selectedTransformer?.quantity || 2;
   const transformerBasePrice = selectedTransformer?.price || 0;
   const transformerBaseTotal = transformerBasePrice * transformerQuantity;
   
-  // Функция для расчета цены УСТ
+  // Р¤СѓРЅРєС†РёСЏ РґР»СЏ СЂР°СЃС‡РµС‚Р° С†РµРЅС‹ РЈРЎРў
   const calculateUstPrice = React.useCallback((calc: any, additionalUstCost: number = 0) => {
     if (!calc?.data?.categories) return 0;
     
@@ -100,18 +121,17 @@ export default function FinalReview() {
     return finalPrice;
   }, []);
 
-  // Рассчитываем стоимость УСТ
+  // Р Р°СЃСЃС‡РёС‚С‹РІР°РµРј СЃС‚РѕРёРјРѕСЃС‚СЊ РЈРЎРў
   const ustTotal = React.useMemo(() => {
     const busbarUstData = selectedTransformer?.busbarUstData;
-    const busbarUstCost = busbarUstData ? 
-      (busbarUstData.mainUstWeight + busbarUstData.zeroUstWeight) * 
-      (busbarUstData.material === 'Алюминий' ? 2800 : 5600) : 0;
 
     let total = 0;
     if (selectedTransformer?.ustCalculations && selectedTransformer.ustCalculations.length > 0) {
       selectedTransformer.ustCalculations.forEach((calc: any) => {
-        const shouldAddBusbarCost = calc.name?.includes('0.4кВ') || calc.name?.includes('УСТ-0.4кВ');
-        const additionalCost = shouldAddBusbarCost ? busbarUstCost : 0;
+        const shouldAddBusbarCost = isUst04CalculationName(calc.name || '');
+        const additionalCost = shouldAddBusbarCost
+          ? calculateBusbarUstCost(busbarUstData, busbarMaterialPrices)
+          : 0;
         const ustPrice = calculateUstPrice(calc, additionalCost);
         total += ustPrice * transformerQuantity;
       });
@@ -120,7 +140,7 @@ export default function FinalReview() {
       total = ustPrice * transformerQuantity;
     }
     return total;
-  }, [selectedTransformer, calculateUstPrice, transformerQuantity]);
+  }, [selectedTransformer, calculateUstPrice, transformerQuantity, busbarMaterialPrices]);
 
   const transformerTotal = transformerBaseTotal + ustTotal;
   const transformerCustomRows = React.useMemo(() => customRowsByTable[transformerTableConfig.id] || [], [customRowsByTable]);
@@ -139,7 +159,7 @@ export default function FinalReview() {
     return rusnBaseTotal + customTotal;
   }, [rusnBaseTotal, rusnCustomRows]);
 
-  // Сумма работ - считаем из тех же строк, что рендерятся в таблице, плюс пользовательские строки
+  // РЎСѓРјРјР° СЂР°Р±РѕС‚ - СЃС‡РёС‚Р°РµРј РёР· С‚РµС… Р¶Рµ СЃС‚СЂРѕРє, С‡С‚Рѕ СЂРµРЅРґРµСЂСЏС‚СЃСЏ РІ С‚Р°Р±Р»РёС†Рµ, РїР»СЋСЃ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёРµ СЃС‚СЂРѕРєРё
   const worksRows = React.useMemo(() => (
     worksTableConfig.dataMapper({ selected: selectedWorks, worksList }, { businessTravelTotal })
   ), [selectedWorks, worksList, businessTravelTotal]);
@@ -150,10 +170,21 @@ export default function FinalReview() {
     return baseTotal + customTotal;
   }, [worksRows, worksCustomRows]);
 
-  // Сумма РУНН — из тех же строк, что рендерятся в таблице RUNN, плюс пользовательские строки
-  const runnRows = React.useMemo(() => (
-    runnTableConfig.dataMapper(runnStore)
-  ), [runnStore.cellSummaries, runnStore.cellConfigs, runnStore.busbarSummary, runnStore.busBridgeSummary, runnStore.busBridgeSummaries]);
+  // РЎСѓРјРјР° Р РЈРќРќ вЂ” РёР· С‚РµС… Р¶Рµ СЃС‚СЂРѕРє, С‡С‚Рѕ СЂРµРЅРґРµСЂСЏС‚СЃСЏ РІ С‚Р°Р±Р»РёС†Рµ RUNN, РїР»СЋСЃ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёРµ СЃС‚СЂРѕРєРё
+  const runnRows = React.useMemo(
+    () => runnTableConfig.dataMapper(runnStore),
+    [
+      runnStore.cellSummaries,
+      runnStore.cellConfigs,
+      runnStore.busbarSummary,
+      runnStore.busBridgeSummary,
+      runnStore.busBridgeSummaries,
+      dguEnabled,
+      dguCellSummaries,
+      dguBusbarSummary,
+      dguBusBridgeSummaries,
+    ]
+  );
   const runnCustomRows = React.useMemo(() => customRowsByTable[runnTableConfig.id] || [], [customRowsByTable]);
   const runnTotal = React.useMemo(() => {
     const baseTotal = runnRows.reduce((sum: number, row: any) => sum + (row.total || 0), 0);
@@ -161,7 +192,7 @@ export default function FinalReview() {
     return baseTotal + customTotal;
   }, [runnRows, runnCustomRows]);
 
-  // Сумма дополнительного оборудования - считаем из тех же строк, что рендерятся в таблице, плюс пользовательские строки
+  // РЎСѓРјРјР° РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅРѕРіРѕ РѕР±РѕСЂСѓРґРѕРІР°РЅРёСЏ - СЃС‡РёС‚Р°РµРј РёР· С‚РµС… Р¶Рµ СЃС‚СЂРѕРє, С‡С‚Рѕ СЂРµРЅРґРµСЂСЏС‚СЃСЏ РІ С‚Р°Р±Р»РёС†Рµ, РїР»СЋСЃ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёРµ СЃС‚СЂРѕРєРё
   const additionalEquipmentRows = React.useMemo(() => (
     additionalEquipmentTableConfig.dataMapper({ selected: selectedEquipment, equipmentList })
   ), [selectedEquipment, equipmentList]);
@@ -173,96 +204,148 @@ export default function FinalReview() {
   }, [additionalEquipmentRows, additionalEquipmentCustomRows]);
 
   const grandTotal = bmzTotal + transformerTotalWithCustom + rusnTotal + runnTotal + worksTotal + additionalEquipmentTotal;
-  // === / Расчет итоговых сумм ===
+  const backendConfig = realtimeData?.config || {};
+  const backendTotals = realtimeData?.snapshot?.totals || {};
+  const displayBmzStore = backendConfig.bmz ? ({ ...bmzStore, ...backendConfig.bmz } as BmzData) : bmzStore;
+  const displaySelectedTransformer = (backendConfig.transformer || selectedTransformer) as any;
+  const displayRusnStore = backendConfig.rusn
+    ? ({ ...rusnStore, ...backendConfig.rusn } as RusnState)
+    : rusnStore;
+  const displayRunnStore = backendConfig.runn ? { ...runnStore, ...backendConfig.runn } : runnStore;
+  const displayAdditionalEquipment = backendConfig.additionalEquipment || {
+    selected: selectedEquipment,
+    equipmentList,
+  };
+  const displayWorks = backendConfig.works || {
+    selected: selectedWorks,
+    worksList,
+  };
+  const effectiveTotals = {
+    bmzTotal: backendTotals.bmzTotal !== undefined ? toNumber(backendTotals.bmzTotal) : bmzTotal,
+    transformerTotal:
+      backendTotals.transformerTotal !== undefined
+        ? toNumber(backendTotals.transformerTotal)
+        : transformerTotalWithCustom,
+    rusnTotal: backendTotals.rusnTotal !== undefined ? toNumber(backendTotals.rusnTotal) : rusnTotal,
+    runnTotal: backendTotals.runnTotal !== undefined ? toNumber(backendTotals.runnTotal) : runnTotal,
+    additionalEquipmentTotal:
+      backendTotals.additionalEquipmentTotal !== undefined
+        ? toNumber(backendTotals.additionalEquipmentTotal)
+        : additionalEquipmentTotal,
+    worksTotal: backendTotals.worksTotal !== undefined ? toNumber(backendTotals.worksTotal) : worksTotal,
+    grandTotal: backendTotals.grandTotal !== undefined ? toNumber(backendTotals.grandTotal) : grandTotal,
+  };
+  // === / Р Р°СЃС‡РµС‚ РёС‚РѕРіРѕРІС‹С… СЃСѓРјРј ===
 
-  // Состояние наценки менеджера (общий процент для отображения в FinalReviewTotal)
+  // РЎРѕСЃС‚РѕСЏРЅРёРµ РЅР°С†РµРЅРєРё РјРµРЅРµРґР¶РµСЂР° (РѕР±С‰РёР№ РїСЂРѕС†РµРЅС‚ РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ РІ FinalReviewTotal)
   const [managerMarkupPercent, setManagerMarkupPercent] = React.useState<number>(20);
   
-  // Состояние для хранения процентов наценки для каждой таблицы
+  // РЎРѕСЃС‚РѕСЏРЅРёРµ РґР»СЏ С…СЂР°РЅРµРЅРёСЏ РїСЂРѕС†РµРЅС‚РѕРІ РЅР°С†РµРЅРєРё РґР»СЏ РєР°Р¶РґРѕР№ С‚Р°Р±Р»РёС†С‹
   const [tableMarkupPercents, setTableMarkupPercents] = React.useState<Record<string, number>>({});
   
-  // Состояние для хранения итоговых сумм с наценкой для каждой таблицы
+  // РЎРѕСЃС‚РѕСЏРЅРёРµ РґР»СЏ С…СЂР°РЅРµРЅРёСЏ РёС‚РѕРіРѕРІС‹С… СЃСѓРјРј СЃ РЅР°С†РµРЅРєРѕР№ РґР»СЏ РєР°Р¶РґРѕР№ С‚Р°Р±Р»РёС†С‹
   const [tableMarkupTotals, setTableMarkupTotals] = React.useState<Record<string, number | null>>({});
 
-  // Состояние режима редактирования
+  React.useEffect(() => {
+    setFinalPricingInputs({
+      customRowsByTable,
+      tableMarkupPercents,
+      tableMarkupTotals,
+    });
+  }, [customRowsByTable, tableMarkupPercents, tableMarkupTotals, setFinalPricingInputs]);
+
+  React.useEffect(() => {
+    const backendPercents = realtimeData?.tableMarkupPercents;
+    const backendTotals = realtimeData?.tableMarkupTotals;
+
+    if (backendPercents && JSON.stringify(backendPercents) !== JSON.stringify(tableMarkupPercents)) {
+      setTableMarkupPercents(backendPercents);
+    }
+
+    if (backendTotals && JSON.stringify(backendTotals) !== JSON.stringify(tableMarkupTotals)) {
+      setTableMarkupTotals(backendTotals);
+    }
+  }, [realtimeData?.tableMarkupPercents, realtimeData?.tableMarkupTotals, tableMarkupPercents, tableMarkupTotals]);
+
+  // РЎРѕСЃС‚РѕСЏРЅРёРµ СЂРµР¶РёРјР° СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёСЏ
   const [isEditing, setIsEditing] = React.useState(false);
   
-  // Состояние видимости таблиц (по умолчанию все видимы, если есть данные)
+  // РЎРѕСЃС‚РѕСЏРЅРёРµ РІРёРґРёРјРѕСЃС‚Рё С‚Р°Р±Р»РёС† (РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ РІСЃРµ РІРёРґРёРјС‹, РµСЃР»Рё РµСЃС‚СЊ РґР°РЅРЅС‹Рµ)
   const [visibleTables, setVisibleTables] = React.useState<Set<string>>(new Set());
 
-  // Инициализация начальных значений наценки 20% для всех таблиц
+  // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РЅР°С‡Р°Р»СЊРЅС‹С… Р·РЅР°С‡РµРЅРёР№ РЅР°С†РµРЅРєРё 20% РґР»СЏ РІСЃРµС… С‚Р°Р±Р»РёС†
   const isInitializedRef = React.useRef(false);
   
-  // Инициализация видимости таблиц на основе наличия данных
-  // Таблицы с данными автоматически добавляются в visibleTables
+  // РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РІРёРґРёРјРѕСЃС‚Рё С‚Р°Р±Р»РёС† РЅР° РѕСЃРЅРѕРІРµ РЅР°Р»РёС‡РёСЏ РґР°РЅРЅС‹С…
+  // РўР°Р±Р»РёС†С‹ СЃ РґР°РЅРЅС‹РјРё Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё РґРѕР±Р°РІР»СЏСЋС‚СЃСЏ РІ visibleTables
   React.useEffect(() => {
     setVisibleTables(prev => {
       const newVisible = new Set(prev);
       let changed = false;
       
-      // Добавляем таблицы с данными, если их еще нет
-      if (bmzTotal > 0 && !newVisible.has(bmzTableConfig.id)) {
+      // Р”РѕР±Р°РІР»СЏРµРј С‚Р°Р±Р»РёС†С‹ СЃ РґР°РЅРЅС‹РјРё, РµСЃР»Рё РёС… РµС‰Рµ РЅРµС‚
+      if (effectiveTotals.bmzTotal > 0 && !newVisible.has(bmzTableConfig.id)) {
         newVisible.add(bmzTableConfig.id);
         changed = true;
       }
-      if (transformerTotalWithCustom > 0 && !newVisible.has(transformerTableConfig.id)) {
+      if (effectiveTotals.transformerTotal > 0 && !newVisible.has(transformerTableConfig.id)) {
         newVisible.add(transformerTableConfig.id);
         changed = true;
       }
-      if (rusnTotal > 0 && !newVisible.has(rusnTableConfig.id)) {
+      if (effectiveTotals.rusnTotal > 0 && !newVisible.has(rusnTableConfig.id)) {
         newVisible.add(rusnTableConfig.id);
         changed = true;
       }
-      if (runnTotal > 0 && !newVisible.has(runnTableConfig.id)) {
+      if (effectiveTotals.runnTotal > 0 && !newVisible.has(runnTableConfig.id)) {
         newVisible.add(runnTableConfig.id);
         changed = true;
       }
-      if (additionalEquipmentTotal > 0 && !newVisible.has(additionalEquipmentTableConfig.id)) {
+      if (effectiveTotals.additionalEquipmentTotal > 0 && !newVisible.has(additionalEquipmentTableConfig.id)) {
         newVisible.add(additionalEquipmentTableConfig.id);
         changed = true;
       }
-      if (worksTotal > 0 && !newVisible.has(worksTableConfig.id)) {
+      if (effectiveTotals.worksTotal > 0 && !newVisible.has(worksTableConfig.id)) {
         newVisible.add(worksTableConfig.id);
         changed = true;
       }
-      // ДГУ не добавляется автоматически (нет данных по умолчанию)
+      // Р”Р“РЈ РЅРµ РґРѕР±Р°РІР»СЏРµС‚СЃСЏ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё (РЅРµС‚ РґР°РЅРЅС‹С… РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ)
       
       return changed ? newVisible : prev;
     });
-    }, [bmzTotal, transformerTotalWithCustom, rusnTotal, runnTotal, additionalEquipmentTotal, worksTotal]);
+    }, [effectiveTotals.bmzTotal, effectiveTotals.transformerTotal, effectiveTotals.rusnTotal, effectiveTotals.runnTotal, effectiveTotals.additionalEquipmentTotal, effectiveTotals.worksTotal]);
   
   React.useEffect(() => {
-    // Инициализируем только один раз при первой загрузке
+    // РРЅРёС†РёР°Р»РёР·РёСЂСѓРµРј С‚РѕР»СЊРєРѕ РѕРґРёРЅ СЂР°Р· РїСЂРё РїРµСЂРІРѕР№ Р·Р°РіСЂСѓР·РєРµ
     if (isInitializedRef.current) return;
     
     const initialPercent = 20;
     const initialPercents: Record<string, number> = {};
     const initialTotals: Record<string, number | null> = {};
 
-    // Инициализируем для всех таблиц с положительными суммами
-    if (bmzTotal > 0) {
+    // РРЅРёС†РёР°Р»РёР·РёСЂСѓРµРј РґР»СЏ РІСЃРµС… С‚Р°Р±Р»РёС† СЃ РїРѕР»РѕР¶РёС‚РµР»СЊРЅС‹РјРё СЃСѓРјРјР°РјРё
+    if (effectiveTotals.bmzTotal > 0) {
       initialPercents[bmzTableConfig.id] = initialPercent;
-      initialTotals[bmzTableConfig.id] = Math.round(bmzTotal * (1 + initialPercent / 100));
+      initialTotals[bmzTableConfig.id] = Math.round(effectiveTotals.bmzTotal * (1 + initialPercent / 100));
     }
-    if (transformerTotalWithCustom > 0) {
+    if (effectiveTotals.transformerTotal > 0) {
       initialPercents[transformerTableConfig.id] = initialPercent;
-      initialTotals[transformerTableConfig.id] = Math.round(transformerTotalWithCustom * (1 + initialPercent / 100));
+      initialTotals[transformerTableConfig.id] = Math.round(effectiveTotals.transformerTotal * (1 + initialPercent / 100));
     }
-    if (rusnTotal > 0) {
+    if (effectiveTotals.rusnTotal > 0) {
       initialPercents[rusnTableConfig.id] = initialPercent;
-      initialTotals[rusnTableConfig.id] = Math.round(rusnTotal * (1 + initialPercent / 100));
+      initialTotals[rusnTableConfig.id] = Math.round(effectiveTotals.rusnTotal * (1 + initialPercent / 100));
     }
-    if (runnTotal > 0) {
+    if (effectiveTotals.runnTotal > 0) {
       initialPercents[runnTableConfig.id] = initialPercent;
-      initialTotals[runnTableConfig.id] = Math.round(runnTotal * (1 + initialPercent / 100));
+      initialTotals[runnTableConfig.id] = Math.round(effectiveTotals.runnTotal * (1 + initialPercent / 100));
     }
-    if (additionalEquipmentTotal > 0) {
+    if (effectiveTotals.additionalEquipmentTotal > 0) {
       initialPercents[additionalEquipmentTableConfig.id] = initialPercent;
-      initialTotals[additionalEquipmentTableConfig.id] = Math.round(additionalEquipmentTotal * (1 + initialPercent / 100));
+      initialTotals[additionalEquipmentTableConfig.id] = Math.round(effectiveTotals.additionalEquipmentTotal * (1 + initialPercent / 100));
     }
-    if (worksTotal > 0) {
+    if (effectiveTotals.worksTotal > 0) {
       initialPercents[worksTableConfig.id] = initialPercent;
-      initialTotals[worksTableConfig.id] = Math.round(worksTotal * (1 + initialPercent / 100));
+      initialTotals[worksTableConfig.id] = Math.round(effectiveTotals.worksTotal * (1 + initialPercent / 100));
     }
 
     if (Object.keys(initialPercents).length > 0) {
@@ -270,92 +353,7 @@ export default function FinalReview() {
       setTableMarkupTotals(initialTotals);
       isInitializedRef.current = true;
     }
-  }, [bmzTotal, transformerTotalWithCustom, rusnTotal, runnTotal, additionalEquipmentTotal, worksTotal]);
-
-  // === Формирование объекта заявки ===
-  function getApplicationPayload() {
-    // Итоги
-    const bmzArea =
-      bmzStore.buildingType !== 'none' ? (bmzStore.length / 1000) * (bmzStore.width / 1000) : 0;
-    const bmzTotal =
-      bmzStore.buildingType !== 'none'
-        ? bmzArea * 257000 +
-          (bmzStore.settings?.equipment?.reduce((sum: number, eq: any) => {
-            const stateKey = eq.name.toLowerCase().replace(/\s+/g, '');
-            if (!bmzStore.equipmentState[stateKey]) return sum;
-            let quantity = 0;
-            if (eq.priceType === 'perSquareMeter') quantity = bmzArea;
-            else if (eq.priceType === 'perHalfSquareMeter') quantity = bmzArea / 2;
-            else if (eq.priceType === 'fixed') quantity = 1;
-            const price = eq.pricePerSquareMeter || eq.fixedPrice || 0;
-            return sum + price * quantity;
-          }, 0) || 0)
-        : 0;
-    const transformerTotal = selectedTransformer?.price ? selectedTransformer.price * 2 : 0;
-    const rusnTotal =
-      rusnStore.cellConfigs.reduce((sum: number, cell: any) => sum + (cell.totalPrice || 0), 0) +
-      (rusnStore.busBridgeSummary?.totalPrice || 0) +
-      (rusnStore.busbarSummary?.totalPrice || 0);
-    const worksTotal = worksList
-      .filter((work) => selectedWorks[work.name]?.checked)
-      .reduce((sum, work) => {
-        const count = selectedWorks[work.name]?.count || 1;
-        return sum + work.price * count;
-      }, 0);
-    const grandTotalForPayload = bmzTotal + transformerTotalForPayload + rusnTotalForPayload + worksTotal;
-
-    // Формируем payload
-    const payload = {
-      meta: {
-        taskNumber,
-        date,
-        client,
-        user: user
-          ? {
-              id: user.id,
-              username: user.username,
-              firstName: user.firstName,
-              lastName: user.lastName,
-            }
-          : null,
-        type: 'БКТП',
-      },
-      bmz: {
-        buildingType: bmzStore.buildingType,
-        length: bmzStore.length,
-        width: bmzStore.width,
-        height: bmzStore.height,
-        thickness: bmzStore.thickness,
-        blockCount: bmzStore.blockCount,
-        settings: bmzStore.settings,
-        equipmentState: bmzStore.equipmentState,
-      },
-        transformer: selectedTransformer as any,
-      rusn: {
-        cellConfigs: rusnStore.cellConfigs,
-        busbarSummary: rusnStore.busbarSummary,
-        busBridgeSummary: rusnStore.busBridgeSummary,
-        busBridgeSummaries: rusnStore.busBridgeSummaries,
-        cellSummaries: rusnStore.cellSummaries,
-      },
-      additionalEquipment: {
-        selected: selectedEquipment,
-        equipmentList: equipmentList,
-      },
-      works: {
-        selected: selectedWorks,
-        worksList: worksList,
-      },
-      totals: {
-        bmzTotal,
-        transformerTotal,
-        rusnTotal,
-        worksTotal,
-        grandTotal,
-      },
-    };
-    return payload;
-  }
+  }, [effectiveTotals.bmzTotal, effectiveTotals.transformerTotal, effectiveTotals.rusnTotal, effectiveTotals.runnTotal, effectiveTotals.additionalEquipmentTotal, effectiveTotals.worksTotal]);
 
   return (
     <div className="h-[calc(100vh-110px)] overflow-y-auto px-6 py-6 bg-gray-50">
@@ -370,13 +368,14 @@ export default function FinalReview() {
       />
 
       <FinalReviewContent
-        bmzStore={bmzStore}
-        selectedTransformer={selectedTransformer as any}
-        rusnStore={rusnStore}
-        selectedEquipment={selectedEquipment}
-        equipmentList={equipmentList}
-        selectedWorks={selectedWorks}
-        worksList={worksList}
+        bmzStore={displayBmzStore}
+        selectedTransformer={displaySelectedTransformer}
+        rusnStore={displayRusnStore}
+        runnStore={displayRunnStore}
+        selectedEquipment={displayAdditionalEquipment.selected}
+        equipmentList={displayAdditionalEquipment.equipmentList}
+        selectedWorks={displayWorks.selected}
+        worksList={displayWorks.worksList}
         managerMarkupPercent={managerMarkupPercent}
         tableMarkupPercents={tableMarkupPercents}
         setTableMarkupPercents={setTableMarkupPercents}
@@ -389,35 +388,35 @@ export default function FinalReview() {
           setVisibleTables(prev => {
             const newSet = new Set(prev);
             if (newSet.has(tableId)) {
-              // Проверяем, можно ли удалить таблицу (таблицы с данными нельзя удалить)
+              // РџСЂРѕРІРµСЂСЏРµРј, РјРѕР¶РЅРѕ Р»Рё СѓРґР°Р»РёС‚СЊ С‚Р°Р±Р»РёС†Сѓ (С‚Р°Р±Р»РёС†С‹ СЃ РґР°РЅРЅС‹РјРё РЅРµР»СЊР·СЏ СѓРґР°Р»РёС‚СЊ)
               const hasData = 
-                (tableId === bmzTableConfig.id && bmzTotal > 0) ||
-                (tableId === transformerTableConfig.id && transformerTotalWithCustom > 0) ||
-                (tableId === rusnTableConfig.id && rusnTotal > 0) ||
-                (tableId === runnTableConfig.id && runnTotal > 0) ||
-                (tableId === additionalEquipmentTableConfig.id && additionalEquipmentTotal > 0) ||
-                (tableId === worksTableConfig.id && worksTotal > 0);
+                (tableId === bmzTableConfig.id && effectiveTotals.bmzTotal > 0) ||
+                (tableId === transformerTableConfig.id && effectiveTotals.transformerTotal > 0) ||
+                (tableId === rusnTableConfig.id && effectiveTotals.rusnTotal > 0) ||
+                (tableId === runnTableConfig.id && effectiveTotals.runnTotal > 0) ||
+                (tableId === additionalEquipmentTableConfig.id && effectiveTotals.additionalEquipmentTotal > 0) ||
+                (tableId === worksTableConfig.id && effectiveTotals.worksTotal > 0);
               
-              // Если у таблицы есть данные, не позволяем её удалить
+              // Р•СЃР»Рё Сѓ С‚Р°Р±Р»РёС†С‹ РµСЃС‚СЊ РґР°РЅРЅС‹Рµ, РЅРµ РїРѕР·РІРѕР»СЏРµРј РµС‘ СѓРґР°Р»РёС‚СЊ
               if (hasData) {
                 return prev;
               }
               
-              // Удаляем таблицу только если у неё нет данных
+              // РЈРґР°Р»СЏРµРј С‚Р°Р±Р»РёС†Сѓ С‚РѕР»СЊРєРѕ РµСЃР»Рё Сѓ РЅРµС‘ РЅРµС‚ РґР°РЅРЅС‹С…
               newSet.delete(tableId);
             } else {
-              // Добавляем таблицу
+              // Р”РѕР±Р°РІР»СЏРµРј С‚Р°Р±Р»РёС†Сѓ
               newSet.add(tableId);
             }
             return newSet;
           });
         }}
-        bmzTotal={bmzTotal}
-        transformerTotal={transformerTotalWithCustom}
-        rusnTotal={rusnTotal}
-        runnTotal={runnTotal}
-        additionalEquipmentTotal={additionalEquipmentTotal}
-        worksTotal={worksTotal}
+        bmzTotal={effectiveTotals.bmzTotal}
+        transformerTotal={effectiveTotals.transformerTotal}
+        rusnTotal={effectiveTotals.rusnTotal}
+        runnTotal={effectiveTotals.runnTotal}
+        additionalEquipmentTotal={effectiveTotals.additionalEquipmentTotal}
+        worksTotal={effectiveTotals.worksTotal}
         customRowsByTable={customRowsByTable}
         onCustomRowsChange={(tableId: string, rows: any[]) => {
           setCustomRowsByTable(prev => ({
@@ -428,27 +427,19 @@ export default function FinalReview() {
       />
 
       <FinalReviewTotal
-        bmzStore={bmzStore}
-        selectedTransformer={selectedTransformer as any}
-        rusnStore={rusnStore}
-        runnStore={runnStore}
-        selectedEquipment={selectedEquipment}
-        equipmentList={equipmentList}
-        selectedWorks={selectedWorks}
-        worksList={worksList}
+        bmzStore={displayBmzStore}
+        selectedTransformer={displaySelectedTransformer}
+        rusnStore={displayRusnStore}
+        runnStore={displayRunnStore}
+        selectedEquipment={displayAdditionalEquipment.selected}
+        equipmentList={displayAdditionalEquipment.equipmentList}
+        selectedWorks={displayWorks.selected}
+        worksList={displayWorks.worksList}
         user={user}
         taskNumber={taskNumber}
         client={client}
         date={date}
-        totals={{
-          bmzTotal,
-          transformerTotal: transformerTotalWithCustom,
-          rusnTotal,
-          runnTotal,
-          additionalEquipmentTotal,
-          worksTotal,
-          grandTotal,
-        }}
+        totals={effectiveTotals}
         filename={filename}
         fullName={fullName}
         managerMarkupPercent={managerMarkupPercent}

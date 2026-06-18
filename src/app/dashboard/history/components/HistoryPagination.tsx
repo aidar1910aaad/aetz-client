@@ -1,6 +1,7 @@
 'use client';
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Select } from '@/components/ui/select';
 
 interface HistoryPaginationProps {
   currentPage: number;
@@ -8,6 +9,7 @@ interface HistoryPaginationProps {
   total: number;
   limit: number;
   onPageChange: (page: number) => void;
+  onLimitChange: (limit: number) => void;
 }
 
 export default function HistoryPagination({
@@ -16,6 +18,7 @@ export default function HistoryPagination({
   total,
   limit,
   onPageChange,
+  onLimitChange,
 }: HistoryPaginationProps) {
   if (totalPages <= 1) {
     return null;
@@ -64,7 +67,18 @@ export default function HistoryPagination({
       <div className="text-sm text-gray-600">
         Показано {startItem}—{endItem} из {total}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
+        <Select
+          value={limit}
+          onChange={(e) => onLimitChange(Number(e.target.value))}
+          className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e]"
+        >
+          {[20, 50, 100].map((size) => (
+            <option key={size} value={size}>
+              {size} / стр
+            </option>
+          ))}
+        </Select>
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}

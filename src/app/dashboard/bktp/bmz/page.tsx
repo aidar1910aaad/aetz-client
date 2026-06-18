@@ -10,11 +10,14 @@ import BmzDimensions from '@/components/BmzConfig/BmzDimensions';
 import BmzOptions from '@/components/BmzConfig/BmzOptions';
 import { useEffect } from 'react';
 import { bmzApi } from '@/api/bmz';
+import { useRealtimeCalculationStore } from '@/store/useRealtimeCalculationStore';
+import { findMatchingAreaPriceRange } from '@/utils/bmzAreaPriceRange';
 
 export default function BmzConfigPage() {
   const router = useRouter();
   const bmz = useBmzStore();
   const { taskNumber, client, date } = useBktpStore();
+  const { data: realtimeData, isCalculating } = useRealtimeCalculationStore();
   const filename = `${taskNumber}-БКТП-${client}-${date}`;
 
   useEffect(() => {
@@ -65,6 +68,12 @@ export default function BmzConfigPage() {
     bmz.equipmentState,
   ]);
 
+  useEffect(() => {
+    if (bmz.settings && bmz.buildingType && bmz.buildingType !== 'none') {
+      bmz.initializeDefaultEquipment();
+    }
+  }, [bmz.settings, bmz.buildingType]);
+
   const handleBuildingTypeChange = (type: 'bmz' | 'tp' | 'none') => {
     bmz.setBuildingType(type);
     if (type === 'bmz') {
@@ -87,7 +96,7 @@ export default function BmzConfigPage() {
         bmz.initializeDefaultEquipment();
       }
     } else {
-      bmz.reset();
+      bmz.setBuildingType('none');
     }
   };
 
@@ -96,6 +105,7 @@ export default function BmzConfigPage() {
   };
 
   const isFormValid = () => {
+    if (!bmz.buildingType) return false;
     if (bmz.buildingType === 'none') return true;
     return (
       bmz.length > 0 &&
@@ -105,21 +115,19 @@ export default function BmzConfigPage() {
     );
   };
 
-  const calculateBasePrice = (width: number, length: number, thickness: number): number => {
+  const calculateBasePrice = (
+    width: number,
+    length: number,
+    thickness: number,
+    height: number,
+  ): number => {
     if (!bmz.settings) return 0;
     const area = (width / 1000) * (length / 1000);
-
-    // Находим все подходящие диапазоны для текущей толщины
-    const matchingRanges = bmz.settings.areaPriceRanges.filter(
-      (range) => thickness >= range.minWallThickness && thickness <= range.maxWallThickness
-    );
-
-    // Сортируем диапазоны по минимальной площади (от большей к меньшей)
-    matchingRanges.sort((a, b) => b.minArea - a.minArea);
-
-    // Находим первый диапазон, где площадь больше или равна минимальной
-    const priceRange = matchingRanges.find((range) => area >= range.minArea);
-
+    const priceRange = findMatchingAreaPriceRange(bmz.settings.areaPriceRanges, {
+      area,
+      thickness,
+      height,
+    });
     return priceRange?.pricePerSquareMeter || 0;
   };
 
@@ -131,7 +139,7 @@ export default function BmzConfigPage() {
 
     // Считаем стоимость здания только для БМЗ
     if (bmz.buildingType === 'bmz') {
-      const basePrice = calculateBasePrice(bmz.width, bmz.length, bmz.thickness);
+      const basePrice = calculateBasePrice(bmz.width, bmz.length, bmz.thickness, bmz.height);
       total += basePrice * area;
     }
 
@@ -155,8 +163,13 @@ export default function BmzConfigPage() {
   const area = (bmz.width / 1000) * (bmz.length / 1000);
   const roundedArea = Math.round(area * 10) / 10;
   const unitPrice =
-    bmz.buildingType === 'bmz' ? calculateBasePrice(bmz.width, bmz.length, bmz.thickness) : 0;
+    bmz.buildingType === 'bmz'
+      ? calculateBasePrice(bmz.width, bmz.length, bmz.thickness, bmz.height)
+      : 0;
   const totalPrice = calculateTotalPrice();
+  const onlineBmzTotal = Number(realtimeData?.snapshot?.totals?.bmzTotal || 0);
+  const displayedBmzTotal = onlineBmzTotal > 0 ? onlineBmzTotal : totalPrice;
+  const hasSelectedBuildingType = Boolean(bmz.buildingType);
 
   return (
     <div className="h-[calc(100vh-64px)] bg-white overflow-y-auto relative z-0">
@@ -191,7 +204,17 @@ export default function BmzConfigPage() {
         <div className=" mx-auto space-y-6">
           <BmzBuildingType onChange={handleBuildingTypeChange} selectedType={bmz.buildingType} />
 
-          {bmz.buildingType !== 'none' ? (
+          {!hasSelectedBuildingType ? (
+            <div className="text-center py-12 bg-white border border-dashed border-gray-300 rounded-2xl shadow-sm">
+              <div className="w-16 h-16 bg-[#8eba1e]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Building2 className="w-8 h-8 text-[#8eba1e]" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Выберите тип здания</h3>
+              <p className="text-gray-600">
+                Параметры, оборудование и расчёт появятся после выбора БМЗ, ТП или «Нет».
+              </p>
+            </div>
+          ) : bmz.buildingType !== 'none' ? (
             <>
               <BmzDimensions
                 width={bmz.width}
@@ -210,7 +233,7 @@ export default function BmzConfigPage() {
               <BmzOptions
                 state={bmz.equipmentState}
                 setField={bmz.setEquipmentState}
-                disabled={!isFormValid()}
+                disabled={false}
                 buildingType={bmz.buildingType}
                 length={bmz.length}
                 width={bmz.width}
@@ -223,6 +246,9 @@ export default function BmzConfigPage() {
                       <Calculator className="w-5 h-5 text-[#8eba1e]" />
                     </div>
                     <h3 className="text-xl font-bold text-gray-900">Расчёт стоимости</h3>
+                    <span className={`ml-auto text-xs font-semibold ${isCalculating ? 'text-amber-600' : 'text-green-600'}`}>
+                      {isCalculating ? 'Онлайн пересчет...' : 'Онлайн расчет актуален'}
+                    </span>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full table-auto border border-gray-200 rounded-lg overflow-hidden">
@@ -231,8 +257,8 @@ export default function BmzConfigPage() {
                           <th className="p-4 text-left font-semibold">Наименование</th>
                           <th className="p-4 text-center font-semibold">Ед. изм.</th>
                           <th className="p-4 text-center font-semibold">Кол-во</th>
-                          <th className="p-4 text-center font-semibold">Цена</th>
-                          <th className="p-4 text-center font-semibold">Сумма</th>
+                          <th className="p-4 text-right font-semibold">Цена</th>
+                          <th className="p-4 text-right font-semibold">Сумма</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white">
@@ -244,8 +270,8 @@ export default function BmzConfigPage() {
                             </td>
                             <td className="p-4 text-center text-gray-600">м²</td>
                             <td className="p-4 text-center font-semibold">{roundedArea}</td>
-                            <td className="p-4 text-center text-[#8eba1e] font-semibold">{unitPrice.toLocaleString()} тг</td>
-                            <td className="p-4 text-center text-[#8eba1e] font-bold">{(unitPrice * roundedArea).toLocaleString()} тг</td>
+                            <td className="p-4 text-right text-[#8eba1e] font-semibold">{unitPrice.toLocaleString()} тг</td>
+                            <td className="p-4 text-right text-[#8eba1e] font-bold">{(unitPrice * roundedArea).toLocaleString()} тг</td>
                           </tr>
                         )}
                         {bmz.buildingType === 'tp' && (
@@ -255,8 +281,8 @@ export default function BmzConfigPage() {
                             </td>
                             <td className="p-4 text-center text-gray-600">м²</td>
                             <td className="p-4 text-center font-semibold">{roundedArea}</td>
-                            <td className="p-4 text-center text-gray-400">—</td>
-                            <td className="p-4 text-center text-gray-400">—</td>
+                            <td className="p-4 text-right text-gray-400">—</td>
+                            <td className="p-4 text-right text-gray-400">—</td>
                           </tr>
                         )}
 
@@ -289,8 +315,8 @@ export default function BmzConfigPage() {
                               <td className="p-4 text-left font-medium">{equipment.name}</td>
                               <td className="p-4 text-center text-gray-600">{unit}</td>
                               <td className="p-4 text-center font-semibold">{quantity.toFixed(2)}</td>
-                              <td className="p-4 text-center text-[#8eba1e] font-semibold">{price.toLocaleString()} тг</td>
-                              <td className="p-4 text-center text-[#8eba1e] font-bold">{totalPrice.toLocaleString()} тг</td>
+                              <td className="p-4 text-right text-[#8eba1e] font-semibold">{price.toLocaleString()} тг</td>
+                              <td className="p-4 text-right text-[#8eba1e] font-bold">{totalPrice.toLocaleString()} тг</td>
                             </tr>
                           );
                         })}
@@ -299,7 +325,7 @@ export default function BmzConfigPage() {
                           <td colSpan={4} className="text-right pr-2 p-4 text-lg">
                             ВСЕГО:
                           </td>
-                          <td className="text-right pl-2 p-4 text-lg text-[#8eba1e]">{totalPrice.toLocaleString()} тг</td>
+                          <td className="text-right pl-2 p-4 text-lg text-[#8eba1e]">{displayedBmzTotal.toLocaleString()} тг</td>
                         </tr>
                       </tbody>
                     </table>

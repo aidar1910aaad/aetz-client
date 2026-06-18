@@ -1,7 +1,20 @@
 import { useState, useEffect } from 'react';
 import { RunnCell } from '@/store/useRunnStore';
-import { getCalculationsByGroup } from '@/api/calculations';
-import { extractCurrentFromBreakerName } from '@/utils/panelNameUtils';
+import { loadRunnPanelCalculations } from '@/domain/runn/calculationLoader';
+import {
+  findBaseOutgoingCalculation,
+  findInputCalculation,
+  findOutgoingCalculationByCaseAndMaterial,
+  findOutgoingMeterCalculation,
+  findSectionSwitchCalculation,
+  findTorcevaiaCalculation,
+} from '@/domain/runn/calculationMatcher';
+import {
+  isInputPurpose,
+  isOutgoingPurpose,
+  isTorcevaiaPurpose,
+  RUNN_CELL_PURPOSE,
+} from '@/domain/runn/runnConstants';
 
 type MaterialType = 'withdrawable_breaker' | 'counter';
 
@@ -12,7 +25,7 @@ export function useRunnCalculation(cell: RunnCell | null, materialType: Material
 
   useEffect(() => {
     const fetchCalculation = async () => {
-      if (!cell || cell.purpose !== 'Ввод') {
+      if (!cell || !isInputPurpose(cell.purpose)) {
         setCalculation(null);
         return;
       }
@@ -22,78 +35,15 @@ export function useRunnCalculation(cell: RunnCell | null, materialType: Material
 
       try {
         const token = localStorage.getItem('token') || '';
-        const calculations = await getCalculationsByGroup('panel-sho-70', token);
+        const calculations = await loadRunnPanelCalculations(token);
         
-        // Фильтруем калькуляции с типом 'input'
-        const inputCalculations = calculations.filter((calc: any) => calc.data?.cellConfig?.type === 'input');
-        
-        // Ищем калькуляцию по типу материала
-        const foundCalculation = calculations.find((calc: any) => {
-          if (calc.data?.cellConfig?.type !== 'input') return false;
-          
-          const materials = calc.data?.cellConfig?.materials?.[materialType];
-          if (!materials?.length) return false;
-          
-          const cellValue = materialType === 'withdrawable_breaker' ? cell.breaker : cell.meterType;
-          
-          // Проверяем, что cellValue не пустой
-          if (!cellValue || cellValue.trim() === '') {
-            return false;
-          }
-          
-          // Проверяем, есть ли выбранный материал в массиве материалов калькуляции
-          // Используем более гибкое сравнение для автоматов CHINT
-          const foundMaterial = materials.find((material: any) => {
-            if (material.name === cellValue) {
-              return true;
-            }
-            
-            // Для автоматов CHINT делаем более гибкое сравнение
-            if (materialType === 'withdrawable_breaker' && 
-                cellValue.includes('CHINT') && 
-                material.name.includes('CHINT')) {
-              
-              // Извлекаем токи из обеих строк
-              const cellCurrentMatch = cellValue.match(/(\d+)\s*A/i);
-              const materialCurrentMatch = material.name.match(/(\d+)\s*A/i);
-              
-              if (cellCurrentMatch && materialCurrentMatch) {
-                const cellCurrent = parseInt(cellCurrentMatch[1]);
-                const materialCurrent = parseInt(materialCurrentMatch[1]);
-                const isMatch = cellCurrent === materialCurrent;
-                
-                if (isMatch) {
-                  // Найдено совпадение по току
-                }
-                
-                return isMatch;
-              }
-            }
-            
-            return false;
-          });
-          
-          if (foundMaterial) {
-            return true;
-          }
-          
-          return false;
-        });
-
+        const cellValue = materialType === 'withdrawable_breaker' ? cell.breaker : cell.meterType;
+        const foundCalculation = cellValue?.trim()
+          ? findInputCalculation(calculations, materialType, cellValue)
+          : undefined;
 
         if (foundCalculation) {
           setCalculation(foundCalculation);
-        } else if (inputCalculations.length > 0) {
-          const fallbackCalculation = inputCalculations.find((calc: any) => {
-            const materials = calc.data?.cellConfig?.materials?.[materialType];
-            return materials?.length > 0;
-          });
-          
-          if (fallbackCalculation) {
-            setCalculation(fallbackCalculation);
-          } else {
-            setError(`Калькуляция для ${materialType === 'withdrawable_breaker' ? 'автомата выкатного' : 'ПУ'} не найдена`);
-          }
         } else {
           setError(`Калькуляция для ${materialType === 'withdrawable_breaker' ? 'автомата выкатного' : 'ПУ'} не найдена`);
         }
@@ -128,7 +78,7 @@ export function useRunnSectionSwitchCalculation(
 
   useEffect(() => {
     const fetchCalculation = async () => {
-      if (!sectionSwitchCell || sectionSwitchCell.purpose !== 'Секционный выключатель' || !inputCell) {
+      if (!sectionSwitchCell || sectionSwitchCell.purpose !== RUNN_CELL_PURPOSE.SECTION_SWITCH || !inputCell) {
         setCalculation(null);
         return;
       }
@@ -138,49 +88,11 @@ export function useRunnSectionSwitchCalculation(
 
       try {
         const token = localStorage.getItem('token') || '';
-        const calculations = await getCalculationsByGroup('panel-sho-70', token);
-        
-
-        // Ищем калькуляцию типа "section_switch" с учетом выбранного автомата
-        const foundCalculation = calculations.find((calc: any) => {
-          // Проверяем тип ячейки
-          if (calc.data?.cellConfig?.type !== 'section_switch') return false;
-          
-          // Проверяем, есть ли материалы в калькуляции
-          const hasMaterials = calc.data?.cellConfig?.materials && 
-            Object.keys(calc.data.cellConfig.materials).length > 0;
-          
-          if (!hasMaterials) return false;
-          
-          // Если есть выбранный автомат, ищем калькуляцию с подходящим материалом
-          if (sectionSwitchCell.breaker) {
-            const materials = calc.data?.cellConfig?.materials?.molded_case_breaker;
-            if (materials && materials.length > 0) {
-              // Сначала ищем точное совпадение по названию
-              let foundMaterial = materials.find((material: any) => 
-                material.name === sectionSwitchCell.breaker
-              );
-              
-              // Если не найден по точному названию, ищем по току
-              if (!foundMaterial) {
-                const cellCurrent = extractCurrentFromBreakerName(sectionSwitchCell.breaker);
-                if (cellCurrent) {
-                  foundMaterial = materials.find((material: any) => {
-                    const materialCurrent = extractCurrentFromBreakerName(material.name);
-                    return materialCurrent === cellCurrent;
-                  });
-                }
-              }
-              
-              // Если найден подходящий материал, используем эту калькуляцию
-              if (foundMaterial) {
-                return true;
-              }
-            }
-          }
-          
-          return true;
-        });
+        const calculations = await loadRunnPanelCalculations(token);
+        const foundCalculation = findSectionSwitchCalculation(
+          calculations,
+          sectionSwitchCell.breaker
+        );
 
         if (foundCalculation) {
           setCalculation(foundCalculation);
@@ -207,48 +119,12 @@ export function useRunnSectionSwitchCalculation(
 
         try {
           const token = localStorage.getItem('token') || '';
-          const calculations = await getCalculationsByGroup('panel-sho-70', token);
+          const calculations = await loadRunnPanelCalculations(token);
           
-          // Ищем калькуляцию типа "section_switch" с учетом выбранного автомата
-          const foundCalculation = calculations.find((calc: any) => {
-            // Проверяем тип ячейки
-            if (calc.data?.cellConfig?.type !== 'section_switch') return false;
-            
-            // Проверяем, есть ли материалы в калькуляции
-            const hasMaterials = calc.data?.cellConfig?.materials && 
-              Object.keys(calc.data.cellConfig.materials).length > 0;
-            
-            if (!hasMaterials) return false;
-            
-            // Если есть выбранный автомат, ищем калькуляцию с подходящим материалом
-            if (sectionSwitchCell.breaker) {
-              const materials = calc.data?.cellConfig?.materials?.molded_case_breaker;
-              if (materials && materials.length > 0) {
-                // Сначала ищем точное совпадение по названию
-                let foundMaterial = materials.find((material: any) => 
-                  material.name === sectionSwitchCell.breaker
-                );
-                
-                // Если не найден по точному названию, ищем по току
-                if (!foundMaterial) {
-                  const cellCurrent = extractCurrentFromBreakerName(sectionSwitchCell.breaker);
-                  if (cellCurrent) {
-                    foundMaterial = materials.find((material: any) => {
-                      const materialCurrent = extractCurrentFromBreakerName(material.name);
-                      return materialCurrent === cellCurrent;
-                    });
-                  }
-                }
-                
-                // Если найден подходящий материал, используем эту калькуляцию
-                if (foundMaterial) {
-                  return true;
-                }
-              }
-            }
-            
-            return true;
-          });
+          const foundCalculation = findSectionSwitchCalculation(
+            calculations,
+            sectionSwitchCell.breaker
+          );
 
           if (foundCalculation) {
             setCalculation(foundCalculation);
@@ -277,21 +153,14 @@ export function useRunnMeterCalculation(cell: RunnCell | null) {
 
   useEffect(() => {
     const fetchCalculation = async () => {
-      console.log('[useRunnMeterCalculation] Starting fetch for cell:', {
-        cell: cell?.purpose,
-        meterType: cell?.meterType
-      });
-
       // Проверяем, что ячейка является отходящей
-      if (!cell || !cell.purpose.includes('Отходящая')) {
-        console.log('[useRunnMeterCalculation] Cell is not outgoing, skipping');
+      if (!cell || !isOutgoingPurpose(cell.purpose)) {
         setCalculation(null);
         return;
       }
 
       // Если в ячейке нет ПУ, не ищем калькуляцию
       if (!cell.meterType) {
-        console.log('[useRunnMeterCalculation] No meter type selected, skipping');
         setCalculation(null);
         return;
       }
@@ -301,70 +170,16 @@ export function useRunnMeterCalculation(cell: RunnCell | null) {
 
       try {
         const token = localStorage.getItem('token') || '';
-        const calculations = await getCalculationsByGroup('panel-sho-70', token);
-        
-        console.log('[useRunnMeterCalculation] Loaded calculations:', calculations.length);
-        
-        // Ищем калькуляцию типа "outgoing" с ПУ
-        const foundCalculation = calculations.find((calc: any) => {
-          console.log('[useRunnMeterCalculation] Checking calculation:', {
-            name: calc.name,
-            type: calc.data?.cellConfig?.type,
-            hasCounter: !!calc.data?.cellConfig?.materials?.counter,
-            counterLength: calc.data?.cellConfig?.materials?.counter?.length || 0
-          });
+        const calculations = await loadRunnPanelCalculations(token);
 
-          // Проверяем тип ячейки
-          if (calc.data?.cellConfig?.type !== 'outgoing') {
-            return false;
-          }
-          
-          // Проверяем, есть ли counter (ПУ) в материалах
-          const materials = calc.data?.cellConfig?.materials?.counter;
-          
-          if (!materials || !Array.isArray(materials) || materials.length === 0) {
-            return false;
-          }
-          
-          // Проверяем, совпадает ли ПУ в калькуляции с ПУ в ячейке
-          const hasMatchingCounter = materials.some(material => {
-            const matches = material.name === cell.meterType;
-            console.log('[useRunnMeterCalculation] Checking material match:', {
-              materialName: material.name,
-              cellMeterType: cell.meterType,
-              matches
-            });
-            return matches;
-          });
-          
-          // Дополнительно проверяем, что это именно калькуляция ПУ
-          // (возможно, по названию или другим характеристикам)
-          const isMeterCalculation = calc.name?.toLowerCase().includes('пу') || 
-                                   calc.name?.toLowerCase().includes('счетчик') ||
-                                   calc.name?.toLowerCase().includes('meter');
-          
-          console.log('[useRunnMeterCalculation] Calculation check result:', {
-            hasMatchingCounter,
-            isMeterCalculation,
-            finalMatch: hasMatchingCounter && isMeterCalculation
-          });
-          
-          if (hasMatchingCounter && isMeterCalculation) {
-            return true;
-          }
-          
-          return false;
-        });
+        const foundCalculation = findOutgoingMeterCalculation(calculations, cell.meterType);
 
         if (foundCalculation) {
-          console.log('[useRunnMeterCalculation] Found calculation:', foundCalculation.name);
           setCalculation(foundCalculation);
         } else {
-          console.log('[useRunnMeterCalculation] No calculation found');
           setError('Калькуляция ПУ для отходящей ячейки не найдена');
         }
       } catch (err) {
-        console.error('[useRunnMeterCalculation] Error:', err);
         setError('Ошибка загрузки калькуляции ПУ');
       } finally {
         setLoading(false);
@@ -385,7 +200,7 @@ export function useRunnTorcevaiaCalculation(cell: RunnCell | null) {
 
   useEffect(() => {
     const fetchCalculation = async () => {
-      if (!cell || cell.purpose !== 'Торцевая панель') {
+      if (!cell || !isTorcevaiaPurpose(cell.purpose)) {
         setCalculation(null);
         setLoading(false);
         setError(null);
@@ -397,12 +212,9 @@ export function useRunnTorcevaiaCalculation(cell: RunnCell | null) {
 
       try {
         const token = localStorage.getItem('token') || '';
-        const calculations = await getCalculationsByGroup('panel-sho-70', token);
+        const calculations = await loadRunnPanelCalculations(token);
         
-        // Ищем калькуляцию с названием "Торцевая панель" или slug "торцевая-панель"
-        const foundCalculation = calculations.find((calc: any) => {
-          return calc.name === 'Торцевая панель' || calc.slug === 'торцевая-панель';
-        });
+        const foundCalculation = findTorcevaiaCalculation(calculations);
 
         if (foundCalculation) {
           setCalculation(foundCalculation);
@@ -433,7 +245,7 @@ export function useRunnOutgoingCalculation(cell: RunnCell | null) {
   useEffect(() => {
     const fetchCalculation = async () => {
       // Проверяем, что ячейка является отходящей
-      if (!cell || !cell.purpose.includes('Отходящая')) {
+      if (!cell || !isOutgoingPurpose(cell.purpose)) {
         setCalculation(null);
         return;
       }
@@ -443,23 +255,9 @@ export function useRunnOutgoingCalculation(cell: RunnCell | null) {
 
       try {
         const token = localStorage.getItem('token') || '';
-        const calculations = await getCalculationsByGroup('panel-sho-70', token);
+        const calculations = await loadRunnPanelCalculations(token);
         
-        // Ищем базовую калькуляцию типа "outgoing" (без ПУ)
-        const foundCalculation = calculations.find((calc: any) => {
-          // Проверяем тип ячейки
-          if (calc.data?.cellConfig?.type !== 'outgoing') {
-            return false;
-          }
-          
-          // Ищем базовую калькуляцию (без counter материалов)
-          const materials = calc.data?.cellConfig?.materials;
-          if (materials?.counter && Array.isArray(materials.counter) && materials.counter.length > 0) {
-            return false; // Пропускаем калькуляции с ПУ
-          }
-          
-          return true;
-        });
+        const foundCalculation = findBaseOutgoingCalculation(calculations);
 
         if (foundCalculation) {
           setCalculation(foundCalculation);
@@ -488,7 +286,7 @@ export function useRunnMoldedCaseCalculation(cell: RunnCell | null, inputCell?: 
   useEffect(() => {
     const fetchCalculation = async () => {
       // Проверяем, что ячейка является отходящей с литым корпусом
-      if (!cell || !cell.purpose.includes('Отходящая')) {
+      if (!cell || !isOutgoingPurpose(cell.purpose)) {
         setCalculation(null);
         return;
       }
@@ -526,43 +324,15 @@ export function useRunnMoldedCaseCalculation(cell: RunnCell | null, inputCell?: 
         }
 
         const token = localStorage.getItem('token') || '';
-        const calculations = await getCalculationsByGroup('panel-sho-70', token);
+        const calculations = await loadRunnPanelCalculations(token);
         
-        // Ищем калькуляцию типа "outgoing" с molded_case_breaker и соответствующей глубиной
-        const foundCalculation = calculations.find((calc: any) => {
-          // Проверяем тип ячейки
-          if (calc.data?.cellConfig?.type !== 'outgoing') return false;
-          
-          // Проверяем, содержит ли название калькуляции глубину корпуса
-          const caseSize = caseInfo.caseSize;
-          const hasCaseSize = calc.name.includes(caseSize);
-          
-          if (!hasCaseSize) {
-            return false;
-          }
-          
-          // Проверяем, есть ли molded_case_breaker в материалах
-          const materials = calc.data?.cellConfig?.materials?.molded_case_breaker;
-          
-          if (!materials || !Array.isArray(materials) || materials.length === 0) {
-            return false;
-          }
-          
-          // Проверяем, есть ли хотя бы один выбранный автомат в материалах калькуляции
-          const selectedAutomatons = cell.rubilniki.filter(r => r && r.trim() !== '');
-          const hasMatchingAutomaton = selectedAutomatons.some(automatonName => {
-            const found = materials.some(material => {
-              return material.name === automatonName;
-            });
-            return found;
-          });
-          
-          if (hasMatchingAutomaton) {
-            return true;
-          }
-          
-          return false;
-        });
+        const selectedAutomatons = cell.rubilniki.filter(r => r && r.trim() !== '');
+        const foundCalculation = findOutgoingCalculationByCaseAndMaterial(
+          calculations,
+          caseInfo.caseSize,
+          'molded_case_breaker',
+          selectedAutomatons
+        );
 
         if (foundCalculation) {
           setCalculation(foundCalculation);
@@ -592,7 +362,7 @@ export function useRunnAirCalculation(cell: RunnCell | null, inputCell?: RunnCel
   useEffect(() => {
     const fetchCalculation = async () => {
       // Проверяем, что ячейка является отходящей с воздушным выключателем
-      if (!cell || !cell.purpose.includes('Отходящая')) {
+      if (!cell || !isOutgoingPurpose(cell.purpose)) {
         setCalculation(null);
         return;
       }
@@ -630,39 +400,14 @@ export function useRunnAirCalculation(cell: RunnCell | null, inputCell?: RunnCel
         }
 
         const token = localStorage.getItem('token') || '';
-        const calculations = await getCalculationsByGroup('panel-sho-70', token);
+        const calculations = await loadRunnPanelCalculations(token);
         
-        // Ищем калькуляцию типа "outgoing" с withdrawable_breaker и соответствующей глубиной
-        const foundCalculation = calculations.find((calc: any) => {
-          // Проверяем тип ячейки
-          if (calc.data?.cellConfig?.type !== 'outgoing') return false;
-          
-          // Проверяем, содержит ли название калькуляции глубину корпуса
-          const caseSize = caseInfo.caseSize;
-          const hasCaseSize = calc.name.includes(caseSize);
-          
-          if (!hasCaseSize) {
-            return false;
-          }
-          
-          // Проверяем, есть ли withdrawable_breaker в материалах
-          const materials = calc.data?.cellConfig?.materials?.withdrawable_breaker;
-          
-          if (!materials || !Array.isArray(materials) || materials.length === 0) {
-            return false;
-          }
-          
-          // Проверяем, есть ли выбранный автомат в материалах калькуляции
-          const hasMatchingBreaker = materials.some(material => {
-            return material.name === cell.breaker;
-          });
-          
-          if (hasMatchingBreaker) {
-            return true;
-          }
-          
-          return false;
-        });
+        const foundCalculation = findOutgoingCalculationByCaseAndMaterial(
+          calculations,
+          caseInfo.caseSize,
+          'withdrawable_breaker',
+          [cell.breaker]
+        );
 
         if (foundCalculation) {
           setCalculation(foundCalculation);

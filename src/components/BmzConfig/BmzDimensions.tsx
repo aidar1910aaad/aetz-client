@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Ruler } from 'lucide-react';
+import { Select } from '@/components/ui/select';
 
 interface BmzDimensionsProps {
   width: number;
@@ -110,7 +111,7 @@ const BmzDimensions = ({
         {buildingType !== 'tp' && (
           <div className="space-y-2">
             <label className={labelClasses}>Высота (мм)</label>
-            <select
+            <Select
               value={height}
               onChange={(e) => onHeightChange(Number(e.target.value))}
               disabled={isDisabled}
@@ -120,7 +121,7 @@ const BmzDimensions = ({
               <option value={2700}>2700</option>
               <option value={3000}>3000</option>
               <option value={3150}>3150</option>
-            </select>
+            </Select>
             <div className="flex flex-wrap gap-2 mt-2">
               {[2700, 3000, 3150].map((size) => (
                 <button
@@ -144,7 +145,7 @@ const BmzDimensions = ({
         {buildingType === 'bmz' && (
           <div className="space-y-2">
             <label className={labelClasses}>Толщина стен (мм)</label>
-            <select
+            <Select
               value={thickness}
               onChange={(e) => onThicknessChange(Number(e.target.value))}
               disabled={isDisabled}
@@ -154,7 +155,7 @@ const BmzDimensions = ({
               <option value={50}>50</option>
               <option value={80}>80</option>
               <option value={100}>100</option>
-            </select>
+            </Select>
             <div className="flex flex-wrap gap-2 mt-2">
               {[50, 80, 100].map((size) => (
                 <button

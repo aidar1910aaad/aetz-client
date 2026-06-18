@@ -5,6 +5,7 @@ import { switchgearApi, Switchgear } from '@/api/switchgear';
 import { useRusnCalculation } from '@/hooks/useRusnCalculation';
 import { calculateCost } from '@/utils/calculationUtils';
 import { useMaterialPrices } from '@/hooks/useMaterialPrices';
+import { applyApiCalculationRates } from '@/utils/calculationSettings';
 
 export const useBusbarCalculation = () => {
   const rusn = useRusnStore();
@@ -21,7 +22,8 @@ export const useBusbarCalculation = () => {
   });
 
   // Получаем все калькуляции по выбранной группе
-  const { calculations, loading: calculationsLoading } = useRusnCalculation(selectedGroupSlug);
+  const { calculations, loading: calculationsLoading, settingsRates } =
+    useRusnCalculation(selectedGroupSlug);
 
   // Находим калькуляцию с типом "busbar"
   const busbarCalculation = calculations.cell.find(
@@ -148,15 +150,12 @@ export const useBusbarCalculation = () => {
             sum + category.items.reduce((itemSum, item) => itemSum + item.price * item.quantity, 0),
           0
         ) + totalPrice,
-        {
-          hourlyRate: busbarCalculation.data.calculation?.hourlyRate || 2000,
-          manufacturingHours: busbarCalculation.data.calculation?.manufacturingHours || 1,
-          overheadPercentage: busbarCalculation.data.calculation?.overheadPercentage || 10,
-          adminPercentage: busbarCalculation.data.calculation?.adminPercentage || 15,
-          plannedProfitPercentage:
-            busbarCalculation.data.calculation?.plannedProfitPercentage || 10,
-          ndsPercentage: busbarCalculation.data.calculation?.ndsPercentage || 12,
-        }
+        applyApiCalculationRates(
+          {
+            manufacturingHours: busbarCalculation.data.calculation?.manufacturingHours || 1,
+          },
+          settingsRates
+        )
       )
     : null;
 

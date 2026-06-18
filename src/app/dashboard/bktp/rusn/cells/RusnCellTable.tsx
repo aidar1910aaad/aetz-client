@@ -2,63 +2,22 @@
 
 import React, { useState, useEffect } from 'react';
 import { useCellManager } from '@/hooks/useCellManager';
-import { useMaterialUpdater } from '@/hooks/useMaterialUpdater';
+import { useMaterialUpdaterWithManager } from '@/hooks/useMaterialUpdater';
 import { getCellTypesForGroup } from '@/config/cellTypeConfigs';
 import { useRusnCalculation } from '@/hooks/useRusnCalculation';
 import RusnCell from './RusnCell';
 import { useRusnStore } from '@/store/useRusnStore';
 import RusnMaterialsSummary from '@/components/bktp/rusn/RusnMaterialsSummary';
+import CellSectionToggler from '@/components/bktp/shared/CellSectionToggler';
+import { createCellByConfig } from '@/utils/autoCellUtils';
+import { autoCellConfigs } from '@/config/autoCellConfigs';
 
-function TogglerWithInput({
-  label,
-  children,
-  defaultEnabled = false,
-  toggled,
-  onToggle,
-}: {
-  label: string;
-  children: React.ReactNode;
-  defaultEnabled?: boolean;
-  toggled?: boolean;
-  onToggle?: () => void;
-}) {
-  const [internalEnabled, setInternalEnabled] = useState(defaultEnabled);
-  const isControlled = toggled !== undefined;
-  const isEnabled = isControlled ? toggled : internalEnabled;
-
-  const handleClick = () => {
-    if (isControlled && onToggle) {
-      onToggle();
-    } else {
-      setInternalEnabled((prev) => !prev);
-    }
-  };
-
-  return (
-    <div className="mb-3 rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 bg-gray-50">
-        <h4 className="text-sm font-medium text-gray-800 truncate" title={label}>
-          {label}
-        </h4>
-        <button
-          onClick={handleClick}
-          className={`text-xs font-medium px-2.5 py-1 rounded transition duration-150 ml-2 ${
-            isEnabled
-              ? 'bg-red-100 text-red-700 hover:bg-red-200'
-              : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-          }`}
-        >
-          {isEnabled ? 'Нет' : 'Добавить'}
-        </button>
-      </div>
-      {isEnabled && <div className="px-4 py-3 space-y-2">{children}</div>}
-    </div>
-  );
-}
+const OUTGOING_CELL_PURPOSE = 'Отходящая';
 
 export default function RusnCellTable() {
-  const { cellConfigs, addCell, updateCell, materials, global } = useCellManager();
-  useMaterialUpdater(); // Автоматически обновляет материалы
+  const cellManager = useCellManager();
+  const { cellConfigs, addCell, updateCell, materials, global } = cellManager;
+  useMaterialUpdaterWithManager(cellManager); // Автоматически обновляет материалы
   
   const [openCellMap, setOpenCellMap] = useState<Record<string, string>>(() => {
     if (typeof window !== 'undefined') {
@@ -148,10 +107,14 @@ export default function RusnCellTable() {
             cell.purpose === 'Секционный разьединитель' ||
             cell.purpose === 'Ввод' || 
             cell.purpose === 'Трансформаторная' ||
-            cell.purpose === 'Отходящая' ||
+            cell.purpose === OUTGOING_CELL_PURPOSE ||
             cell.purpose === 'Трансформатор напряжения' ||
             cell.purpose === 'Трансформатор собственных нужд') {
-          newOpenCellMap[cell.purpose] = cell.id;
+          if (cell.purpose === OUTGOING_CELL_PURPOSE) {
+            newOpenCellMap[OUTGOING_CELL_PURPOSE] = 'open';
+          } else {
+            newOpenCellMap[cell.purpose] = cell.id;
+          }
         }
       });
       
@@ -219,6 +182,14 @@ export default function RusnCellTable() {
         // Проверяем, что ячейки все еще существуют
         const validOpenCells: Record<string, string> = {};
         Object.entries(parsedOpenCells).forEach(([cellType, cellId]) => {
+          if (cellType === OUTGOING_CELL_PURPOSE) {
+            const hasOutgoing = cellConfigs.some((cell) => cell.purpose === OUTGOING_CELL_PURPOSE);
+            if (hasOutgoing) {
+              validOpenCells[cellType] = 'open';
+            }
+            return;
+          }
+
           const cellExists = cellConfigs.some(cell => cell.id === cellId && cell.purpose === cellType);
           if (cellExists && typeof cellId === 'string') {
             validOpenCells[cellType] = cellId;
@@ -233,8 +204,66 @@ export default function RusnCellTable() {
 
   // Получаем типы ячеек для выбранной группы
   const cellTypes = getCellTypesForGroup(global.bodyType || 'Камера КСО А12-10');
+  const staticCellTypes = cellTypes.filter((type) => type !== OUTGOING_CELL_PURPOSE);
+  const outgoingCells = cellConfigs.filter((cell) => cell.purpose === OUTGOING_CELL_PURPOSE);
+
+  const createOutgoingCell = () => {
+    const config = autoCellConfigs[OUTGOING_CELL_PURPOSE];
+    const count = outgoingCells.length === 0 ? config?.count ?? 2 : 1;
+
+    if (config) {
+      createCellByConfig(
+        OUTGOING_CELL_PURPOSE,
+        { ...config, count },
+        materials,
+        global,
+        addCell
+      );
+      return;
+    }
+
+    addCell({
+      purpose: OUTGOING_CELL_PURPOSE,
+      cellType: global.bodyType || '',
+      count,
+      totalPrice: 0,
+    });
+  };
+
+  const openOutgoingSection = () => {
+    setOpenCellMap((prev) => ({ ...prev, [OUTGOING_CELL_PURPOSE]: 'open' }));
+    setDeletedCells((prev) => {
+      const next = new Set(prev);
+      next.delete(OUTGOING_CELL_PURPOSE);
+      return next;
+    });
+  };
 
   const handleToggle = (type: string) => {
+    if (type === OUTGOING_CELL_PURPOSE) {
+      const isOpen = !!openCellMap[OUTGOING_CELL_PURPOSE];
+
+      if (isOpen) {
+        outgoingCells.forEach((cell) => {
+          removeCellSummary(cell.id);
+          removeCell(cell.id);
+        });
+        setOpenCellMap((prev) => {
+          const newMap = { ...prev };
+          delete newMap[OUTGOING_CELL_PURPOSE];
+          return newMap;
+        });
+        setDeletedCells((prev) => new Set([...prev, OUTGOING_CELL_PURPOSE]));
+        return;
+      }
+
+      if (outgoingCells.length === 0) {
+        createOutgoingCell();
+      }
+      openOutgoingSection();
+      return;
+    }
+
     const isOpen = !!openCellMap[type];
     const existingCell = cellConfigs.find(cell => cell.purpose === type);
     
@@ -290,21 +319,30 @@ export default function RusnCellTable() {
   };
 
   const handleAddOutgoing = () => {
-    const outgoingCell = {
-      purpose: 'Отходящая',
-      cellType: global.bodyType || '',
-      count: 2,
-      totalPrice: 0,
-    };
-    addCell(outgoingCell);
+    createOutgoingCell();
+    openOutgoingSection();
   };
 
-
   const handleRemove = (cellId: string) => {
+    const removedCell = cellConfigs.find((cell) => cell.id === cellId);
     removeCellSummary(cellId);
     removeCell(cellId);
-    // Удаляем из openCellMap
-    const cellType = cellConfigs.find(cell => cell.id === cellId)?.purpose;
+
+    if (removedCell?.purpose === OUTGOING_CELL_PURPOSE) {
+      const remainingOutgoing = cellConfigs.filter(
+        (cell) => cell.purpose === OUTGOING_CELL_PURPOSE && cell.id !== cellId
+      );
+      if (remainingOutgoing.length === 0) {
+        setOpenCellMap((prev) => {
+          const newMap = { ...prev };
+          delete newMap[OUTGOING_CELL_PURPOSE];
+          return newMap;
+        });
+      }
+      return;
+    }
+
+    const cellType = removedCell?.purpose;
     if (cellType) {
       setOpenCellMap(prev => {
         const newMap = { ...prev };
@@ -333,7 +371,7 @@ export default function RusnCellTable() {
         </div>
       </div>
 
-      {cellTypes.map((cellType) => {
+      {staticCellTypes.map((cellType) => {
         const existingCell = cellConfigs.find(cell => cell.purpose === cellType);
         const isOpen = !!openCellMap[cellType];
         const isDeleted = deletedCells.has(cellType);
@@ -349,7 +387,7 @@ export default function RusnCellTable() {
         }
 
         return (
-          <TogglerWithInput
+          <CellSectionToggler
             key={cellType}
             label={`Ячейка: ${cellType}`}
             toggled={isOpen && !isDeleted}
@@ -367,22 +405,54 @@ export default function RusnCellTable() {
                 calculations={calculations}
               />
             )}
-          </TogglerWithInput>
+          </CellSectionToggler>
         );
       })}
 
-      {/* Кнопка добавления отходящей ячейки */}
-      <div className="flex justify-center">
-        <button
-          onClick={handleAddOutgoing}
-          className="flex items-center gap-2 px-4 py-2 bg-[#8eba1e] text-white rounded-lg hover:bg-[#7aa51a] transition-all duration-200 shadow-sm hover:shadow-md"
+      {cellTypes.includes(OUTGOING_CELL_PURPOSE) && (
+        <CellSectionToggler
+          label={`Ячейка: ${OUTGOING_CELL_PURPOSE}`}
+          toggled={!!openCellMap[OUTGOING_CELL_PURPOSE] && !deletedCells.has(OUTGOING_CELL_PURPOSE)}
+          onToggle={() => handleToggle(OUTGOING_CELL_PURPOSE)}
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-          Добавить отходящую
-        </button>
-      </div>
+          <div className="space-y-4">
+            {outgoingCells.map((cell, index) => (
+              <div key={cell.id} className="space-y-4">
+                {outgoingCells.length > 1 && (
+                  <p className="text-xs font-medium text-gray-500">Отходящая {index + 1}</p>
+                )}
+                <RusnCell
+                  cell={cell}
+                  materials={materials}
+                  onUpdate={updateCell}
+                  onRemove={handleRemove}
+                  groupSlug={selectedGroupSlug}
+                  selectedGroupName={selectedGroupName}
+                  selectedCalculationName={
+                    calculations.cell && calculations.cell.length > 0
+                      ? calculations.cell[0].name
+                      : ''
+                  }
+                  calculations={calculations}
+                />
+              </div>
+            ))}
+
+            {outgoingCells.length > 0 && (
+              <button
+                type="button"
+                onClick={handleAddOutgoing}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-[#8eba1e]/35 bg-[#8eba1e]/5 px-4 py-3 text-sm font-medium text-[#5f7f14] transition-colors hover:border-[#8eba1e] hover:bg-[#8eba1e]/10"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Добавить ещё отходящую
+              </button>
+            )}
+          </div>
+        </CellSectionToggler>
+      )}
 
       {/* Итоговая сводка */}
       <RusnMaterialsSummary title="Сводка по материалам" showClearButton={true} />

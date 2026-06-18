@@ -1,5 +1,6 @@
 import { RunnCell } from '@/store/useRunnStore';
 import { Material } from '@/api/material';
+import { Select } from '@/components/ui/select';
 
 interface SimplifiedRpsSelectorProps {
   cell: RunnCell & { update: (field: keyof RunnCell, val: string | number | string[]) => void; remove: () => void; };
@@ -90,7 +91,7 @@ export default function SimplifiedRpsSelector({ cell, rpsLeftMaterials }: Simpli
             <div key={index} className="flex items-center gap-2">
               <div className="flex flex-col gap-1 flex-1">
                 <span className="text-xs text-gray-500">Рубильник {index + 1}</span>
-                <select
+                <Select
                   value={rubilnik || ''}
                   onChange={(e) => updateRubilnik(index, e.target.value)}
                   className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
@@ -99,7 +100,7 @@ export default function SimplifiedRpsSelector({ cell, rpsLeftMaterials }: Simpli
                   {rpsOptions.map((opt, optIndex) => (
                     <option key={`${opt}-${optIndex}`} value={opt}>{opt}</option>
                   ))}
-                </select>
+                </Select>
               </div>
               <button
                 onClick={() => removeRubilnik(index)}

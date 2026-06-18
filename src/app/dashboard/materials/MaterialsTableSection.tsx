@@ -2,6 +2,7 @@
 
 import { Dispatch, SetStateAction, useState, useRef, useEffect, useMemo } from 'react';
 import { Material } from '@/api/material/index';
+import PageLoader from '@/shared/loader/PageLoader';
 import { Pencil, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, X, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 
@@ -22,9 +23,15 @@ interface Props {
   categories: string[];
   selectedCategory: string;
   setSelectedCategory: Dispatch<SetStateAction<string>>;
+  selectedCurrency: 'ALL' | 'FOREIGN' | 'KZT' | 'USD' | 'RUB' | 'EUR' | 'CNY';
+  setSelectedCurrency: Dispatch<
+    SetStateAction<'ALL' | 'FOREIGN' | 'KZT' | 'USD' | 'RUB' | 'EUR' | 'CNY'>
+  >;
   setEditingMaterial: Dispatch<SetStateAction<Material | null>>;
   handleDelete: (id: number) => void;
+  handleDeleteMany: (ids: number[]) => Promise<boolean>;
   canEdit?: boolean;
+  importBadgeById?: Record<string, 'create' | 'update'>;
 }
 
 export default function MaterialsTableSection({
@@ -44,11 +51,16 @@ export default function MaterialsTableSection({
   categories,
   selectedCategory,
   setSelectedCategory,
+  selectedCurrency,
+  setSelectedCurrency,
   setEditingMaterial,
   handleDelete,
+  handleDeleteMany,
   canEdit = true,
+  importBadgeById = {},
 }: Props) {
-  const totalPages = Math.ceil(total / limit);
+  const isShowAll = limit === 0;
+  const totalPages = isShowAll ? 1 : Math.ceil(total / limit);
   const [inputPage, setInputPage] = useState('');
   const [categorySearch, setCategorySearch] = useState('');
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
@@ -56,13 +68,62 @@ export default function MaterialsTableSection({
   
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
   const sortDropdownRef = useRef<HTMLDivElement>(null);
+  const [currencyDropdownOpen, setCurrencyDropdownOpen] = useState(false);
+  const currencyDropdownRef = useRef<HTMLDivElement>(null);
   
   const [orderDropdownOpen, setOrderDropdownOpen] = useState(false);
   const orderDropdownRef = useRef<HTMLDivElement>(null);
   
   const [limitDropdownOpen, setLimitDropdownOpen] = useState(false);
   const limitDropdownRef = useRef<HTMLDivElement>(null);
-  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const currentPageIds = useMemo(() => materials.map((material) => material.id), [materials]);
+  const allCurrentPageSelected =
+    currentPageIds.length > 0 && currentPageIds.every((id) => selectedIds.has(id));
+  const someCurrentPageSelected =
+    currentPageIds.some((id) => selectedIds.has(id)) && !allCurrentPageSelected;
+
+  const toggleSelectAllCurrentPage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allCurrentPageSelected) {
+        currentPageIds.forEach((id) => next.delete(id));
+      } else {
+        currentPageIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectMaterial = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0 || bulkDeleting) {
+      return;
+    }
+
+    setBulkDeleting(true);
+    try {
+      const deleted = await handleDeleteMany(Array.from(selectedIds));
+      if (deleted) {
+        setSelectedIds(new Set());
+      }
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   // Фильтрация категорий по поисковому запросу
   const filteredCategories = useMemo(() => {
@@ -91,6 +152,12 @@ export default function MaterialsTableSection({
         setSortDropdownOpen(false);
       }
       if (
+        currencyDropdownRef.current &&
+        !currencyDropdownRef.current.contains(event.target as Node)
+      ) {
+        setCurrencyDropdownOpen(false);
+      }
+      if (
         orderDropdownRef.current &&
         !orderDropdownRef.current.contains(event.target as Node)
       ) {
@@ -109,41 +176,7 @@ export default function MaterialsTableSection({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [categoryDropdownOpen, sortDropdownOpen, orderDropdownOpen, limitDropdownOpen]);
-
-  // Обновление позиции overlay при скролле - overlay должен покрывать видимую область
-  useEffect(() => {
-    if (!loading || !tableContainerRef.current) return;
-
-    const container = tableContainerRef.current;
-    const overlay = container.querySelector('.loading-overlay') as HTMLElement;
-    
-    if (!overlay) return;
-
-    const updateOverlayPosition = () => {
-      const rect = container.getBoundingClientRect();
-      // Overlay должен покрывать видимую область контейнера
-      overlay.style.position = 'fixed';
-      overlay.style.top = `${rect.top}px`;
-      overlay.style.left = `${rect.left}px`;
-      overlay.style.width = `${rect.width}px`;
-      overlay.style.height = `${rect.height}px`;
-    };
-
-    updateOverlayPosition();
-    const handleScroll = () => updateOverlayPosition();
-    const handleResize = () => updateOverlayPosition();
-
-    container.addEventListener('scroll', handleScroll, true);
-    window.addEventListener('scroll', handleScroll, true);
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      container.removeEventListener('scroll', handleScroll, true);
-      window.removeEventListener('scroll', handleScroll, true);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [loading]);
+  }, [categoryDropdownOpen, sortDropdownOpen, currencyDropdownOpen, orderDropdownOpen, limitDropdownOpen]);
 
   // Вычисляем диапазон страниц для отображения
   const getPageNumbers = () => {
@@ -195,11 +228,38 @@ export default function MaterialsTableSection({
     }
   };
 
-  const startItem = (page - 1) * limit + 1;
-  const endItem = Math.min(page * limit, total);
+  const startItem = isShowAll ? (total > 0 ? 1 : 0) : (page - 1) * limit + 1;
+  const endItem = isShowAll ? total : Math.min(page * limit, total);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
+      {canEdit && selectedIds.size > 0 && (
+        <div className="flex-shrink-0 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50/70 px-4 py-3">
+          <p className="text-sm text-gray-700">
+            Выбрано: <span className="font-semibold text-gray-900">{selectedIds.size}</span>
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              disabled={bulkDeleting}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Снять выделение
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Trash2 size={16} />
+              {bulkDeleting ? 'Удаление...' : `Удалить выбранные (${selectedIds.size})`}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Фильтры */}
       <div className="flex-shrink-0 flex flex-wrap gap-4 mb-6 items-center w-full">
         <input
@@ -209,6 +269,63 @@ export default function MaterialsTableSection({
           onChange={(e) => setSearch(e.target.value)}
           className="border border-gray-300 focus:border-[#8eba1e] focus:ring-2 focus:ring-[#8eba1e]/20 px-4 py-2 rounded-lg text-sm w-[200px] transition-all duration-200"
         />
+
+        <div className="relative" ref={currencyDropdownRef} style={{ width: '220px', minWidth: '220px' }}>
+          <button
+            type="button"
+            onClick={() => setCurrencyDropdownOpen(!currencyDropdownOpen)}
+            className="w-full border border-gray-300 focus:border-[#8eba1e] focus:ring-2 focus:ring-[#8eba1e]/20 px-4 py-2 pr-8 rounded-lg text-sm transition-all duration-200 text-left bg-white hover:bg-gray-50 relative"
+          >
+            <span className="truncate pr-6 block">
+              {selectedCurrency === 'ALL' && 'Все валюты'}
+              {selectedCurrency === 'FOREIGN' && 'Только иностранная'}
+              {selectedCurrency === 'USD' && 'Только USD'}
+              {selectedCurrency === 'RUB' && 'Только RUB'}
+              {selectedCurrency === 'EUR' && 'Только EUR'}
+              {selectedCurrency === 'CNY' && 'Только CNY'}
+              {selectedCurrency === 'KZT' && 'Только KZT'}
+            </span>
+            <ChevronDown
+              size={16}
+              className={`absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-transform pointer-events-none ${
+                currencyDropdownOpen ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
+          {currencyDropdownOpen && (
+            <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg">
+              {(
+                [
+                  ['ALL', 'Все валюты'],
+                  ['FOREIGN', 'Только иностранная'],
+                  ['USD', 'Только USD'],
+                  ['RUB', 'Только RUB'],
+                  ['EUR', 'Только EUR'],
+                  ['CNY', 'Только CNY'],
+                  ['KZT', 'Только KZT'],
+                ] as const
+              ).map(([value, label]) => {
+                const isSelected = selectedCurrency === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      setSelectedCurrency(value);
+                      setCurrencyDropdownOpen(false);
+                    }}
+                    onMouseDown={(e) => e.preventDefault()}
+                    className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 transition-colors ${
+                      isSelected ? 'bg-[#8eba1e]/10 text-[#8eba1e] font-medium' : 'text-gray-700'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         <div className="relative" ref={categoryDropdownRef} style={{ width: '400px', minWidth: '400px' }}>
           <div className="relative w-full">
@@ -422,25 +539,32 @@ export default function MaterialsTableSection({
         </div>
 
         {/* Количество на странице */}
-        <div className="relative" ref={limitDropdownRef} style={{ width: '170px', minWidth: '170px' }}>
+        <div className="relative" ref={limitDropdownRef} style={{ width: '190px', minWidth: '190px' }}>
           <button
             type="button"
             onClick={() => setLimitDropdownOpen(!limitDropdownOpen)}
             className="w-full border border-gray-300 focus:border-[#8eba1e] focus:ring-2 focus:ring-[#8eba1e]/20 px-4 py-2 pr-8 rounded-lg text-sm transition-all duration-200 text-left bg-white hover:bg-gray-50 relative"
           >
-            <span className="truncate pr-6 block">{limit} на страницу</span>
+            <span className="truncate pr-6 block">
+              {isShowAll ? 'Все' : `${limit} на страницу`}
+            </span>
             <ChevronDown size={16} className={`absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-transform pointer-events-none ${limitDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           {limitDropdownOpen && (
             <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg">
-              {[20, 50, 100, 200].map((limitOption) => {
-                const isSelected = limit === limitOption;
+              {[
+                { value: 200, label: '200 на страницу' },
+                { value: 500, label: '500 на страницу' },
+                { value: 1000, label: '1000 на страницу' },
+                { value: 0, label: 'Все' },
+              ].map((limitOption) => {
+                const isSelected = limit === limitOption.value;
                 return (
                   <button
-                    key={limitOption}
+                    key={limitOption.value}
                     type="button"
                     onClick={() => {
-                      setLimit(limitOption);
+                      setLimit(limitOption.value);
                       setLimitDropdownOpen(false);
                     }}
                     onMouseDown={(e) => e.preventDefault()}
@@ -448,7 +572,7 @@ export default function MaterialsTableSection({
                       isSelected ? 'bg-[#8eba1e]/10 text-[#8eba1e] font-medium' : 'text-gray-700'
                     }`}
                   >
-                    {limitOption} на страницу
+                    {limitOption.label}
                   </button>
                 );
               })}
@@ -458,68 +582,104 @@ export default function MaterialsTableSection({
       </div>
 
       {/* Таблица */}
-      <div 
-        ref={tableContainerRef}
-        className="flex-1 overflow-y-auto border border-gray-200 rounded-lg shadow-sm min-h-0 relative"
-      >
+      <div className="flex-1 overflow-y-auto border border-gray-200 rounded-lg shadow-sm min-h-0 relative">
         {loading && (
-          <div 
-            className="loading-overlay fixed flex items-center justify-center z-30 pointer-events-none rounded-lg"
+          <div
+            className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none rounded-lg overflow-hidden"
             style={{
               backdropFilter: 'blur(8px)',
               WebkitBackdropFilter: 'blur(8px)',
               backgroundColor: 'rgba(255, 255, 255, 0.8)',
             }}
           >
-            <div className="animate-spin h-10 w-10 rounded-full border-4 border-[#8eba1e] border-t-transparent pointer-events-auto" />
+            <PageLoader size="compact" className="pointer-events-auto" message="Обновление..." />
           </div>
         )}
         <div className="relative">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-gray-600 border-b border-gray-200 sticky top-0 z-10">
               <tr>
+                {canEdit && (
+                  <th className="w-12 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={allCurrentPageSelected}
+                      ref={(input) => {
+                        if (input) {
+                          input.indeterminate = someCurrentPageSelected;
+                        }
+                      }}
+                      onChange={toggleSelectAllCurrentPage}
+                      className="h-4 w-4 rounded border-gray-300 text-[#8eba1e] focus:ring-[#8eba1e]"
+                      aria-label="Выбрать все на странице"
+                    />
+                  </th>
+                )}
                 <th className="text-left px-6 py-3">Название</th>
                 <th className="text-left px-6 py-3">Категория</th>
                 <th className="text-left px-6 py-3">Код</th>
                 <th className="text-left px-6 py-3">Ед. изм.</th>
-                <th className="text-left px-6 py-3">Цена</th>
+                <th className="text-left px-6 py-3">Исходная цена</th>
+                <th className="text-left px-6 py-3">Текущая цена (₸)</th>
                 {canEdit && (
                   <th className="text-left px-6 py-3">Изменить / Удалить</th>
                 )}
               </tr>
             </thead>
             <tbody>
-              {loading && materials.length === 0 ? (
+              {!loading && materials.length === 0 ? (
                 <tr>
-                  <td colSpan={canEdit ? 6 : 5} className="px-6 py-10 text-center text-gray-500">
-                    Загрузка...
-                  </td>
-                </tr>
-              ) : !loading && materials.length === 0 ? (
-                <tr>
-                  <td colSpan={canEdit ? 6 : 5} className="px-6 py-10 text-center text-gray-500">
+                  <td colSpan={canEdit ? 8 : 6} className="px-6 py-10 text-center text-gray-500">
                     Нет данных
                   </td>
                 </tr>
               ) : (
                 materials.map((m) => (
-                  <tr key={m.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+                  <tr
+                    key={m.id}
+                    className={`border-b border-gray-200 transition-colors hover:bg-gray-50 ${
+                      selectedIds.has(m.id) ? 'bg-[#8eba1e]/5' : ''
+                    }`}
+                  >
+                    {canEdit && (
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(m.id)}
+                          onChange={() => toggleSelectMaterial(m.id)}
+                          className="h-4 w-4 rounded border-gray-300 text-[#8eba1e] focus:ring-[#8eba1e]"
+                          aria-label={`Выбрать ${m.name}`}
+                        />
+                      </td>
+                    )}
                     <td className="px-6 py-3">
-                      <Link
-                        href={`/dashboard/materials/${m.id}/history`}
-                        className="text-gray-900 font-medium hover:text-[#8eba1e] hover:underline transition-colors duration-200"
-                      >
-                        {m.name}
-                      </Link>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Link
+                          href={`/dashboard/materials/${m.id}/history`}
+                          className="text-gray-900 font-medium hover:text-[#8eba1e] hover:underline transition-colors duration-200"
+                        >
+                          {m.name}
+                        </Link>
+                        {importBadgeById[String(m.id)] === 'update' && (
+                          <span className="inline-flex rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-amber-200">
+                            Обновлён
+                          </span>
+                        )}
+                        {importBadgeById[String(m.id)] === 'create' && (
+                          <span className="inline-flex rounded-full bg-green-100 text-green-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-green-200">
+                            Новый
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-3">{m.category?.name || '—'}</td>
                     <td className="px-6 py-3">{m.code || '—'}</td>
                     <td className="px-6 py-3">{m.unit}</td>
                     <td className="px-6 py-3">
-                      {typeof m.price === 'string'
-                        ? parseFloat(m.price).toLocaleString()
-                        : m.price.toLocaleString()}{' '}
-                      ₸
+                      {Number(m.priceInCurrency ?? 0).toLocaleString('ru-RU')} {m.currency || 'KZT'}
+                    </td>
+                    <td className="px-6 py-3">
+                      {Number(m.currentPriceKzt ?? m.price ?? 0).toLocaleString('ru-RU')} ₸
                     </td>
                     {canEdit && (
                       <td className="px-6 py-3">
@@ -555,6 +715,8 @@ export default function MaterialsTableSection({
         </div>
 
         {/* Навигация по страницам */}
+        {!isShowAll && (
+        <>
         <div className="flex items-center gap-2">
           {/* Кнопка "Первая страница" */}
           <button
@@ -642,6 +804,8 @@ export default function MaterialsTableSection({
           />
           <span className="text-sm text-gray-500">из {totalPages}</span>
         </div>
+        </>
+        )}
       </div>
     </div>
   );

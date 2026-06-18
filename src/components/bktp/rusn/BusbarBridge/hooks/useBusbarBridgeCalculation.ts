@@ -5,6 +5,7 @@ import { switchgearApi, Switchgear } from '@/api/switchgear';
 import { useRusnCalculation } from '@/hooks/useRusnCalculation';
 import { calculateCost } from '@/utils/calculationUtils';
 import { useMaterialPrices } from '@/hooks/useMaterialPrices';
+import { applyApiCalculationRates } from '@/utils/calculationSettings';
 
 export const useBusbarBridgeCalculation = () => {
   const rusn = useRusnStore();
@@ -23,7 +24,8 @@ export const useBusbarBridgeCalculation = () => {
   });
 
   // Получаем все калькуляции по выбранной группе
-  const { calculations, loading: calculationsLoading } = useRusnCalculation(selectedGroupSlug);
+  const { calculations, loading: calculationsLoading, settingsRates } =
+    useRusnCalculation(selectedGroupSlug);
 
   // Находим калькуляцию с типом "busbridge"
   const busbarBridgeCalculation = calculations.cell.find(
@@ -100,15 +102,13 @@ export const useBusbarBridgeCalculation = () => {
             sum + category.items.reduce((itemSum, item) => itemSum + item.price * item.quantity, 0),
           0
         ) + totalPrice,
-        {
-          hourlyRate: busbarBridgeCalculation.data.calculation?.hourlyRate || 2000,
-          manufacturingHours: busbarBridgeCalculation.data.calculation?.manufacturingHours || 1,
-          overheadPercentage: busbarBridgeCalculation.data.calculation?.overheadPercentage || 10,
-          adminPercentage: busbarBridgeCalculation.data.calculation?.adminPercentage || 15,
-          plannedProfitPercentage:
-            busbarBridgeCalculation.data.calculation?.plannedProfitPercentage || 10,
-          ndsPercentage: busbarBridgeCalculation.data.calculation?.ndsPercentage || 12,
-        }
+        applyApiCalculationRates(
+          {
+            manufacturingHours:
+              busbarBridgeCalculation.data.calculation?.manufacturingHours || 1,
+          },
+          settingsRates
+        )
       )
     : null;
 
@@ -158,16 +158,16 @@ export const useBusbarBridgeCalculation = () => {
           const totalMaterialsPricePerUnit = bridgePrice + additionalMaterialsTotal;
 
           // Базовая калькуляция для одной единицы
-          const calculationResult = calculateCost(totalMaterialsPricePerUnit, {
-            hourlyRate: busbarBridgeCalculation?.data?.calculation?.hourlyRate || 2000,
-            manufacturingHours: busbarBridgeCalculation?.data?.calculation?.manufacturingHours || 1,
-            overheadPercentage:
-              busbarBridgeCalculation?.data?.calculation?.overheadPercentage || 10,
-            adminPercentage: busbarBridgeCalculation?.data?.calculation?.adminPercentage || 15,
-            plannedProfitPercentage:
-              busbarBridgeCalculation?.data?.calculation?.plannedProfitPercentage || 10,
-            ndsPercentage: busbarBridgeCalculation?.data?.calculation?.ndsPercentage || 12,
-          });
+          const calculationResult = calculateCost(
+            totalMaterialsPricePerUnit,
+            applyApiCalculationRates(
+              {
+                manufacturingHours:
+                  busbarBridgeCalculation?.data?.calculation?.manufacturingHours || 1,
+              },
+              settingsRates
+            )
+          );
 
           return {
             name: `№${index + 1} Шинный мост ${materialName} ${matchingConfig.busbar} (длина: ${

@@ -18,6 +18,7 @@ interface OutgoingCellSectionProps {
   rpsLeftMaterials?: Material[];
   fusesPnMaterials?: Material[];
   avtomatLityMaterials?: Material[];
+  currentTransformerMaterials?: Material[];
   inputCell?: RunnCell; // Ячейка "Ввод" для получения информации о корпусе
   selectedCalculationName?: string; // Название выбранной калькуляции
   onCalculationResult?: (cellId: string, type: 'main' | 'meter', price: number) => void;
@@ -30,6 +31,7 @@ export default function OutgoingCellSection({
   rpsLeftMaterials = [],
   fusesPnMaterials = [],
   avtomatLityMaterials = [],
+  currentTransformerMaterials = [],
   inputCell,
   selectedCalculationName,
   onCalculationResult
@@ -152,6 +154,7 @@ export default function OutgoingCellSection({
             rpsLeftMaterials={rpsLeftMaterials}
             fusesPnMaterials={fusesPnMaterials}
             avtomatLityMaterials={avtomatLityMaterials}
+            currentTransformerMaterials={currentTransformerMaterials}
             inputCell={inputCell}
             onCalculationResult={updateCellResult}
           />
@@ -172,6 +175,7 @@ export default function OutgoingCellSection({
       ))}
 
       <button
+        type="button"
         onClick={() =>
           addCell({
             purpose: 'Отходящая',
@@ -182,9 +186,12 @@ export default function OutgoingCellSection({
             selectedCalculationName: '',
           })
         }
-        className="mt-4 px-4 py-2 bg-[#3A55DF] hover:bg-[#2d48be] text-white rounded text-sm font-medium"
+        className="mt-5 flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-[#8eba1e]/35 bg-[#8eba1e]/5 px-5 py-4 text-sm font-semibold text-[#5f7f14] transition-all hover:border-[#8eba1e] hover:bg-[#8eba1e]/10 hover:shadow-sm"
       >
-        + Добавить ещё отходящую
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-lg font-bold text-[#8eba1e] shadow-sm">
+          +
+        </span>
+        <span>Добавить ещё отходящую</span>
       </button>
     </TogglerWithInput>
   );

@@ -55,6 +55,15 @@ export interface ApplicationData {
       busBridges?: any[];
       total: number;
     };
+    dgu?: {
+      enabled: boolean;
+      settings: any;
+      cells: any[];
+      cellSummaries: any[];
+      busbarSummary: any;
+      busBridgeSummaries: any[];
+      total: number;
+    };
     additionalEquipment: {
       selected: any;
       equipmentList: any[];
@@ -140,6 +149,26 @@ export interface ApplicationResponse extends ApplicationData {
   updatedAt: string;
 }
 
+export interface CloneRepriceRequestOptions {
+  useCurrentDate?: boolean;
+  date?: string;
+  client?: string;
+  taskNumber?: string;
+  managerMarkupPercent?: number;
+  notes?: string;
+  configOverrides?: Record<string, any>;
+}
+
+export interface CalculateApplicationDraftRequest {
+  type?: string;
+  data: any;
+}
+
+export interface CalculateApplicationDraftResponse {
+  totalAmount: number;
+  data: any;
+}
+
 // Получить заявку по ID
 export async function getApplicationById(id: number, token: string): Promise<ApplicationResponse> {
   const response = await fetch(`${api}/bids/${id}`, {
@@ -197,6 +226,51 @@ export async function updateApplication(id: number, data: Partial<ApplicationDat
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.message || 'Ошибка при обновлении заявки');
+  }
+
+  return response.json();
+}
+
+// Создать новую заявку из существующей с пересчетом по актуальным ценам
+export async function cloneRepriceApplication(
+  id: number,
+  token: string,
+  options: CloneRepriceRequestOptions = {},
+): Promise<{ id: number; bidNumber: string; data?: any; totalAmount?: number }> {
+  const response = await fetch(`${api}/bids/${id}/clone-reprice`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(options),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || 'Ошибка при создании заявки по актуальным ценам');
+  }
+
+  return response.json();
+}
+
+// Онлайн пересчет черновика заявки без сохранения в БД
+export async function calculateApplicationDraft(
+  payload: CalculateApplicationDraftRequest,
+  token: string,
+): Promise<CalculateApplicationDraftResponse> {
+  const response = await fetch(`${api}/bids/calculate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || 'Ошибка при онлайн пересчете заявки');
   }
 
   return response.json();

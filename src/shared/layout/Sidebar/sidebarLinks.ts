@@ -65,7 +65,7 @@ export const sidebarLinks = [
   },
   {
     type: 'link',
-    label: 'История изменений',
+    label: 'Единый журнал',
     icon: FileDiff,
     href: '/dashboard/history',
   },

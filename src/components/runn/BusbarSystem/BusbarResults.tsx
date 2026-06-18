@@ -1,5 +1,6 @@
 import React from 'react';
 import { Switchgear } from '@/api/switchgear';
+import { BusAlert } from '@/components/shared/busUi';
 
 interface BusbarResultsProps {
   title: string;
@@ -11,8 +12,18 @@ interface BusbarResultsProps {
   hasMatchingConfig: boolean;
   transformerPower?: number;
   selectedTransformer?: any;
-  cellDetails?: Array<{name: string, quantity: number, weightPerCell: number, totalWeight: number}>;
+  cellDetails?: Array<{ name: string; quantity: number; weightPerCell: number; totalWeight: number }>;
   busbarCalculationResult?: any;
+}
+
+function StatItem({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="rounded-xl border border-gray-100 bg-gray-50/80 px-4 py-3">
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-gray-900">{value}</p>
+      {hint && <p className="mt-0.5 text-xs text-gray-400">{hint}</p>}
+    </div>
+  );
 }
 
 export const BusbarResults: React.FC<BusbarResultsProps> = ({
@@ -20,100 +31,62 @@ export const BusbarResults: React.FC<BusbarResultsProps> = ({
   matchingConfig,
   totalWeight,
   totalPrice,
-  materialCost,
   pricePerKg,
   hasMatchingConfig,
   transformerPower,
   selectedTransformer,
-  cellDetails = [],
-  busbarCalculationResult
 }) => {
+  const materialLabel =
+    matchingConfig?.group === 'МТ' || matchingConfig?.group === 'МТ2'
+      ? 'Медь'
+      : matchingConfig?.group === 'АД' || matchingConfig?.group === 'АД2'
+        ? 'Алюминий'
+        : selectedTransformer?.busbars || 'Не выбран';
+
   if (!hasMatchingConfig) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-          </div>
-          <div>
-            <h4 className="text-sm font-semibold text-red-800">Не найдена подходящая конфигурация</h4>
-            <p className="text-sm text-red-600">
-              Для трансформатора {transformerPower} кВА и материала {selectedTransformer?.busbars} не найдена подходящая конфигурация.
-            </p>
-          </div>
-        </div>
-      </div>
+      <BusAlert variant="error" title="Конфигурация не найдена">
+        Для трансформатора {transformerPower ?? '—'} кВА и материала «{selectedTransformer?.busbars ?? '—'}»
+        не найдена подходящая конфигурация. Проверьте ячейки РУНН и настройки трансформатора.
+      </BusAlert>
     );
   }
 
   return (
-    <div className="space-y-6">
-     
-
-      {/* Информация о выбранном материале */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
-        <h4 className="text-sm font-semibold text-gray-700 mb-2">Материал сборных шин</h4>
-        <div className="text-sm text-gray-600">
-          <p><span className="font-medium">Тип материала:</span> {
-            matchingConfig?.group === 'МТ' || matchingConfig?.group === 'МТ2' ? 'Медь' :
-            matchingConfig?.group === 'АД' || matchingConfig?.group === 'АД2' ? 'Алюминий' :
-            selectedTransformer?.busbars || 'Не выбран'
-          }</p>
-          <p className="text-xs text-gray-500 mt-1">
-            {matchingConfig ? 
-              `Определяется автоматически из конфигурации "${matchingConfig.type}" (группа: ${matchingConfig.group})` : 
-              'Выбирается автоматически на основе выбора в трансформаторе'
-            }
-          </p>
-        </div>
+    <div className="space-y-4">
+      <div className="rounded-xl border border-[#8eba1e]/20 bg-[#8eba1e]/5 px-4 py-3 text-sm text-gray-700">
+        <span className="font-medium text-gray-900">Материал:</span> {materialLabel}
+        {matchingConfig && (
+          <span className="text-gray-500">
+            {' '}
+            · из конфигурации «{matchingConfig.type}» (группа {matchingConfig.group})
+          </span>
+        )}
       </div>
 
-      {/* Результаты расчета */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
-        <h4 className="text-sm font-semibold text-gray-700 mb-3">Результаты расчета</h4>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-          <div>
-            <span className="text-gray-600">Конфигурация:</span>
-            <div className="font-semibold text-gray-900">{matchingConfig?.type || 'Не найдена'}</div>
-          </div>
-          <div>
-            <span className="text-gray-600">Общий вес:</span>
-            <div className="font-semibold text-gray-900">{(totalWeight || 0).toFixed(2)} кг</div>
-          </div>
-          <div>
-            <span className="text-gray-600">Цена за кг:</span>
-            <div className="font-semibold text-gray-900">{pricePerKg.toLocaleString()} тг</div>
-            <div className="text-xs text-gray-500">
-              {matchingConfig?.group === 'МТ' || matchingConfig?.group === 'МТ2' ? 'Медь (ID: 3490)' : 'Алюминий (ID: 3489)'}
-            </div>
-          </div>
-          <div>
-            <span className="text-gray-600">Общая стоимость:</span>
-            <div className="font-semibold text-gray-900">{(totalPrice || 0).toLocaleString()} тг</div>
-          </div>
-        </div>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <StatItem label="Конфигурация" value={matchingConfig?.type || '—'} />
+        <StatItem label="Общий вес" value={`${(totalWeight || 0).toFixed(2)} кг`} />
+        <StatItem
+          label="Цена за кг"
+          value={`${pricePerKg.toLocaleString()} тг`}
+          hint={
+            matchingConfig?.group === 'МТ' || matchingConfig?.group === 'МТ2' ? 'Медь' : 'Алюминий'
+          }
+        />
+        <StatItem
+          label="Стоимость"
+          value={`${(totalPrice || 0).toLocaleString()} тг`}
+          hint="без НДС по материалам"
+        />
       </div>
 
-
-      {/* Итоговая сводка */}
-      <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
-        <h4 className="text-sm font-semibold text-gray-700 mb-3">Итоговая сводка по {title}</h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          <div>
-            <span className="text-gray-600">Материал шин:</span>
-            <div className="font-semibold text-gray-900">{matchingConfig?.group || 'Не определен'}</div>
-          </div>
-          <div>
-            <span className="text-gray-600">Конфигурация:</span>
-            <div className="font-semibold text-gray-900">{matchingConfig?.type || 'Не найдена'}</div>
-          </div>
-          <div>
-            <span className="text-gray-600">Напряжение:</span>
-            <div className="font-semibold text-gray-900">{selectedTransformer?.voltage || 0.4} кВ</div>
-          </div>
-        </div>
+      <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Сводка</p>
+        <p className="mt-1 text-sm text-gray-600">
+          Итог по <span className="font-medium text-gray-900">{title}</span> · напряжение{' '}
+          {selectedTransformer?.voltage ?? 0.4} кВ
+        </p>
       </div>
     </div>
   );

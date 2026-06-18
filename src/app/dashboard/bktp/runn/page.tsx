@@ -10,11 +10,32 @@ import RunnHeaderSimple from './components/common/RunnHeaderSimple';
 import RunnModeSelector from './components/selectors/RunnModeSelector';
 
 type RunnMode = 'configured' | 'not-configured';
+type RunnTabType = 'main' | 'dgu';
+
+function getInitialRunnTab(): RunnTabType {
+  if (typeof window === 'undefined') return 'main';
+  const saved = localStorage.getItem('runn-active-tab');
+  return saved === 'dgu' ? 'dgu' : 'main';
+}
 
 export default function RunnConfigurator() {
   const { selectedTransformer } = useTransformerStore();
   const { cellConfigs, clearAllCells } = useRunnStore();
   const voltage = selectedTransformer?.voltage || 0.4;
+
+  const [activeTab, setActiveTab] = useState<RunnTabType>(getInitialRunnTab);
+
+  const handleTabChange = (tab: RunnTabType) => {
+    setActiveTab(tab);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('runn-active-tab', tab);
+    }
+  };
+
+  const handleSwitchToDgu = () => {
+    handleTabChange('dgu');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // Определяем режим на основе наличия конфигурации
   const [mode, setMode] = useState<RunnMode>(
@@ -27,9 +48,6 @@ export default function RunnConfigurator() {
     setMode(hasConfiguration ? 'configured' : 'not-configured');
   }, [cellConfigs]);
   
-  // Текущая активная вкладка
-  const [currentTab, setCurrentTab] = useState<'main' | 'bus-bridge' | 'dgu'>('main');
-
   const handleModeChange = (newMode: RunnMode) => {
     setMode(newMode);
     if (newMode === 'not-configured') {
@@ -62,11 +80,11 @@ export default function RunnConfigurator() {
                     </svg>
                   </div>
                   <h2 className="text-lg font-bold text-gray-900">
-                    Конфигурация РУНН Сборные шины
+                    Конфигурация РУНН
                   </h2>
                 </div>
                 <div className="p-6">
-                  <RunnFormFields onTabChange={setCurrentTab} />
+                  <RunnFormFields activeTab={activeTab} onTabChange={handleTabChange} />
                 </div>
               </div>
             </div>
@@ -83,14 +101,10 @@ export default function RunnConfigurator() {
 
           {/* Navigation */}
           <div className="mt-8 flex justify-start">
-            <RunnNextStepButton 
-              skip={mode === 'not-configured'} 
-              currentTab={currentTab}
-              onSwitchToBusbar={() => {
-                // Переключаемся на вкладку "Сборные шины" в RunnFormFields
-                const event = new CustomEvent('switchToBusbar');
-                window.dispatchEvent(event);
-              }}
+            <RunnNextStepButton
+              skip={mode === 'not-configured'}
+              activeTab={activeTab}
+              onSwitchToDgu={handleSwitchToDgu}
             />
           </div>
         </div>

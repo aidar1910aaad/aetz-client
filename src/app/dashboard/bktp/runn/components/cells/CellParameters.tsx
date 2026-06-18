@@ -3,6 +3,7 @@ import { Material } from '@/api/material';
 import { useEffect } from 'react';
 import RpsRubilnikSelector from '../selectors/RpsRubilnikSelector';
 import MoldedCaseWithRubilnikSelector from '../selectors/MoldedCaseWithRubilnikSelector';
+import { Select } from '@/components/ui/select';
 
 interface CellParametersProps {
   cell: RunnCell & { update: (field: keyof RunnCell, val: string | number | string[]) => void; remove: () => void; };
@@ -158,76 +159,82 @@ export default function CellParameters({
     options: string[],
     isLoading: boolean = false
   ) => (
-    <div className="flex flex-col gap-1 min-w-[120px]">
-      <span className="text-xs font-medium text-[#3A55DF]">{label}</span>
-      <select
+    <div className="flex min-w-[160px] flex-col gap-1.5">
+      <span className="text-xs font-semibold text-gray-600">{label}</span>
+      <Select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
+        className="h-10 rounded-lg border border-gray-200 px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#8eba1e]/25"
         disabled={isLoading}
       >
         <option value="">—</option>
         {options.map((opt) => (
           <option key={opt} value={opt}>{opt}</option>
         ))}
-      </select>
+      </Select>
     </div>
   );
 
   return (
-    <div className="flex gap-4 items-end p-4 rounded bg-white border border-gray-100">
-      {/* Показываем поле "Автомат выкатной" только если не выбран РПС, Литой корпус или Литой корпус + Рубильник */}
-      {cell.switchingDevice !== 'РПС' && 
-       cell.switchingDevice !== 'Литой корпус' && 
-       cell.switchingDevice !== 'Литой корпус + Рубильник' && (
-        renderSelectBlock(
-          'Автомат выкатной',
-          cell.breaker,
-          (val) => cell.update('breaker', val),
-          filteredBreakerOptions
-        )
-      )}
-
-      {renderSelectBlock(
-        'ПУ',
-        cell.meterType ?? '',
-        (val) => cell.update('meterType', val),
-        meterOptions,
-        meterMaterialsLoading || isMeterDisabled
-      )}
-
-      {/* Показываем селектор рубильников только если выбран РПС */}
-      {cell.switchingDevice === 'РПС' && (
-        <RpsRubilnikSelector cell={cell} rpsLeftMaterials={rpsLeftMaterials} additionalRpsMaterials={additionalRpsMaterials} />
-      )}
-
-      {/* Показываем селектор рубильников для "Литой корпус" и "Литой корпус + Рубильник" */}
-      {(cell.switchingDevice === 'Литой корпус' || cell.switchingDevice === 'Литой корпус + Рубильник') && (
-        <MoldedCaseWithRubilnikSelector 
-          cell={cell} 
-          avtomatLityMaterials={avtomatLityMaterials}
-          additionalMoldedCaseMaterials={additionalMoldedCaseMaterials}
-        />
-      )}
-
-      <div className="flex flex-col gap-1 min-w-[100px]">
-        <span className="text-xs font-medium text-[#3A55DF]">Кол-во</span>
-        <input
-          type="number"
-          min={1}
-          value={cell.quantity || 1}
-          onChange={(e) => cell.update('quantity', Number(e.target.value))}
-          className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
-        />
+    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h4 className="text-sm font-semibold text-gray-900">Параметры ячейки</h4>
+        <button
+          type="button"
+          onClick={cell.remove}
+          className="rounded-lg px-2.5 py-1.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 hover:text-red-700"
+          title="Удалить ячейку"
+        >
+          x
+        </button>
       </div>
 
-      <button
-        onClick={cell.remove}
-        className="text-red-600 hover:text-red-800 text-sm font-bold ml-auto"
-        title="Удалить ячейку"
-      >
-        ✕
-      </button>
+      <div className="flex flex-wrap items-end gap-4">
+        {/* Показываем поле "Автомат выкатной" только если не выбран РПС, Литой корпус или Литой корпус + Рубильник */}
+        {cell.switchingDevice !== 'РПС' && 
+         cell.switchingDevice !== 'Литой корпус' && 
+         cell.switchingDevice !== 'Литой корпус + Рубильник' && (
+          renderSelectBlock(
+            'Автомат выкатной',
+            cell.breaker,
+            (val) => cell.update('breaker', val),
+            filteredBreakerOptions
+          )
+        )}
+
+        {renderSelectBlock(
+          'ПУ',
+          cell.meterType ?? '',
+          (val) => cell.update('meterType', val),
+          meterOptions,
+          meterMaterialsLoading || isMeterDisabled
+        )}
+
+        {/* Показываем селектор рубильников только если выбран РПС */}
+        {cell.switchingDevice === 'РПС' && (
+          <RpsRubilnikSelector cell={cell} rpsLeftMaterials={rpsLeftMaterials} additionalRpsMaterials={additionalRpsMaterials} />
+        )}
+
+        {/* Показываем селектор рубильников для "Литой корпус" и "Литой корпус + Рубильник" */}
+        {(cell.switchingDevice === 'Литой корпус' || cell.switchingDevice === 'Литой корпус + Рубильник') && (
+          <MoldedCaseWithRubilnikSelector 
+            cell={cell} 
+            avtomatLityMaterials={avtomatLityMaterials}
+            additionalMoldedCaseMaterials={additionalMoldedCaseMaterials}
+          />
+        )}
+
+        <div className="flex min-w-[120px] flex-col gap-1.5">
+          <span className="text-xs font-semibold text-gray-600">Кол-во</span>
+          <input
+            type="number"
+            min={1}
+            value={cell.quantity || 1}
+            onChange={(e) => cell.update('quantity', Number(e.target.value))}
+            className="h-10 rounded-lg border border-gray-200 px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#8eba1e]/25"
+          />
+        </div>
+      </div>
     </div>
   );
 } 

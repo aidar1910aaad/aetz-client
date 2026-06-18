@@ -2,20 +2,29 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getApplicationById, ApplicationResponse } from '@/api/requests';
+import { getApplicationById, ApplicationResponse, cloneRepriceApplication } from '@/api/requests';
 import { FinalReviewContent, FinalReviewTotal } from '@/app/dashboard/final/components';
 import { bmzTableConfig, transformerTableConfig, rusnTableConfig, worksTableConfig, runnTableConfig, additionalEquipmentTableConfig } from '@/components/FinalReview/tableConfigs';
-import { FileText, Calendar, Hash, Building2, DollarSign, UserCircle, Edit, X, Save, ArrowLeft, ChevronLeft } from 'lucide-react';
+import { FileText, Calendar, Hash, Building2, DollarSign, UserCircle, Edit, X, Save, ArrowLeft, ChevronLeft, RefreshCw } from 'lucide-react';
 import { formatAmount } from '@/utils/formatAmount';
 import { updateApplication, createApplication } from '@/api/requests';
 import { useUserStore } from '@/store/useUserStore';
 import { showToast } from '@/shared/modals/ToastProvider';
+import PageLoader from '@/shared/loader/PageLoader';
+import { useMaterialPrices } from '@/hooks/useMaterialPrices';
+import { calculateBusbarUstCost, isUst04CalculationName } from '@/utils/busbarUstCost';
 
 export default function RequestDetailPage() {
+  const isServerRepriceEnabled = process.env.NEXT_PUBLIC_ENABLE_SERVER_REPRICE !== 'false';
   const params = useParams();
   const router = useRouter();
   const { user: currentUser } = useUserStore();
   const [requestData, setRequestData] = useState<ApplicationResponse | null>(null);
+  const { aluminum: aluminumPrice, copper: copperPrice } = useMaterialPrices();
+  const busbarMaterialPrices = React.useMemo(
+    () => ({ aluminum: aluminumPrice, copper: copperPrice }),
+    [aluminumPrice, copperPrice],
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -70,12 +79,23 @@ export default function RequestDetailPage() {
     if (!Number.isNaN(parsed)) setBusinessTravelTotal(parsed);
   }, []);
 
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString('ru-RU');
+
   // Преобразуем данные в формат, ожидаемый компонентами Final
   // Используем безопасные значения по умолчанию для всех полей
   const bmzStore = requestData?.data?.bmz || {};
-  const selectedTransformer = requestData?.data?.transformer?.selected || null;
+  const selectedTransformer =
+    requestData?.data?.transformer?.selected ||
+    requestData?.data?.config?.transformer?.selected ||
+    (requestData?.data?.config?.transformer?.id ? requestData.data.config.transformer : null) ||
+    null;
   const rusnStore = requestData?.data?.rusn || {};
-  const runnStore = (requestData?.data?.runn || {}) as any;
+  const runnStore = React.useMemo(() => {
+    const runn = (requestData?.data?.runn || {}) as any;
+    const dgu = requestData?.data?.dgu;
+    return dgu ? { ...runn, dgu } : runn;
+  }, [requestData?.data?.runn, requestData?.data?.dgu]);
   
   // Логирование данных РУНН для отладки
   React.useEffect(() => {
@@ -140,15 +160,14 @@ export default function RequestDetailPage() {
   const ustTotal = React.useMemo(() => {
     if (!selectedTransformer) return 0;
     const busbarUstData = selectedTransformer.busbarUstData;
-    const busbarUstCost = busbarUstData ? 
-      (busbarUstData.mainUstWeight + busbarUstData.zeroUstWeight) * 
-      (busbarUstData.material === 'Алюминий' ? 2800 : 5600) : 0;
 
     let total = 0;
     if (selectedTransformer.ustCalculations && selectedTransformer.ustCalculations.length > 0) {
       selectedTransformer.ustCalculations.forEach((calc: any) => {
-        const shouldAddBusbarCost = calc.name?.includes('0.4кВ') || calc.name?.includes('УСТ-0.4кВ');
-        const additionalCost = shouldAddBusbarCost ? busbarUstCost : 0;
+        const shouldAddBusbarCost = isUst04CalculationName(calc.name || '');
+        const additionalCost = shouldAddBusbarCost
+          ? calculateBusbarUstCost(busbarUstData, busbarMaterialPrices)
+          : 0;
         const ustPrice = calculateUstPrice(calc, additionalCost);
         total += ustPrice * transformerQuantity;
       });
@@ -157,7 +176,7 @@ export default function RequestDetailPage() {
       total = ustPrice * transformerQuantity;
     }
     return total;
-  }, [selectedTransformer, calculateUstPrice, transformerQuantity]);
+  }, [selectedTransformer, calculateUstPrice, transformerQuantity, busbarMaterialPrices]);
 
   const transformerTotal = transformerBaseTotal + ustTotal;
 
@@ -203,7 +222,47 @@ export default function RequestDetailPage() {
   const [tableMarkupPercents, setTableMarkupPercents] = useState<Record<string, number>>(initialTableMarkupPercents);
   const [tableMarkupTotals, setTableMarkupTotals] = useState<Record<string, number | null>>(initialTableMarkupTotals);
   const [managerMarkupPercent, setManagerMarkupPercent] = useState<number>(initialManagerMarkupPercent);
-  
+
+  const managerMarkupAmount = React.useMemo(() => {
+    let totalMarkup = 0;
+    const sections = [
+      { id: bmzTableConfig.id, baseTotal: bmzTotal },
+      { id: transformerTableConfig.id, baseTotal: transformerTotal },
+      { id: rusnTableConfig.id, baseTotal: rusnTotal },
+      { id: runnTableConfig.id, baseTotal: runnTotal },
+      { id: worksTableConfig.id, baseTotal: worksTotal },
+      { id: additionalEquipmentTableConfig.id, baseTotal: additionalEquipmentTotal },
+    ];
+    sections.forEach(({ id, baseTotal }) => {
+      if (baseTotal <= 0) return;
+      const markupTotal = tableMarkupTotals[id];
+      if (markupTotal !== null && markupTotal !== undefined) {
+        totalMarkup += markupTotal - baseTotal;
+      }
+    });
+    return Math.round(totalMarkup);
+  }, [
+    tableMarkupTotals,
+    bmzTotal,
+    transformerTotal,
+    rusnTotal,
+    runnTotal,
+    worksTotal,
+    additionalEquipmentTotal,
+  ]);
+
+  const finalTotalWithMarkup = React.useMemo(
+    () => Math.round(grandTotal + managerMarkupAmount),
+    [grandTotal, managerMarkupAmount],
+  );
+
+  const displayTotalAmount = React.useMemo(() => {
+    const snapshotFinal = Number((requestData as any)?.data?.snapshot?.totals?.finalTotal);
+    if (snapshotFinal > 0) return snapshotFinal;
+    if (finalTotalWithMarkup > 0) return finalTotalWithMarkup;
+    return requestData?.totalAmount ?? 0;
+  }, [requestData, finalTotalWithMarkup]);
+
   // Состояние для заметок
   const [notes, setNotes] = useState<string>('');
   
@@ -270,6 +329,7 @@ export default function RequestDetailPage() {
 
   // Функция сохранения изменений наценок
   const [isSaving, setIsSaving] = React.useState(false);
+  const [isRepricing, setIsRepricing] = React.useState(false);
   const handleSaveMarkups = async () => {
     if (!requestData || !hasChanges) return;
     
@@ -288,28 +348,7 @@ export default function RequestDetailPage() {
       // Если нет originalBidId, значит это оригинальная заявка, поэтому originalBidId новой = ID текущей
       const originalBidId = requestData.id;
 
-      // Вычисляем итоговую сумму с наценками
-      // Сумма наценки = сумма разниц между marked-up totals и base totals для каждой таблицы
-      let managerMarkupAmount = 0;
-      const tableConfigs = [
-        { id: bmzTableConfig.id, baseTotal: bmzTotal },
-        { id: transformerTableConfig.id, baseTotal: transformerTotal },
-        { id: rusnTableConfig.id, baseTotal: rusnTotal },
-        { id: runnTableConfig.id, baseTotal: runnTotal },
-        { id: worksTableConfig.id, baseTotal: worksTotal },
-        { id: additionalEquipmentTableConfig.id, baseTotal: additionalEquipmentTotal },
-      ];
-
-      tableConfigs.forEach(({ id, baseTotal }) => {
-        if (baseTotal > 0) {
-          const markupTotal = tableMarkupTotals[id];
-          if (markupTotal && markupTotal > 0) {
-            managerMarkupAmount += markupTotal - baseTotal;
-          }
-        }
-      });
-
-      const finalTotal = grandTotal + managerMarkupAmount;
+      const finalTotal = finalTotalWithMarkup;
 
       // Получаем текущую дату в формате YYYY-MM-DD
       const today = new Date().toISOString().split('T')[0];
@@ -355,6 +394,32 @@ export default function RequestDetailPage() {
     }
   };
 
+  const handleCreateWithActualPrices = async () => {
+    if (!requestData) return;
+    setIsRepricing(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Токен авторизации не найден');
+      }
+
+      const result = await cloneRepriceApplication(requestData.id, token, {
+        useCurrentDate: true,
+      });
+
+      showToast(
+        `Новая заявка по актуальным ценам создана! ID: ${result.id}, Номер: ${result.bidNumber}`,
+        'success',
+      );
+      router.push(`/dashboard/requests/${result.id}`);
+    } catch (error: any) {
+      console.error('Ошибка при создании заявки по актуальным ценам:', error);
+      showToast(`Ошибка при пересчете: ${error.message}`, 'error');
+    } finally {
+      setIsRepricing(false);
+    }
+  };
+
   // Логирование данных о наценках для отладки
   React.useEffect(() => {
     if (requestData && process.env.NODE_ENV === 'development') {
@@ -386,11 +451,8 @@ export default function RequestDetailPage() {
   // Условные возвраты после всех хуков
   if (loading) {
     return (
-      <div className="h-[calc(100vh-110px)] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Загрузка заявки...</p>
-        </div>
+      <div className="h-[calc(100vh-110px)]">
+        <PageLoader inline />
       </div>
     );
   }
@@ -451,16 +513,37 @@ export default function RequestDetailPage() {
               </div>
               <div>
                 <h1 className="text-3xl font-bold mb-1">
-                  Заявка {requestData.bidNumber}
+                  {requestData.bidNumber}
                 </h1>
-                <p className="text-white/90 text-lg">Детальная информация о заявке</p>
+                <p className="text-white/90 text-lg">
+                  {requestData.date ? `от ${formatDate(requestData.date)}` : 'Детальная информация о заявке'}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <div className="text-right bg-white/10 backdrop-blur-sm rounded-2xl px-6 py-3 border border-white/20 flex items-center justify-end whitespace-nowrap">
+              {isServerRepriceEnabled && (
+                <button
+                  onClick={handleCreateWithActualPrices}
+                  disabled={isRepricing || isSaving}
+                  className="bg-white/20 hover:bg-white/30 disabled:bg-white/10 disabled:cursor-not-allowed backdrop-blur-sm rounded-xl px-6 py-3 border border-white/20 text-white font-semibold transition-colors flex items-center gap-2"
+                  title="Создать новую заявку по актуальным ценам"
+                >
+                  <RefreshCw className={`w-5 h-5 ${isRepricing ? 'animate-spin' : ''}`} />
+                  {isRepricing ? 'Пересчет...' : 'По актуальным ценам'}
+                </button>
+              )}
+              <div className="text-right bg-white/10 backdrop-blur-sm rounded-2xl px-6 py-3 border border-white/20 flex flex-col items-end justify-center whitespace-nowrap gap-1">
+                {managerMarkupAmount > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-white/80 text-xs">Без наценки</span>
+                    <span className="text-sm font-semibold">{formatAmount(grandTotal)} ₸</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
-                  <span className="text-white/90 text-sm">Общая сумма</span>
-                  <span className="text-lg font-bold">{formatAmount(requestData.totalAmount)} ₸</span>
+                  <span className="text-white/90 text-sm">
+                    {managerMarkupAmount > 0 ? 'С наценкой' : 'Общая сумма'}
+                  </span>
+                  <span className="text-lg font-bold">{formatAmount(displayTotalAmount)} ₸</span>
                 </div>
               </div>
               {!isEditing ? (
@@ -601,6 +684,7 @@ export default function RequestDetailPage() {
         taskNumber={requestData.taskNumber}
         client={requestData.client}
         date={requestData.date}
+        bidNumber={requestData.bidNumber}
         totals={{
           bmzTotal,
           transformerTotal,

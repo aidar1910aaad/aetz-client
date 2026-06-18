@@ -3,32 +3,35 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 
+export type RunnTabType = 'main' | 'dgu';
+
 interface RunnNextStepButtonProps {
   skip: boolean;
-  onSwitchToBusbar?: () => void;
-  currentTab?: 'main' | 'bus-bridge';
+  activeTab?: RunnTabType;
+  onSwitchToDgu?: () => void;
 }
 
-export const RunnNextStepButton: React.FC<RunnNextStepButtonProps> = ({ skip, onSwitchToBusbar, currentTab }) => {
+export const RunnNextStepButton: React.FC<RunnNextStepButtonProps> = ({
+  skip,
+  activeTab = 'main',
+  onSwitchToDgu,
+}) => {
   const router = useRouter();
 
   const handleClick = () => {
     if (skip) {
-      // Если пропускаем, переходим на следующую страницу
       router.push('/dashboard/bktp/additional-equipment');
-    } else {
-      // Если добавляем в спецификацию
-      if (currentTab === 'bus-bridge') {
-        // Если мы в разделе "Сборные шины", переходим на следующую страницу
-        router.push('/dashboard/bktp/additional-equipment');
-      } else {
-        // Если мы в разделе "Конфигурация", переключаемся на вкладку "Сборные шины"
-        if (onSwitchToBusbar) {
-          onSwitchToBusbar();
-        }
-      }
+      return;
     }
+    if (activeTab === 'main') {
+      onSwitchToDgu?.();
+      return;
+    }
+    router.push('/dashboard/bktp/additional-equipment');
   };
+
+  const label =
+    skip || activeTab === 'dgu' ? 'Далее' : 'Добавить в спецификацию';
 
   return (
     <button 
@@ -38,7 +41,7 @@ export const RunnNextStepButton: React.FC<RunnNextStepButtonProps> = ({ skip, on
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      {skip ? 'Далее' : 'Добавить в спецификацию'}
+      {label}
     </button>
   );
 };

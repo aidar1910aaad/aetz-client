@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useRusnStore } from '@/store/useRusnStore';
+import { useDebugPanelsEnabled } from '@/components/common/DebugToggle';
 
 interface RusnMaterialsSummaryProps {
   title?: string;
@@ -13,6 +14,7 @@ export default function RusnMaterialsSummary({
   showClearButton = true 
 }: RusnMaterialsSummaryProps) {
   const rusn = useRusnStore();
+  const { enabled: debugPanelsEnabled } = useDebugPanelsEnabled();
   const [, forceUpdate] = React.useReducer(x => x + 1, 0);
   const [key, setKey] = React.useState(0);
   
@@ -88,7 +90,7 @@ export default function RusnMaterialsSummary({
           </div>
           <h3 className="text-lg font-bold text-gray-900">{title}</h3>
         </div>
-        {showClearButton && (
+        {showClearButton && debugPanelsEnabled && (
           <div className="flex gap-2">
             <button 
               onClick={() => {

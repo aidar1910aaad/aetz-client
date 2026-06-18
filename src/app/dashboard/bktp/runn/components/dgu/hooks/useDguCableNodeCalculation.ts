@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getCalculationsByGroup } from '@/api/calculations';
+import { loadRunnPanelCalculations } from '@/domain/runn/calculationLoader';
 
 export function useDguCableNodeCalculation() {
   const [calculation, setCalculation] = useState<any>(null);
@@ -19,7 +19,7 @@ export function useDguCableNodeCalculation() {
           return;
         }
 
-        const calculations = await getCalculationsByGroup('panel-sho-70', token);
+        const calculations = await loadRunnPanelCalculations(token);
         
         // Ищем калькуляцию по ID 108 или slug "узел-дгу-кабель"
         const foundCalculation = calculations.find((calc: any) => 

@@ -1,4 +1,5 @@
 import { useBmzStore } from '@/store/useBmzStore';
+import { Select } from '@/components/ui/select';
 
 const BmzForm = () => {
   const bmz = useBmzStore();
@@ -39,7 +40,7 @@ const BmzForm = () => {
 
       <div>
         <label className="block text-sm font-medium text-gray-700">Высота (мм)</label>
-        <select
+        <Select
           value={bmz.height}
           onChange={(e) => bmz.setHeight(Number(e.target.value))}
           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
@@ -47,7 +48,7 @@ const BmzForm = () => {
           <option value={2700}>2700</option>
           <option value={3150}>3150</option>
           <option value="other">Указать другую</option>
-        </select>
+        </Select>
         {bmz.height === 0 && (
           <input
             type="number"
@@ -60,7 +61,7 @@ const BmzForm = () => {
 
       <div>
         <label className="block text-sm font-medium text-gray-700">Толщина (мм)</label>
-        <select
+        <Select
           value={bmz.thickness}
           onChange={(e) => bmz.setThickness(Number(e.target.value))}
           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
@@ -70,12 +71,12 @@ const BmzForm = () => {
               {thickness}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700">Количество блоков</label>
-        <select
+        <Select
           value={bmz.blockCount}
           onChange={(e) => bmz.setBlockCount(Number(e.target.value))}
           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
@@ -85,7 +86,7 @@ const BmzForm = () => {
           <option value={2}>2</option>
           <option value={3}>3</option>
           <option value={4}>4</option>
-        </select>
+        </Select>
       </div>
 
       <div className="space-y-4">

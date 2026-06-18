@@ -2,6 +2,8 @@
 
 import { useRusnStore } from '@/store/useRusnStore';
 import { useTransformerStore } from '@/store/useTransformerStore';
+import { useWorkPricesStore } from '@/store/useWorkPricesStore';
+import { calculateRusnInstallationCost } from '@/utils/worksCalculationUtils';
 
 interface RusnInstallationTableProps {
   isVisible: boolean;
@@ -10,6 +12,7 @@ interface RusnInstallationTableProps {
 export default function RusnInstallationTable({ isVisible }: RusnInstallationTableProps) {
   const rusnStore = useRusnStore();
   const transformerStore = useTransformerStore();
+  const workPrices = useWorkPricesStore();
   
   // Получаем данные из РУСН проекта
   const cellConfigs = rusnStore.cellConfigs || [];
@@ -27,38 +30,20 @@ export default function RusnInstallationTable({ isVisible }: RusnInstallationTab
   // Количество трансформаторов
   const transformerQuantity = selectedTransformer?.quantity || 0;
   
-  // Цены за монтаж РУСН (из изображения)
-  const priceUpTo6Cells = 60948; // Монтаж РУ-10\20 кВ с ШРЗ до 6 ячеек
-  const price6To8Cells = 108840; // Свыше 6 ячеек до 8 ячеек
-  const priceOver8Cells = 21770; // Каждая последующая добавленная свыше 8 ячеек
-  const busBridgePrice = 100130; // Шинный мост монтаж и изготовление
-  const busBridgeInstallationPrice = 25000; // Установка Шинного моста
-  const transformerUnitPrice = 108840; // Узел силового трансформатора 10/20 кВ
+  const priceUpTo6Cells = workPrices.rusnPriceUpTo6Cells;
+  const price6To8Cells = workPrices.rusnPrice6To8Cells;
+  const priceOver8Cells = workPrices.rusnPriceOver8Cells;
+  const busBridgePrice = workPrices.rusnBusBridgePrice;
+  const busBridgeInstallationPrice = workPrices.rusnBusBridgeInstallationPrice;
+  const transformerUnitPrice = workPrices.rusnTransformerUnitPrice;
   
   // Расчет стоимости монтажа
-  const calculateInstallationCost = () => {
-    if (totalCellCount <= 0) return 0;
-    
-    if (totalCellCount <= 6) {
-      return totalCellCount * priceUpTo6Cells;
-    } else if (totalCellCount <= 8) {
-      const costForFirst6 = 6 * priceUpTo6Cells;
-      const costForRemaining = (totalCellCount - 6) * price6To8Cells;
-      return costForFirst6 + costForRemaining;
-    } else {
-      const costForFirst6 = 6 * priceUpTo6Cells;
-      const costFor6To8 = 2 * price6To8Cells;
-      const costForOver8 = (totalCellCount - 8) * priceOver8Cells;
-      return costForFirst6 + costFor6To8 + costForOver8;
-    }
-  };
-  
   if (!isVisible || totalCellCount === 0) {
     return null;
   }
   
-  const installationTotal = calculateInstallationCost();
-  const busBridgeTotal = busBridgePrice; // Всегда 1 шт.
+  const installationTotal = calculateRusnInstallationCost(totalCellCount, workPrices);
+  const busBridgeTotal = totalBusBridgeCount > 0 ? busBridgePrice : 0; // изготовление один раз, если мост есть
   const busBridgeInstallationTotal = totalBusBridgeCount * busBridgeInstallationPrice;
   const transformerUnitTotal = transformerQuantity * transformerUnitPrice;
   const grandTotal = installationTotal + busBridgeTotal + busBridgeInstallationTotal + transformerUnitTotal;
@@ -77,8 +62,8 @@ export default function RusnInstallationTable({ isVisible }: RusnInstallationTab
               <tr>
                 <th className="px-4 py-2 text-left font-medium text-gray-700">Описание</th>
                 <th className="px-4 py-2 text-center font-medium text-gray-700">Количество</th>
-                <th className="px-4 py-2 text-center font-medium text-gray-700">Цена за единицу</th>
-                <th className="px-4 py-2 text-center font-medium text-gray-700">Сумма</th>
+                <th className="px-4 py-2 text-right font-medium text-gray-700">Цена за единицу</th>
+                <th className="px-4 py-2 text-right font-medium text-gray-700">Сумма</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -88,10 +73,10 @@ export default function RusnInstallationTable({ isVisible }: RusnInstallationTab
                     Монтаж РУ-10\20 кВ с ШРЗ до 6 ячеек
                   </td>
                   <td className="px-4 py-3 text-center text-gray-900">{totalCellCount}</td>
-                  <td className="px-4 py-3 text-center text-gray-900">
+                  <td className="px-4 py-3 text-right text-gray-900">
                     {priceUpTo6Cells.toLocaleString()} тг
                   </td>
-                  <td className="px-4 py-3 text-center font-medium text-gray-900">
+                  <td className="px-4 py-3 text-right font-medium text-gray-900">
                     {(totalCellCount * priceUpTo6Cells).toLocaleString()} тг
                   </td>
                 </tr>
@@ -102,10 +87,10 @@ export default function RusnInstallationTable({ isVisible }: RusnInstallationTab
                       Монтаж РУ-10\20 кВ с ШРЗ до 6 ячеек
                     </td>
                     <td className="px-4 py-3 text-center text-gray-900">6</td>
-                    <td className="px-4 py-3 text-center text-gray-900">
+                    <td className="px-4 py-3 text-right text-gray-900">
                       {priceUpTo6Cells.toLocaleString()} тг
                     </td>
-                    <td className="px-4 py-3 text-center font-medium text-gray-900">
+                    <td className="px-4 py-3 text-right font-medium text-gray-900">
                       {(6 * priceUpTo6Cells).toLocaleString()} тг
                     </td>
                   </tr>
@@ -114,10 +99,10 @@ export default function RusnInstallationTable({ isVisible }: RusnInstallationTab
                       Свыше 6 ячеек до 8 ячеек
                     </td>
                     <td className="px-4 py-3 text-center text-gray-900">{totalCellCount - 6}</td>
-                    <td className="px-4 py-3 text-center text-gray-900">
+                    <td className="px-4 py-3 text-right text-gray-900">
                       {price6To8Cells.toLocaleString()} тг
                     </td>
-                    <td className="px-4 py-3 text-center font-medium text-gray-900">
+                    <td className="px-4 py-3 text-right font-medium text-gray-900">
                       {((totalCellCount - 6) * price6To8Cells).toLocaleString()} тг
                     </td>
                   </tr>
@@ -129,10 +114,10 @@ export default function RusnInstallationTable({ isVisible }: RusnInstallationTab
                       Монтаж РУ-10\20 кВ с ШРЗ до 6 ячеек
                     </td>
                     <td className="px-4 py-3 text-center text-gray-900">6</td>
-                    <td className="px-4 py-3 text-center text-gray-900">
+                    <td className="px-4 py-3 text-right text-gray-900">
                       {priceUpTo6Cells.toLocaleString()} тг
                     </td>
-                    <td className="px-4 py-3 text-center font-medium text-gray-900">
+                    <td className="px-4 py-3 text-right font-medium text-gray-900">
                       {(6 * priceUpTo6Cells).toLocaleString()} тг
                     </td>
                   </tr>
@@ -141,10 +126,10 @@ export default function RusnInstallationTable({ isVisible }: RusnInstallationTab
                       Свыше 6 ячеек до 8 ячеек
                     </td>
                     <td className="px-4 py-3 text-center text-gray-900">2</td>
-                    <td className="px-4 py-3 text-center text-gray-900">
+                    <td className="px-4 py-3 text-right text-gray-900">
                       {price6To8Cells.toLocaleString()} тг
                     </td>
-                    <td className="px-4 py-3 text-center font-medium text-gray-900">
+                    <td className="px-4 py-3 text-right font-medium text-gray-900">
                       {(2 * price6To8Cells).toLocaleString()} тг
                     </td>
                   </tr>
@@ -153,10 +138,10 @@ export default function RusnInstallationTable({ isVisible }: RusnInstallationTab
                       Каждая последующая добавленная свыше 8 ячеек
                     </td>
                     <td className="px-4 py-3 text-center text-gray-900">{totalCellCount - 8}</td>
-                    <td className="px-4 py-3 text-center text-gray-900">
+                    <td className="px-4 py-3 text-right text-gray-900">
                       {priceOver8Cells.toLocaleString()} тг
                     </td>
-                    <td className="px-4 py-3 text-center font-medium text-gray-900">
+                    <td className="px-4 py-3 text-right font-medium text-gray-900">
                       {((totalCellCount - 8) * priceOver8Cells).toLocaleString()} тг
                     </td>
                   </tr>
@@ -168,7 +153,7 @@ export default function RusnInstallationTable({ isVisible }: RusnInstallationTab
                 <td colSpan={3} className="px-4 py-3 text-right font-medium text-gray-900">
                   Итого монтаж ячеек:
                 </td>
-                <td className="px-4 py-3 text-center font-bold text-gray-900">
+                <td className="px-4 py-3 text-right font-bold text-gray-900">
                   {installationTotal.toLocaleString()} тг
                 </td>
               </tr>
@@ -177,6 +162,7 @@ export default function RusnInstallationTable({ isVisible }: RusnInstallationTab
         </div>
 
         {/* Таблица шинного моста */}
+        {totalBusBridgeCount > 0 && (
         <div>
           <h4 className="text-md font-medium text-gray-800 mb-3">Шинный мост</h4>
           <div className="overflow-x-auto">
@@ -185,8 +171,8 @@ export default function RusnInstallationTable({ isVisible }: RusnInstallationTab
                 <tr>
                   <th className="px-4 py-2 text-left font-medium text-gray-700">Описание</th>
                   <th className="px-4 py-2 text-center font-medium text-gray-700">Количество</th>
-                  <th className="px-4 py-2 text-center font-medium text-gray-700">Цена за единицу</th>
-                  <th className="px-4 py-2 text-center font-medium text-gray-700">Сумма</th>
+                  <th className="px-4 py-2 text-right font-medium text-gray-700">Цена за единицу</th>
+                  <th className="px-4 py-2 text-right font-medium text-gray-700">Сумма</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -195,10 +181,10 @@ export default function RusnInstallationTable({ isVisible }: RusnInstallationTab
                     Шинный мост монтаж и изготовление (без металла, установка шины в корпус в т.ч. ДГУ)
                   </td>
                   <td className="px-4 py-3 text-center text-gray-900">1</td>
-                  <td className="px-4 py-3 text-center text-gray-900">
+                  <td className="px-4 py-3 text-right text-gray-900">
                     {busBridgePrice.toLocaleString()} тг
                   </td>
-                  <td className="px-4 py-3 text-center font-medium text-gray-900">
+                  <td className="px-4 py-3 text-right font-medium text-gray-900">
                     {busBridgeTotal.toLocaleString()} тг
                   </td>
                 </tr>
@@ -207,10 +193,10 @@ export default function RusnInstallationTable({ isVisible }: RusnInstallationTab
                     Установка Шинного моста
                   </td>
                   <td className="px-4 py-3 text-center text-gray-900">{totalBusBridgeCount}</td>
-                  <td className="px-4 py-3 text-center text-gray-900">
+                  <td className="px-4 py-3 text-right text-gray-900">
                     {busBridgeInstallationPrice.toLocaleString()} тг
                   </td>
-                  <td className="px-4 py-3 text-center font-medium text-gray-900">
+                  <td className="px-4 py-3 text-right font-medium text-gray-900">
                     {busBridgeInstallationTotal.toLocaleString()} тг
                   </td>
                 </tr>
@@ -220,7 +206,7 @@ export default function RusnInstallationTable({ isVisible }: RusnInstallationTab
                   <td colSpan={3} className="px-4 py-3 text-right font-medium text-gray-900">
                     Итого шинный мост:
                   </td>
-                  <td className="px-4 py-3 text-center font-bold text-gray-900">
+                  <td className="px-4 py-3 text-right font-bold text-gray-900">
                     {(busBridgeTotal + busBridgeInstallationTotal).toLocaleString()} тг
                   </td>
                 </tr>
@@ -228,6 +214,7 @@ export default function RusnInstallationTable({ isVisible }: RusnInstallationTab
             </table>
           </div>
         </div>
+        )}
 
         {/* Таблица трансформаторов */}
         {transformerQuantity > 0 && (
@@ -239,8 +226,8 @@ export default function RusnInstallationTable({ isVisible }: RusnInstallationTab
                   <tr>
                     <th className="px-4 py-2 text-left font-medium text-gray-700">Описание</th>
                     <th className="px-4 py-2 text-center font-medium text-gray-700">Количество</th>
-                    <th className="px-4 py-2 text-center font-medium text-gray-700">Цена за единицу</th>
-                    <th className="px-4 py-2 text-center font-medium text-gray-700">Сумма</th>
+                    <th className="px-4 py-2 text-right font-medium text-gray-700">Цена за единицу</th>
+                    <th className="px-4 py-2 text-right font-medium text-gray-700">Сумма</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -249,10 +236,10 @@ export default function RusnInstallationTable({ isVisible }: RusnInstallationTab
                       Узел силового трансформатора 10/20 кВ
                     </td>
                     <td className="px-4 py-3 text-center text-gray-900">{transformerQuantity}</td>
-                    <td className="px-4 py-3 text-center text-gray-900">
+                    <td className="px-4 py-3 text-right text-gray-900">
                       {transformerUnitPrice.toLocaleString()} тг
                     </td>
-                    <td className="px-4 py-3 text-center font-medium text-gray-900">
+                    <td className="px-4 py-3 text-right font-medium text-gray-900">
                       {transformerUnitTotal.toLocaleString()} тг
                     </td>
                   </tr>
@@ -262,7 +249,7 @@ export default function RusnInstallationTable({ isVisible }: RusnInstallationTab
                     <td colSpan={3} className="px-4 py-3 text-right font-medium text-gray-900">
                       Итого трансформаторы:
                     </td>
-                    <td className="px-4 py-3 text-center font-bold text-gray-900">
+                    <td className="px-4 py-3 text-right font-bold text-gray-900">
                       {transformerUnitTotal.toLocaleString()} тг
                     </td>
                   </tr>

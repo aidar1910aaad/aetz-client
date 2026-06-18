@@ -23,8 +23,11 @@ export default function BmzSection({ bmz }: Props) {
   const area = useMemo(() => calculateArea(bmz.width, bmz.length), [bmz.width, bmz.length]);
   const roundedArea = useMemo(() => Math.round(area * 10) / 10, [area]);
   const unitPrice = useMemo(
-    () => (bmz.buildingType === 'bmz' ? calculateBasePrice(bmz.settings, bmz.thickness, area) : 0),
-    [bmz.buildingType, bmz.settings, bmz.thickness, area]
+    () =>
+      bmz.buildingType === 'bmz'
+        ? calculateBasePrice(bmz.settings, bmz.thickness, area, bmz.height)
+        : 0,
+    [bmz.buildingType, bmz.settings, bmz.thickness, bmz.height, area]
   );
   const totalPrice = useMemo(() => calculateTotalPrice(bmz), [bmz]);
 
