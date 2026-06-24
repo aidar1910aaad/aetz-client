@@ -22,7 +22,6 @@ export default function CreateMaterialModal({ onClose, onCreate }: Props) {
     priceInCurrency: 0,
     currency: 'KZT',
     categoryId: undefined,
-    code: '',
   });
 
   const [search, setSearch] = useState('');
@@ -103,7 +102,6 @@ export default function CreateMaterialModal({ onClose, onCreate }: Props) {
       unit: form.unit.trim(),
       currency: form.currency,
       priceInCurrency: form.priceInCurrency,
-      ...(form.code?.trim() ? { code: form.code.trim() } : {}),
       ...(form.categoryId ? { categoryId: form.categoryId } : {}),
     };
     setLoading(true);
@@ -228,16 +226,9 @@ export default function CreateMaterialModal({ onClose, onCreate }: Props) {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Код (опционально)</label>
-            <input
-              type="text"
-              placeholder="Внутренний код материала"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#8eba1e] focus:border-[#8eba1e] transition-all"
-              value={form.code || ''}
-              onChange={(e) => setForm({ ...form, code: e.target.value })}
-            />
-          </div>
+          <p className="text-xs text-gray-500">
+            Код материала будет сгенерирован автоматически (формат: 10000000085)
+          </p>
 
           <div className="relative" ref={categoryDropdownRef}>
             <label className="block text-sm font-medium text-gray-700 mb-1">

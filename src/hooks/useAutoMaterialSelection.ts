@@ -135,8 +135,13 @@ export function useAutoMaterialSelection({
           });
           vvodCell = { id: newCellId, purpose: 'Ввод', breaker: foundMaterial.name, quantity: 1 };
         } else {
-          // Обновляем существующую ячейку только если материал отличается
-          if (vvodCell.breaker !== foundMaterial.name) {
+          // Не перезаписываем ручной выбор — только пустую ячейку или прежнее авто-значение
+          const previousAutoBreaker = autoSelectedMaterial?.name;
+          const canAutoUpdate =
+            !vvodCell.breaker ||
+            (previousAutoBreaker && vvodCell.breaker === previousAutoBreaker);
+
+          if (canAutoUpdate && vvodCell.breaker !== foundMaterial.name) {
             updateCell(vvodCell.id, 'breaker', foundMaterial.name);
           }
         }
@@ -169,8 +174,12 @@ export function useAutoMaterialSelection({
             quantity: 1,
           };
         } else {
-          // Обновляем существующую ячейку только если материал отличается
-          if (svCell.breaker !== foundSvMaterial.name) {
+          const previousAutoBreaker = autoSelectedSvMaterial?.name;
+          const canAutoUpdate =
+            !svCell.breaker ||
+            (previousAutoBreaker && svCell.breaker === previousAutoBreaker);
+
+          if (canAutoUpdate && svCell.breaker !== foundSvMaterial.name) {
             updateCell(svCell.id, 'breaker', foundSvMaterial.name);
           }
         }
@@ -184,14 +193,28 @@ export function useAutoMaterialSelection({
 
         // Проверяем и обновляем ячейку "Ввод"
         const vvodCell = updatedCellConfigs.find((cell) => cell.purpose === 'Ввод');
-        if (vvodCell && foundMaterial && vvodCell.breaker !== foundMaterial.name) {
-          updateCell(vvodCell.id, 'breaker', foundMaterial.name);
+        if (vvodCell && foundMaterial) {
+          const previousAutoBreaker = autoSelectedMaterial?.name;
+          const canAutoUpdate =
+            !vvodCell.breaker ||
+            (previousAutoBreaker && vvodCell.breaker === previousAutoBreaker);
+
+          if (canAutoUpdate && vvodCell.breaker !== foundMaterial.name) {
+            updateCell(vvodCell.id, 'breaker', foundMaterial.name);
+          }
         }
 
         // Проверяем и обновляем ячейку "Секционный выключатель"
         const svCell = updatedCellConfigs.find((cell) => cell.purpose === 'Секционный выключатель');
-        if (svCell && foundSvMaterial && svCell.breaker !== foundSvMaterial.name) {
-          updateCell(svCell.id, 'breaker', foundSvMaterial.name);
+        if (svCell && foundSvMaterial) {
+          const previousAutoBreaker = autoSelectedSvMaterial?.name;
+          const canAutoUpdate =
+            !svCell.breaker ||
+            (previousAutoBreaker && svCell.breaker === previousAutoBreaker);
+
+          if (canAutoUpdate && svCell.breaker !== foundSvMaterial.name) {
+            updateCell(svCell.id, 'breaker', foundSvMaterial.name);
+          }
         }
       }, 200); // Дополнительная задержка для обновления
     }, 100); // Небольшая задержка в 100мс

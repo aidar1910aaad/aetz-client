@@ -5,6 +5,7 @@ import {
   BusbarHeader,
   BreakerInfo,
   MaterialSelector,
+  BusbarSectionSelector,
   ErrorMessages,
   CalculationResults,
   BusbarCalculation,
@@ -18,13 +19,17 @@ export const RusnBusbarSystem = () => {
   const {
     selectedBreaker,
     matchingConfig,
+    baseMatchingConfig,
     totalWeight,
     totalPrice,
     busbarCalculation,
     busbarCalculationResult,
     busBridgeMaterial,
+    availableBusbarSections,
+    selectedBusbarSection,
     getBreakerCurrent,
     getPricePerKg,
+    setBusbarSection,
   } = useBusbarCalculation();
 
   const handleMaterialChange = (material: BusMaterial) => {
@@ -45,8 +50,18 @@ export const RusnBusbarSystem = () => {
           onMaterialChange={handleMaterialChange}
         />
 
+        {/* Выбор сечения */}
+        {busBridgeMaterial && baseMatchingConfig && (
+          <BusbarSectionSelector
+            availableSections={availableBusbarSections}
+            selectedSection={selectedBusbarSection ?? baseMatchingConfig.busbar}
+            recommendedSection={baseMatchingConfig.busbar}
+            onSectionChange={setBusbarSection}
+          />
+        )}
+
         {/* Сообщения об ошибках */}
-        <ErrorMessages selectedMaterial={busBridgeMaterial} hasMatchingConfig={!!matchingConfig} />
+        <ErrorMessages selectedMaterial={busBridgeMaterial} hasMatchingConfig={!!baseMatchingConfig} />
 
         {/* Результаты расчета */}
         {matchingConfig && (

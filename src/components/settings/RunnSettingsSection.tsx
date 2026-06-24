@@ -1,5 +1,5 @@
 import { X, Eye, EyeOff } from 'lucide-react';
-import { Select } from '@/components/ui/select';
+import { CategorySearchSelect } from './CategorySearchSelect';
 
 interface Category {
   id: string;
@@ -16,7 +16,14 @@ interface CategoryObject {
 
 interface RunnSettingsSectionProps {
   title: string;
-  type: 'avtomatVyk' | 'avtomatLity' | 'counter' | 'rpsLeft';
+  type:
+    | 'avtomatVyk'
+    | 'avtomatLity'
+    | 'counter'
+    | 'rpsLeft'
+    | 'fusesPn'
+    | 'currentTransformer'
+    | 'moldedCaseSwitch';
   icon: React.ReactNode;
   allCategories: CategoryObject[] | string[];
   selectedCategories: Category[];
@@ -88,32 +95,16 @@ export function RunnSettingsSection({
         ))}
       </div>
 
-      {/* Add Category Dropdown */}
+      {/* Add Category Search */}
       {availableCategories.length > 0 && (
-        <div className="relative">
-          <Select
-            onChange={(e) => {
-              const categoryId = e.target.value;
-              if (categoryId) {
-                onAddCategory(type, categoryId);
-              }
-            }}
-            className="w-full p-2 border border-gray-300 rounded-lg bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#3A55DF] focus:border-transparent"
-            value=""
-          >
-            <option value="" disabled>
-              Выберите
-            </option>
-            {availableCategories.map((category) => (
-              <option
-                key={category.id}
-                value={typeof category.original === 'string' ? category.name : category.id}
-              >
-                {category.name}
-              </option>
-            ))}
-          </Select>
-        </div>
+        <CategorySearchSelect
+          options={availableCategories.map((category) => ({
+            id: category.id,
+            name: category.name,
+            value: typeof category.original === 'string' ? category.name : category.id,
+          }))}
+          onSelect={(categoryId) => onAddCategory(type, categoryId)}
+        />
       )}
     </div>
   );

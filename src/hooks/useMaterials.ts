@@ -30,7 +30,7 @@ export function useMaterials() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(500);
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<'name' | 'price' | 'code'>('name');
+  const [sort, setSort] = useState<'name' | 'price' | 'code' | 'createdAt'>('name');
   const [order, setOrder] = useState<'ASC' | 'DESC'>('ASC');
   const [selectedCategory, setSelectedCategory] = useState('Все');
   const [selectedCurrency, setSelectedCurrency] = useState<

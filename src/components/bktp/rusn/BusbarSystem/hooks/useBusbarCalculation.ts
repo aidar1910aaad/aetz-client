@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRusnStore } from '@/store/useRusnStore';
 import { BusMaterial } from '@/types/rusn';
 import { switchgearApi, Switchgear } from '@/api/switchgear';
@@ -6,9 +6,37 @@ import { useRusnCalculation } from '@/hooks/useRusnCalculation';
 import { calculateCost } from '@/utils/calculationUtils';
 import { useMaterialPrices } from '@/hooks/useMaterialPrices';
 import { applyApiCalculationRates } from '@/utils/calculationSettings';
+import {
+  ALL_BUSBAR_SECTIONS,
+  getBusbarSectionWeightScale,
+  normalizeBusbarSection,
+} from '@/utils/busbarSectionUtils';
+
+function buildEffectiveConfig(
+  baseConfig: Switchgear,
+  section: string,
+  matchingConfigs: Switchgear[],
+  material: BusMaterial
+): Switchgear {
+  const exactConfig = matchingConfigs.find(
+    (c) => normalizeBusbarSection(c.busbar) === normalizeBusbarSection(section)
+  );
+  if (exactConfig) return exactConfig;
+
+  const scale = getBusbarSectionWeightScale(baseConfig.busbar, section, material);
+  return {
+    ...baseConfig,
+    busbar: section,
+    cells: baseConfig.cells.map((cell) => ({
+      ...cell,
+      quantity: (cell.quantity || 0) * scale,
+    })),
+  };
+}
 
 export const useBusbarCalculation = () => {
   const rusn = useRusnStore();
+  const setBusbarSection = useRusnStore((s) => s.setBusbarSection);
   const { busBridge } = rusn.global;
   const [switchgearConfigs, setSwitchgearConfigs] = useState<Switchgear[]>([]);
   const { aluminum: aluminumPrice, copper: copperPrice } = useMaterialPrices();
@@ -62,23 +90,55 @@ export const useBusbarCalculation = () => {
     return [];
   };
 
-  // Находим подходящую конфигурацию для выбранного выключателя и материала
-  const matchingConfig =
-    selectedBreaker && busBridge.material
-      ? switchgearConfigs.find((config) => {
-          const breakerCurrent = getBreakerCurrent(selectedBreaker.name);
-          const configBreakerMatch = config.breaker.match(/(\d+)[АA]/);
-          const configBreakerCurrent = configBreakerMatch ? parseInt(configBreakerMatch[1]) : null;
-          const materialGroups = getMaterialGroup(busBridge.material);
+  // Находим все подходящие конфигурации для выбранного выключателя и материала
+  const matchingConfigs = useMemo(() => {
+    if (!selectedBreaker || !busBridge.material) return [];
 
-          return (
-            breakerCurrent &&
-            configBreakerCurrent &&
-            breakerCurrent === configBreakerCurrent &&
-            materialGroups.includes(config.group)
-          );
-        })
-      : null;
+    return switchgearConfigs.filter((config) => {
+      const breakerCurrent = getBreakerCurrent(selectedBreaker.name);
+      const configBreakerMatch = config.breaker.match(/(\d+)[АA]/);
+      const configBreakerCurrent = configBreakerMatch ? parseInt(configBreakerMatch[1]) : null;
+      const materialGroups = getMaterialGroup(busBridge.material);
+
+      return (
+        breakerCurrent &&
+        configBreakerCurrent &&
+        breakerCurrent === configBreakerCurrent &&
+        materialGroups.includes(config.group)
+      );
+    });
+  }, [switchgearConfigs, selectedBreaker, busBridge.material]);
+
+  const availableBusbarSections = useMemo(() => [...ALL_BUSBAR_SECTIONS], []);
+
+  const selectedBusbarSection = busBridge.selectedBusbarSection;
+
+  const baseMatchingConfig = matchingConfigs[0] ?? null;
+
+  const matchingConfig = useMemo(() => {
+    if (!baseMatchingConfig) return null;
+    const section = selectedBusbarSection || baseMatchingConfig.busbar;
+    return buildEffectiveConfig(
+      baseMatchingConfig,
+      section,
+      matchingConfigs,
+      busBridge.material
+    );
+  }, [baseMatchingConfig, matchingConfigs, selectedBusbarSection, busBridge.material]);
+
+  // Устанавливаем сечение по умолчанию из конфигурации
+  useEffect(() => {
+    if (!baseMatchingConfig) {
+      if (busBridge.selectedBusbarSection) {
+        setBusbarSection(null);
+      }
+      return;
+    }
+
+    if (!busBridge.selectedBusbarSection) {
+      setBusbarSection(baseMatchingConfig.busbar);
+    }
+  }, [baseMatchingConfig, busBridge.selectedBusbarSection, setBusbarSection]);
 
   // Рассчитываем общий вес и стоимость
   const totalWeight = matchingConfig
@@ -179,7 +239,7 @@ export const useBusbarCalculation = () => {
     if (matchingConfig && busbarCalculation && busbarCalculationResult) {
       const materialName =
         busBridge.material === 'АД' || busBridge.material === 'АД2' ? 'Алюминий' : 'Медь';
-      const summaryName = `Сборный шина ${materialName} ${matchingConfig.busbar} ${matchingConfig.breaker}`;
+      const summaryName = `Сборный шина ${materialName} ${matchingConfig.busbar}`;
 
       const newSummary = {
         name: summaryName,
@@ -199,6 +259,7 @@ export const useBusbarCalculation = () => {
     busbarCalculation?.id,
     busbarCalculationResult?.finalPrice,
     busBridge.material,
+    selectedBusbarSection,
   ]);
 
   // Отображаем калькуляцию в консоли
@@ -223,6 +284,10 @@ export const useBusbarCalculation = () => {
     busbarCalculation,
     selectedBreaker,
     matchingConfig,
+    baseMatchingConfig,
+    matchingConfigs,
+    availableBusbarSections,
+    selectedBusbarSection,
     totalWeight,
     totalPrice,
     busbarCalculationResult,
@@ -232,5 +297,6 @@ export const useBusbarCalculation = () => {
     getBreakerCurrent,
     getPricePerKg,
     getMaterialGroup,
+    setBusbarSection,
   };
 };

@@ -3,6 +3,7 @@ import { getSettings, saveSettings } from '@/api/settings/index';
 import { getAllCategories, Category } from '@/api/categories';
 import { getMaterialsByCategoryId } from '@/api/material/index';
 import { showToast } from '@/shared/modals/ToastProvider';
+import { invalidateRunnMaterialsCache } from '@/hooks/useRunnMaterials';
 
 interface CategorySetting {
   id: string;
@@ -87,6 +88,14 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
 
   // Ref для отслеживания предыдущего состояния видимости категорий
   const prevVisibilityRef = useRef<string>('');
+  const settingsRequestIdRef = useRef(0);
+  const hasChangesRef = useRef(false);
+  const settingsLoadedRef = useRef(false);
+  const selectedCategoriesRef = useRef<RunnSettings | null>(null);
+
+  useEffect(() => {
+    selectedCategoriesRef.current = selectedCategories;
+  }, [selectedCategories]);
 
   // Загрузка всех доступных категорий из API
   useEffect(() => {
@@ -224,8 +233,13 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
   // Загрузка текущих настроек
   useEffect(() => {
     const fetchSettings = async () => {
+      const requestId = ++settingsRequestIdRef.current;
+
       try {
-        setLoading(true);
+        // Не показываем лоадер повторно — иначе форма размонтируется и теряется ввод
+        if (!selectedCategories) {
+          setLoading(true);
+        }
 
         // Получаем токен из localStorage
         const token = localStorage.getItem('token');
@@ -238,11 +252,13 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
         // Выполняем GET запрос к API
         const apiResponse = await getSettings(token);
 
+        if (requestId !== settingsRequestIdRef.current) return;
+
         // Обрабатываем настройки РУНН (если они есть)
         if (apiResponse.settings?.runn && apiResponse.settings.runn.length > 0) {
-          await processRunnSettings(apiResponse.settings.runn, apiCategories);
-        } else {
-          // Показываем пустые секции (пользователь сам добавит категории)
+          await processRunnSettings(apiResponse.settings.runn, apiCategories, requestId);
+        } else if (!hasChangesRef.current && !selectedCategoriesRef.current) {
+          // Пустое состояние только при первой загрузке, без уже выбранных категорий
           const emptySettings: RunnSettings = {
             avtomatVyk: [],
             avtomatLity: [],
@@ -255,32 +271,45 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
 
           setSelectedCategories(emptySettings);
           setOriginalSettings(JSON.parse(JSON.stringify(emptySettings)));
+          settingsLoadedRef.current = true;
         }
       } catch (error) {
         console.error('Ошибка загрузки настроек РУНН:', error);
 
-        // В случае ошибки показываем пустые настройки
-        const emptySettings: RunnSettings = {
-          avtomatVyk: [],
-          avtomatLity: [],
-          counter: [],
-          rpsLeft: [],
-          fusesPn: [],
-          currentTransformer: [],
-          moldedCaseSwitch: [],
-        };
+        if (requestId !== settingsRequestIdRef.current || hasChangesRef.current) {
+          return;
+        }
 
-        setSelectedCategories(emptySettings);
-        setOriginalSettings(JSON.parse(JSON.stringify(emptySettings)));
+        if (!selectedCategoriesRef.current) {
+          const emptySettings: RunnSettings = {
+            avtomatVyk: [],
+            avtomatLity: [],
+            counter: [],
+            rpsLeft: [],
+            fusesPn: [],
+            currentTransformer: [],
+            moldedCaseSwitch: [],
+          };
+
+          setSelectedCategories(emptySettings);
+          setOriginalSettings(JSON.parse(JSON.stringify(emptySettings)));
+          settingsLoadedRef.current = true;
+        }
       } finally {
-        setLoading(false);
+        if (requestId === settingsRequestIdRef.current) {
+          setLoading(false);
+        }
       }
     };
 
     const processRunnSettings = async (
       apiRunnSettings: { categoryId: number; type: string; isVisible: boolean }[],
-      categories: Category[]
+      categories: Category[],
+      requestId: number
     ) => {
+      if (requestId !== settingsRequestIdRef.current || hasChangesRef.current) {
+        return;
+      }
 
       // Преобразуем API формат в наш формат
       const transformedSettings: RunnSettings = {
@@ -336,6 +365,7 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
 
       setSelectedCategories(transformedSettings);
       setOriginalSettings(JSON.parse(JSON.stringify(transformedSettings)));
+      settingsLoadedRef.current = true;
       
       if (!skipMaterialsLoad) {
         const token = localStorage.getItem('token');
@@ -346,14 +376,18 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
     };
 
     if (apiCategories.length === 0) return;
+    if (settingsLoadedRef.current) return;
+
     fetchSettings();
   }, [apiCategories.length, skipMaterialsLoad]);
 
   // Проверка изменений
   useEffect(() => {
     if (selectedCategories && originalSettings) {
-      const hasChanges = JSON.stringify(selectedCategories) !== JSON.stringify(originalSettings);
-      setHasChanges(hasChanges);
+      const changed =
+        JSON.stringify(selectedCategories) !== JSON.stringify(originalSettings);
+      hasChangesRef.current = changed;
+      setHasChanges(changed);
     }
   }, [selectedCategories, originalSettings]);
 
@@ -427,6 +461,9 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
       visible: true,
     };
 
+    hasChangesRef.current = true;
+    setHasChanges(true);
+
     setSelectedCategories((prev) => {
       const newCategories = {
         ...prev!,
@@ -443,7 +480,6 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
       
       return newCategories;
     });
-    setHasChanges(true);
   };
 
   const handleRemoveCategory = (type: keyof RunnSettings, categoryId: string) => {
@@ -451,6 +487,9 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
 
     const categoryToRemove = selectedCategories[type].find((cat) => cat.id === categoryId);
     if (!categoryToRemove) return;
+
+    hasChangesRef.current = true;
+    setHasChanges(true);
 
     setSelectedCategories((prev) => {
       const newCategories = {
@@ -468,7 +507,6 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
       
       return newCategories;
     });
-    setHasChanges(true);
   };
 
   const handleToggleVisibility = (type: keyof RunnSettings, categoryId: string) => {
@@ -479,6 +517,9 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
 
     const newVisible = !categoryToToggle.visible;
     
+
+    hasChangesRef.current = true;
+    setHasChanges(true);
 
     setSelectedCategories((prev) => {
       const newCategories = {
@@ -498,7 +539,6 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
       
       return newCategories;
     });
-    setHasChanges(true);
   };
 
   const handleSave = async () => {
@@ -518,12 +558,12 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
         return;
       }
 
-      // Получаем текущие настройки из API
-      const currentSettings = await getSettings(token);
-
-
-      // Преобразуем наши настройки в формат API
-      const runnSettings = [];
+      // Получаем текущие настройки из API — отправляем только секцию runn (как в РУСН)
+      const runnSettings: {
+        categoryId: number;
+        type: string;
+        isVisible: boolean;
+      }[] = [];
 
       // Собираем все категории из всех типов
       Object.entries(selectedCategories).forEach(([type, categories]) => {
@@ -566,11 +606,9 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
         return;
       }
 
-      // Обновляем настройки в API
+      // Обновляем только секцию runn — остальные настройки на сервере не трогаем
       const updatedSettings = {
-        ...currentSettings,
         settings: {
-          ...currentSettings.settings,
           runn: runnSettings,
         },
       };
@@ -587,13 +625,13 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
       }
 
       // Сохраняем в API
-      const result = await saveSettings(updatedSettings, token);
+      await saveSettings(updatedSettings, token);
 
-      // Обновляем оригинальные настройки
       setOriginalSettings(JSON.parse(JSON.stringify(selectedCategories)));
+      hasChangesRef.current = false;
       setHasChanges(false);
+      invalidateRunnMaterialsCache();
 
-      // Уведомление об успешном сохранении
       showToast('Настройки успешно сохранены', 'success');
     } catch (error) {
       console.error('Ошибка сохранения настроек БКТП РУНН:', error);

@@ -17,7 +17,7 @@ interface Props {
   search: string;
   setSearch: Dispatch<SetStateAction<string>>;
   sort: string;
-  setSort: Dispatch<SetStateAction<'name' | 'price' | 'code'>>;
+  setSort: Dispatch<SetStateAction<'name' | 'price' | 'code' | 'createdAt'>>;
   order: string;
   setOrder: Dispatch<SetStateAction<'ASC' | 'DESC'>>;
   categories: string[];
@@ -454,7 +454,7 @@ export default function MaterialsTableSection({
         </div>
 
         {/* Сортировка */}
-        <div className="relative" ref={sortDropdownRef} style={{ width: '200px', minWidth: '200px' }}>
+        <div className="relative" ref={sortDropdownRef} style={{ width: '240px', minWidth: '240px' }}>
           <button
             type="button"
             onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
@@ -464,16 +464,18 @@ export default function MaterialsTableSection({
               {sort === 'name' && 'Сортировка: Название'}
               {sort === 'price' && 'Сортировка: Цена'}
               {sort === 'code' && 'Сортировка: Код'}
+              {sort === 'createdAt' && 'Сортировка: Дата создания'}
             </span>
             <ChevronDown size={16} className={`absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-transform pointer-events-none ${sortDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           {sortDropdownOpen && (
             <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg">
-              {(['name', 'price', 'code'] as const).map((sortOption) => {
+              {(['name', 'price', 'code', 'createdAt'] as const).map((sortOption) => {
                 const labels = {
                   name: 'Сортировка: Название',
                   price: 'Сортировка: Цена',
                   code: 'Сортировка: Код',
+                  createdAt: 'Сортировка: Дата создания',
                 };
                 const isSelected = sort === sortOption;
                 return (

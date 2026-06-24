@@ -282,6 +282,14 @@ function RequestsPageContent() {
     router.push(`/dashboard/requests/${requestId}`);
   };
 
+  if (loading) {
+    return (
+      <div className="h-[calc(100vh-64px)] bg-white">
+        <PageLoader size="section" className="min-h-full" message="Загрузка заявок..." />
+      </div>
+    );
+  }
+
   return (
     <div className="h-[calc(100vh-64px)] bg-white overflow-y-auto">
       <div className="p-6">
@@ -298,7 +306,7 @@ function RequestsPageContent() {
               </div>
             </div>
             
-            {!loading && !error && (
+            {!error && (
               <div className="bg-gray-50 px-4 py-2 rounded-lg">
                 <span className="text-sm text-gray-600">Всего заявок: </span>
                 <span className="font-semibold text-[#8eba1e]">{requests.length}</span>
@@ -606,11 +614,7 @@ function RequestsPageContent() {
         </div>
 
         {/* Table Section */}
-        {loading ? (
-          <div className="flex min-h-[200px] items-center justify-center rounded-xl border border-gray-200 bg-white">
-            <PageLoader size="compact" message="Загрузка заявок..." />
-          </div>
-        ) : error ? (
+        {error ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <div className="text-red-500 text-6xl mb-4">⚠️</div>
@@ -745,8 +749,8 @@ function RequestsPageContent() {
 export default function RequestsPage() {
   return (
     <Suspense fallback={
-      <div className="h-[calc(100vh-110px)]">
-        <PageLoader inline />
+      <div className="h-[calc(100vh-64px)] bg-white">
+        <PageLoader size="section" className="min-h-full" message="Загрузка заявок..." />
       </div>
     }>
       <RequestsPageContent />

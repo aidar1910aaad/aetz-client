@@ -25,7 +25,7 @@ export interface GetMaterialsParams {
   page?: number;
   limit?: number;
   search?: string;
-  sort?: 'name' | 'price' | 'code';
+  sort?: 'name' | 'price' | 'code' | 'createdAt';
   order?: 'ASC' | 'DESC';
   categoryId?: number;
 }

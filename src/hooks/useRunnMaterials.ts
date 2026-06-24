@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getSettings } from '@/api/settings';
 import { getMaterialsByCategoryId, Material } from '@/api/material';
-import { fetchWithDedup } from '@/lib/materialsFetchCache';
+import { fetchWithDedup, invalidateCacheSlot } from '@/lib/materialsFetchCache';
 
 interface RunnSetting {
   type: string;
@@ -97,6 +97,10 @@ async function loadRunnMaterialsFromApi(): Promise<RunnMaterials> {
 
     return newMaterials;
   });
+}
+
+export function invalidateRunnMaterialsCache(): void {
+  invalidateCacheSlot(runnMaterialsSlot);
 }
 
 export function useRunnMaterials() {

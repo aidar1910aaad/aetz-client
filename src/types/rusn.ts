@@ -14,6 +14,8 @@ export interface BusConsumption {
 export interface BusBridgeConfig {
   material: BusMaterial;
   selectedBus: BusSpec | null;
+  /** Выбранное сечение шины (например, 80x8) */
+  selectedBusbarSection: string | null;
   totalWeight: number;
   pricePerKg: number;
   totalPrice: number;

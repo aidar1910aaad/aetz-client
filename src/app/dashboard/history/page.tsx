@@ -21,6 +21,7 @@ function HistoryPageContent() {
     entityType: '',
     action: '',
     changedBy: searchParams.get('changedBy') || '',
+    materialSearch: searchParams.get('materialSearch') || '',
   });
   const [page, setPage] = useState(Number(searchParams.get('page') || 1));
   const [limit, setLimit] = useState(Number(searchParams.get('limit') || 50));
@@ -37,6 +38,7 @@ function HistoryPageContent() {
       entityType: (searchParams.get('entityType') as HistoryFiltersState['entityType']) || '',
       action: (searchParams.get('action') as HistoryFiltersState['action']) || '',
       changedBy: searchParams.get('changedBy') || '',
+      materialSearch: searchParams.get('materialSearch') || '',
     });
     setPage(Number(searchParams.get('page') || 1));
     setLimit(Number(searchParams.get('limit') || 50));
@@ -48,6 +50,7 @@ function HistoryPageContent() {
       if (nextFilters.entityType) params.set('entityType', nextFilters.entityType);
       if (nextFilters.action) params.set('action', nextFilters.action);
       if (nextFilters.changedBy) params.set('changedBy', nextFilters.changedBy);
+      if (nextFilters.materialSearch) params.set('materialSearch', nextFilters.materialSearch);
       if (nextPage > 1) params.set('page', String(nextPage));
       if (nextLimit !== 50) params.set('limit', String(nextLimit));
       const queryString = params.toString();
@@ -76,6 +79,7 @@ function HistoryPageContent() {
         entityType: filters.entityType || undefined,
         action: filters.action || undefined,
         changedBy: filters.changedBy || undefined,
+        materialSearch: filters.materialSearch || undefined,
       });
       const newHistory = data.data || [];
       const newTotal = data.total || 0;

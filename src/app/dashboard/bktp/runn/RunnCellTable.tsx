@@ -734,15 +734,27 @@ export default function RunnCellTable({
       currentSvMaterial !== processedMaterialsRef.current.svMaterial;
 
     if (materialsChanged) {
-      // Обновляем ячейку "Ввод"
+      // Обновляем ячейку "Ввод" только если пользователь не выбрал значение вручную
       const vvodCell = cellConfigs.find((c) => c.purpose === 'Ввод');
-      if (vvodCell && currentVvodMaterial) {
+      const previousVvodMaterial = processedMaterialsRef.current.vvodMaterial;
+      if (
+        vvodCell &&
+        currentVvodMaterial &&
+        (!vvodCell.breaker ||
+          (previousVvodMaterial && vvodCell.breaker === previousVvodMaterial))
+      ) {
         updateCell(vvodCell.id, 'breaker', currentVvodMaterial);
       }
 
-      // Обновляем ячейку "Секционный выключатель"
+      // Обновляем ячейку "Секционный выключатель" только если пользователь не выбрал значение вручную
       const svCell = cellConfigs.find((c) => c.purpose === 'Секционный выключатель');
-      if (svCell && currentSvMaterial) {
+      const previousSvMaterial = processedMaterialsRef.current.svMaterial;
+      if (
+        svCell &&
+        currentSvMaterial &&
+        (!svCell.breaker ||
+          (previousSvMaterial && svCell.breaker === previousSvMaterial))
+      ) {
         updateCell(svCell.id, 'breaker', currentSvMaterial);
       }
 

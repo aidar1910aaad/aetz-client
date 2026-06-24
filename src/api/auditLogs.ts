@@ -25,6 +25,7 @@ export interface GetAuditLogsParams {
   entityType?: AuditEntityType;
   action?: AuditActionType;
   changedBy?: string;
+  materialSearch?: string;
 }
 
 export interface AuditLogsResponse {
@@ -46,6 +47,7 @@ export async function getAuditLogs(
   if (params.entityType) query.append('entityType', params.entityType);
   if (params.action) query.append('action', params.action);
   if (params.changedBy?.trim()) query.append('changedBy', params.changedBy.trim());
+  if (params.materialSearch?.trim()) query.append('materialSearch', params.materialSearch.trim());
 
   const response = await fetch(`${api}/audit-logs?${query.toString()}`, {
     method: 'GET',

@@ -124,6 +124,7 @@ interface RusnState {
   removeCell: (id: string) => void;
   clearAllCells: () => void;
   setBusMaterial: (material: BusMaterial) => void;
+  setBusbarSection: (section: string | null) => void;
   updateBusBridge: () => void;
   reset: () => void;
   busbarSummary: RusnBusbarSummary | null;
@@ -145,6 +146,7 @@ interface RusnState {
 const initialBusBridge: BusBridgeConfig = {
   material: 'АД',
   selectedBus: null,
+  selectedBusbarSection: null,
   totalWeight: 0,
   pricePerKg: BUS_MATERIAL_PRICES['АД'],
   totalPrice: 0,
@@ -270,7 +272,19 @@ export const useRusnStore = create<RusnState>()(
             busBridge: {
               ...state.global.busBridge,
               material,
+              selectedBusbarSection: null,
               pricePerKg: BUS_MATERIAL_PRICES[material],
+            },
+          },
+        })),
+
+      setBusbarSection: (section: string | null) =>
+        set((state) => ({
+          global: {
+            ...state.global,
+            busBridge: {
+              ...state.global.busBridge,
+              selectedBusbarSection: section,
             },
           },
         })),

@@ -10,6 +10,7 @@ export interface HistoryFiltersState {
   entityType: '' | AuditEntityType;
   action: '' | AuditActionType;
   changedBy: string;
+  materialSearch: string;
 }
 
 interface HistoryFiltersProps {
@@ -40,11 +41,17 @@ export default function HistoryFilters({
   loading,
 }: HistoryFiltersProps) {
   const [localChangedBy, setLocalChangedBy] = useState(filters.changedBy);
+  const [localMaterialSearch, setLocalMaterialSearch] = useState(filters.materialSearch);
   const debouncedChangedBy = useDebounce(localChangedBy, 500);
+  const debouncedMaterialSearch = useDebounce(localMaterialSearch, 500);
 
   useEffect(() => {
     setLocalChangedBy(filters.changedBy);
   }, [filters.changedBy]);
+
+  useEffect(() => {
+    setLocalMaterialSearch(filters.materialSearch);
+  }, [filters.materialSearch]);
 
   useEffect(() => {
     if (debouncedChangedBy !== filters.changedBy) {
@@ -53,16 +60,25 @@ export default function HistoryFilters({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedChangedBy]);
 
+  useEffect(() => {
+    if (debouncedMaterialSearch !== filters.materialSearch) {
+      onFiltersChange({ ...filters, materialSearch: debouncedMaterialSearch });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedMaterialSearch]);
+
   const handleFilterChange = (key: keyof HistoryFiltersState, value: string) => {
     onFiltersChange({ ...filters, [key]: value });
   };
 
   const clearFilters = () => {
     setLocalChangedBy('');
-    onFiltersChange({ entityType: '', action: '', changedBy: '' });
+    setLocalMaterialSearch('');
+    onFiltersChange({ entityType: '', action: '', changedBy: '', materialSearch: '' });
   };
 
-  const hasActiveFilters = filters.entityType || filters.action || filters.changedBy;
+  const hasActiveFilters =
+    filters.entityType || filters.action || filters.changedBy || filters.materialSearch;
 
   return (
     <div className="mb-5 rounded-lg border border-[#8eba1e]/20 bg-white p-4">
@@ -96,7 +112,18 @@ export default function HistoryFilters({
             ))}
           </Select>
 
-          <div className="relative min-w-[240px] flex-1 sm:max-w-xs">
+          <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={localMaterialSearch}
+              onChange={(e) => setLocalMaterialSearch(e.target.value)}
+              placeholder="Поиск по материалу..."
+              className="w-full rounded-lg border border-gray-200 py-2 pl-10 pr-3 text-sm focus:border-[#8eba1e] focus:outline-none focus:ring-1 focus:ring-[#8eba1e]"
+            />
+          </div>
+
+          <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
