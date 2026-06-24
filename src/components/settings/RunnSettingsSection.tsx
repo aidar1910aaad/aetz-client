@@ -73,6 +73,7 @@ export function RunnSettingsSection({
             <span className="text-gray-700">{category.name}</span>
             <div className="flex items-center gap-2">
               <button
+                type="button"
                 onClick={() => onToggleVisibility(type, category.id)}
                 className={`p-1.5 rounded-lg transition-colors duration-200 ${
                   category.visible
@@ -84,6 +85,7 @@ export function RunnSettingsSection({
                 {category.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
               </button>
               <button
+                type="button"
                 onClick={() => onRemoveCategory(type, category.id)}
                 className="p-1.5 hover:bg-red-50 rounded-lg transition-colors duration-200"
                 title="Удалить"

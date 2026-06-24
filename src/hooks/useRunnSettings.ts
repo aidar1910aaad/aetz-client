@@ -482,37 +482,45 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
     });
   };
 
-  const handleRemoveCategory = (type: keyof RunnSettings, categoryId: string) => {
+  const handleRemoveCategory = async (type: keyof RunnSettings, categoryId: string) => {
     if (!selectedCategories) return;
 
-    const categoryToRemove = selectedCategories[type].find((cat) => cat.id === categoryId);
+    const normalizedId = String(categoryId);
+    const categoryToRemove = selectedCategories[type].find(
+      (cat) => String(cat.id) === normalizedId
+    );
     if (!categoryToRemove) return;
+
+    const newCategories: RunnSettings = {
+      ...selectedCategories,
+      [type]: selectedCategories[type].filter((cat) => String(cat.id) !== normalizedId),
+    };
 
     hasChangesRef.current = true;
     setHasChanges(true);
+    setSelectedCategories(newCategories);
 
-    setSelectedCategories((prev) => {
-      const newCategories = {
-        ...prev!,
-        [type]: prev![type].filter((cat) => cat.id !== categoryId),
-      };
-      
-      // Принудительно перезагружаем материалы после удаления категории
-      setTimeout(() => {
-        const token = localStorage.getItem('token');
-        if (token) {
-          loadMaterialsForCategories(newCategories, token);
-        }
-      }, 100);
-      
-      return newCategories;
-    });
+    if (!skipMaterialsLoad) {
+      const token = localStorage.getItem('token');
+      if (token) {
+        loadMaterialsForCategories(newCategories, token);
+      }
+    }
+
+    try {
+      await persistRunnSettings(newCategories, { successMessage: 'Категория удалена' });
+    } catch {
+      // persistRunnSettings уже показывает toast об ошибке
+    }
   };
 
   const handleToggleVisibility = (type: keyof RunnSettings, categoryId: string) => {
     if (!selectedCategories) return;
 
-    const categoryToToggle = selectedCategories[type].find((cat) => cat.id === categoryId);
+    const normalizedId = String(categoryId);
+    const categoryToToggle = selectedCategories[type].find(
+      (cat) => String(cat.id) === normalizedId
+    );
     if (!categoryToToggle) return;
 
     const newVisible = !categoryToToggle.visible;
@@ -525,7 +533,7 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
       const newCategories = {
         ...prev!,
         [type]: prev![type].map((cat) =>
-          cat.id === categoryId ? { ...cat, visible: newVisible } : cat
+          String(cat.id) === normalizedId ? { ...cat, visible: newVisible } : cat
         ),
       };
       
@@ -541,6 +549,79 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
     });
   };
 
+  const buildRunnSettingsPayload = (settings: RunnSettings) => {
+    const runnSettings: {
+      categoryId: number;
+      type: string;
+      isVisible: boolean;
+    }[] = [];
+
+    Object.entries(settings).forEach(([type, categories]) => {
+      categories.forEach((category) => {
+        const apiCategory = apiCategories.find((cat) => cat.name === category.name);
+
+        if (!apiCategory) {
+          const categoryId = parseInt(category.id, 10);
+
+          if (!isNaN(categoryId) && categoryId > 0 && categoryId <= 2147483647) {
+            runnSettings.push({
+              categoryId,
+              type,
+              isVisible: category.visible,
+            });
+          } else {
+            console.warn(
+              `Неправильный ID категории: ${category.id} (${category.name}). ID должен быть числом от 1 до 2147483647.`
+            );
+          }
+        } else {
+          runnSettings.push({
+            categoryId: apiCategory.id,
+            type,
+            isVisible: category.visible,
+          });
+        }
+      });
+    });
+
+    return runnSettings;
+  };
+
+  const persistRunnSettings = async (
+    settings: RunnSettings,
+    options: { successMessage?: string } = {}
+  ) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      showToast('Ошибка авторизации', 'error');
+      throw new Error('Токен не найден');
+    }
+
+    const runnSettings = buildRunnSettingsPayload(settings);
+    const totalInUi = Object.values(settings).reduce((sum, categories) => sum + categories.length, 0);
+
+    if (totalInUi > 0 && runnSettings.length === 0) {
+      showToast('Не удалось сохранить: проверьте выбранные категории', 'error');
+      throw new Error('Invalid category ids');
+    }
+
+    const updatedSettings = {
+      settings: {
+        runn: runnSettings,
+      },
+    };
+
+    await saveSettings(updatedSettings, token);
+
+    setSelectedCategories(settings);
+    setOriginalSettings(JSON.parse(JSON.stringify(settings)));
+    hasChangesRef.current = false;
+    setHasChanges(false);
+    invalidateRunnMaterialsCache();
+
+    showToast(options.successMessage ?? 'Настройки успешно сохранены', 'success');
+  };
+
   const handleSave = async () => {
     if (!selectedCategories) {
       console.error('selectedCategories is null or undefined');
@@ -548,100 +629,18 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
       return;
     }
 
+    if (!hasChangesRef.current) {
+      showToast('Нет изменений для сохранения', 'error');
+      return;
+    }
+
     try {
-      
-
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.error('Токен не найден в localStorage');
-        showToast('Ошибка авторизации', 'error');
-        return;
-      }
-
-      // Получаем текущие настройки из API — отправляем только секцию runn (как в РУСН)
-      const runnSettings: {
-        categoryId: number;
-        type: string;
-        isVisible: boolean;
-      }[] = [];
-
-      // Собираем все категории из всех типов
-      Object.entries(selectedCategories).forEach(([type, categories]) => {
-                  categories.forEach((category) => {
-
-          // Сначала пытаемся найти категорию по названию в API
-          const apiCategory = apiCategories.find((cat) => cat.name === category.name);
-          
-
-          // Если не найдена в API, используем ID из category (для моковых данных)
-          if (!apiCategory) {
-            // Проверяем, что ID является числом, а не UUID
-            const categoryId = parseInt(category.id);
-
-            if (!isNaN(categoryId) && categoryId > 0 && categoryId <= 2147483647) {
-              runnSettings.push({
-                categoryId: categoryId,
-                type: type as 'avtomatVyk' | 'avtomatLity' | 'counter' | 'rpsLeft' | 'fusesPn' | 'currentTransformer' | 'moldedCaseSwitch',
-                isVisible: category.visible,
-              });
-            } else {
-              console.warn(`Неправильный ID категории: ${category.id} (${category.name}). ID должен быть числом от 1 до 2147483647.`);
-            }
-          } else {
-            // Для API данных используем найденный ID
-
-            runnSettings.push({
-              categoryId: apiCategory.id,
-              type: type as 'avtomatVyk' | 'avtomatLity' | 'counter' | 'rpsLeft' | 'fusesPn' | 'currentTransformer' | 'moldedCaseSwitch',
-              isVisible: category.visible,
-            });
-          }
-        });
-      });
-
-
-      if (runnSettings.length === 0) {
-        console.warn('Нет настроек для сохранения');
-        showToast('Нет изменений для сохранения', 'error');
-        return;
-      }
-
-      // Обновляем только секцию runn — остальные настройки на сервере не трогаем
-      const updatedSettings = {
-        settings: {
-          runn: runnSettings,
-        },
-      };
-
-      const settingsJson = JSON.stringify(updatedSettings);
-      const settingsSize = settingsJson.length;
-      
-
-      // Проверяем размер данных
-      if (settingsSize > 1000000) { // 1MB лимит
-        console.error('Размер настроек слишком большой:', settingsSize, 'байт');
-        showToast('Размер настроек слишком большой для сохранения', 'error');
-        return;
-      }
-
-      // Сохраняем в API
-      await saveSettings(updatedSettings, token);
-
-      setOriginalSettings(JSON.parse(JSON.stringify(selectedCategories)));
-      hasChangesRef.current = false;
-      setHasChanges(false);
-      invalidateRunnMaterialsCache();
-
-      showToast('Настройки успешно сохранены', 'success');
+      await persistRunnSettings(selectedCategories);
     } catch (error) {
       console.error('Ошибка сохранения настроек БКТП РУНН:', error);
-      if (error instanceof Error) {
-        console.error('Детали ошибки:', {
-          message: error.message,
-          stack: error.stack,
-        });
+      if (error instanceof Error && error.message !== 'Invalid category ids') {
         showToast(`Ошибка при сохранении: ${error.message}`, 'error');
-      } else {
+      } else if (!(error instanceof Error)) {
         showToast('Ошибка при сохранении настроек', 'error');
       }
     }
