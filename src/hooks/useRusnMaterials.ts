@@ -3,7 +3,7 @@ import { getSettings } from '@/api/settings';
 import { getMaterialsByCategoryId } from '@/api/material';
 import { Material } from '@/api/material';
 import { useRusnStore } from '@/store/useRusnStore';
-import { fetchWithDedup } from '@/lib/materialsFetchCache';
+import { fetchWithDedup, invalidateCacheSlot } from '@/lib/materialsFetchCache';
 
 interface RusnSetting {
   type: 'switch' | 'rza' | 'counter' | 'sr' | 'tsn' | 'tn' | 'tt';
@@ -39,6 +39,10 @@ const rusnMaterialsSlot: {
   promise: Promise<RusnMaterialsState> | null;
   updatedAt: number;
 } = { key: '', data: null, promise: null, updatedAt: 0 };
+
+export function invalidateRusnMaterialsCache(): void {
+  invalidateCacheSlot(rusnMaterialsSlot);
+}
 
 export function useRusnMaterials() {
   const { global } = useRusnStore();

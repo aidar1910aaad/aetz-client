@@ -4,7 +4,11 @@ import Link from 'next/link';
 import { useUserStore } from '@/store/useUserStore';
 import { useRoleCheck } from '@/hooks/useRoleCheck';
 
-export default function HeroSection() {
+export default function HeroSection({
+  onNewBktpClick,
+}: {
+  onNewBktpClick?: () => void;
+}) {
   const { user } = useUserStore();
   const { isManagerUser } = useRoleCheck();
 
@@ -43,12 +47,13 @@ export default function HeroSection() {
         </div>
 
         {!isManagerUser && (
-          <Link
-            href="/dashboard/bktp"
+          <button
+            type="button"
+            onClick={onNewBktpClick}
             className="inline-flex shrink-0 items-center justify-center rounded-lg bg-white px-5 py-2.5 text-[15px] font-semibold text-[#7aa31a] shadow-sm transition-colors hover:bg-white/90"
           >
             + Новая заявка БКТП
-          </Link>
+          </button>
         )}
 
         {isManagerUser && (

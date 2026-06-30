@@ -19,10 +19,22 @@ function PayloadSection({ title, value }: { title: string; value: unknown }) {
   );
 }
 
+function TotalsRow({ label, amount }: { label: string; amount: number | null | undefined }) {
+  const normalizedAmount = Number(amount ?? 0);
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md border border-gray-200 bg-white px-3 py-2">
+      <span className="text-xs text-gray-600">{label}</span>
+      <span className="text-xs font-semibold text-gray-900">{formatAmount(normalizedAmount)} ₸</span>
+    </div>
+  );
+}
+
 function RealtimeCalculationBadge() {
   const [isPayloadOpen, setIsPayloadOpen] = useState(false);
   const { isCalculating, totalAmount, error, lastCalculatedAt, data, requestConfig } =
     useRealtimeCalculationStore();
+  const totals = data?.snapshot?.totals;
 
   const debugPayload = {
     request: {
@@ -78,6 +90,20 @@ function RealtimeCalculationBadge() {
             Заявка › Общая информация › Здание подстанции › Трансформатор › РУСН › РУНН › Доп
             Оборудование › Работы
           </p>
+
+          <div className="rounded-md border border-gray-200 bg-gray-50 p-2">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+              Суммы по разделам
+            </p>
+            <div className="space-y-1.5">
+              <TotalsRow label="Здание подстанции" amount={totals?.bmzTotal} />
+              <TotalsRow label="Трансформатор" amount={totals?.transformerTotal} />
+              <TotalsRow label="РУСН" amount={totals?.rusnTotal} />
+              <TotalsRow label="РУНН" amount={totals?.runnTotal} />
+              <TotalsRow label="Доп Оборудование" amount={totals?.additionalEquipmentTotal} />
+              <TotalsRow label="Работы" amount={totals?.worksTotal} />
+            </div>
+          </div>
 
           <PayloadSection title="Заявка" value={debugPayload} />
           <PayloadSection title="Общая информация" value={requestConfig?.meta} />

@@ -40,13 +40,10 @@ export default function TransformerConfigurator() {
   });
 
   const [quantity, setQuantity] = useState(selectedTransformer?.quantity ?? 2);
-  const [skip, setSkip] = useState(() => {
+  const [skip, setSkip] = useState<boolean | null>(() => {
     if (selectedTransformer !== null) return false;
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('transformer-skip');
-      return stored === 'true';
-    }
-    return false;
+    if (useTransformerStore.getState().isSkipped) return true;
+    return null;
   });
 
   // Загрузка трансформаторов
@@ -84,12 +81,10 @@ export default function TransformerConfigurator() {
 
   // Синхронизация состояния skip с localStorage
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      if (skip) {
-        localStorage.setItem('transformer-skip', 'true');
-      } else {
-        localStorage.removeItem('transformer-skip');
-      }
+    if (skip === true) {
+      localStorage.setItem('transformer-skip', 'true');
+    } else {
+      localStorage.removeItem('transformer-skip');
     }
   }, [skip]);
 
@@ -203,6 +198,8 @@ export default function TransformerConfigurator() {
   // Синхронизируем выбранный трансформатор в store в реальном времени,
   // чтобы backend realtime calculation видел актуальные данные страницы до submit.
   useEffect(() => {
+    if (skip === null) return;
+
     if (skip) {
       skipTransformer();
       return;
@@ -285,6 +282,11 @@ export default function TransformerConfigurator() {
   }, [isComplete, matched, calculations]);
 
   const handleSubmit = () => {
+    if (skip === null) {
+      showToast('Выберите, будет ли трансформатор', 'error');
+      return;
+    }
+
     if (skip) {
       skipTransformer();
     } else if (matched) {
@@ -318,7 +320,7 @@ export default function TransformerConfigurator() {
     <div className="h-[calc(100vh-64px)] bg-white overflow-y-auto">
       <div className="p-6">
         <Breadcrumbs />
-        
+
         {/* Header Section */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-6">
@@ -341,7 +343,7 @@ export default function TransformerConfigurator() {
                   setSkip(false);
                 }}
                 className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold border-2 transition-all duration-200 ${
-                  !skip
+                  skip === false
                     ? 'bg-[#8eba1e] text-white border-[#8eba1e] shadow-lg'
                     : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300 hover:border-[#8eba1e]'
                 }`}
@@ -358,7 +360,7 @@ export default function TransformerConfigurator() {
                   setQuantity(2);
                 }}
                 className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold border-2 transition-all duration-200 ${
-                  skip
+                  skip === true
                     ? 'bg-red-100 text-red-700 border-red-300 shadow-lg'
                     : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300 hover:border-red-300'
                 }`}
@@ -374,7 +376,15 @@ export default function TransformerConfigurator() {
 
 
         <div className="space-y-6">
-          {!skip && (
+          {skip === null && (
+            <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center shadow-lg">
+              <p className="text-gray-600">
+                Выберите «Да» или «Нет», чтобы настроить трансформатор или пропустить этот этап.
+              </p>
+            </div>
+          )}
+
+          {skip === false && (
             <>
               <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-lg">
                 <div className="flex items-center gap-3 mb-6">
@@ -464,15 +474,15 @@ export default function TransformerConfigurator() {
               )}
             </>
           )}
-          {skip && <TransformerSkipBlock />}
+          {skip === true && <TransformerSkipBlock />}
         </div>
 
         <div className="pt-6 pb-8">
           <button
             onClick={handleSubmit}
-            disabled={!skip && !isComplete}
+            disabled={skip === null || (skip === false && !isComplete)}
             className={`flex items-center gap-2 px-8 py-4 rounded-xl text-lg font-semibold transition-all duration-200 ${
-              skip || isComplete
+              skip === true || (skip === false && isComplete)
                 ? 'bg-[#8eba1e] hover:bg-[#7aa31a] text-white shadow-lg hover:shadow-xl transform hover:scale-105'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
@@ -480,7 +490,7 @@ export default function TransformerConfigurator() {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            {skip ? 'Далее' : 'Добавить в спецификацию'}
+            {skip === true ? 'Далее' : 'Добавить в спецификацию'}
           </button>
         </div>
       </div>

@@ -175,7 +175,7 @@ export default function BmzConfigPage() {
     <div className="h-[calc(100vh-64px)] bg-white overflow-y-auto relative z-0">
       <div className="p-6 pb-20 relative z-10">
         <Breadcrumbs />
-        
+
         {/* Header Section */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-6">

@@ -416,7 +416,7 @@ export default function WorkPage() {
       <div className="flex-1 overflow-y-auto">
         <div className="p-6">
           <Breadcrumbs />
-          
+
           {/* Header Section */}
           <div className="mb-8">
             <div className="flex items-center gap-4 mb-6">

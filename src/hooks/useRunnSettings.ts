@@ -93,6 +93,24 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
   const settingsLoadedRef = useRef(false);
   const selectedCategoriesRef = useRef<RunnSettings | null>(null);
 
+  const countRunnCategories = (settings: RunnSettings) =>
+    Object.values(settings).reduce((sum, categories) => sum + categories.length, 0);
+
+  const canApplyFetchedSettings = (requestId: number, fetched: RunnSettings) => {
+    if (requestId !== settingsRequestIdRef.current) return false;
+    if (hasChangesRef.current) return false;
+
+    const uiCount = selectedCategoriesRef.current
+      ? countRunnCategories(selectedCategoriesRef.current)
+      : 0;
+    const fetchedCount = countRunnCategories(fetched);
+
+    // Не затираем уже выбранные категории пустым устаревшим ответом API
+    if (fetchedCount === 0 && uiCount > 0) return false;
+
+    return true;
+  };
+
   useEffect(() => {
     selectedCategoriesRef.current = selectedCategories;
   }, [selectedCategories]);
@@ -255,9 +273,13 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
         if (requestId !== settingsRequestIdRef.current) return;
 
         // Обрабатываем настройки РУНН (если они есть)
-        if (apiResponse.settings?.runn && apiResponse.settings.runn.length > 0) {
+        if (apiResponse.settings?.runn) {
           await processRunnSettings(apiResponse.settings.runn, apiCategories, requestId);
-        } else if (!hasChangesRef.current && !selectedCategoriesRef.current) {
+        } else if (
+          !hasChangesRef.current &&
+          !selectedCategoriesRef.current &&
+          requestId === settingsRequestIdRef.current
+        ) {
           // Пустое состояние только при первой загрузке, без уже выбранных категорий
           const emptySettings: RunnSettings = {
             avtomatVyk: [],
@@ -325,13 +347,14 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
       // Группируем настройки по типам и находим названия категорий
       apiRunnSettings.forEach(
         (setting: { categoryId: number; type: string; isVisible: boolean }) => {
-          const category = categories.find((cat) => cat.id === setting.categoryId);
-          const categoryName = category?.name || `Категория ${setting.categoryId}`;
+          const categoryId = Number(setting.categoryId);
+          const category = categories.find((cat) => cat.id === categoryId);
+          const categoryName = category?.name || `Категория ${categoryId}`;
 
           const categorySetting: CategorySetting = {
-            id: setting.categoryId.toString(),
+            id: String(categoryId),
             name: categoryName,
-            visible: setting.isVisible || false,
+            visible: setting.isVisible ?? true,
           };
 
           switch (setting.type) {
@@ -362,6 +385,10 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
         }
       );
 
+
+      if (!canApplyFetchedSettings(requestId, transformedSettings)) {
+        return;
+      }
 
       setSelectedCategories(transformedSettings);
       setOriginalSettings(JSON.parse(JSON.stringify(transformedSettings)));
@@ -416,15 +443,13 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
     }
   }, [selectedCategories]);
 
-  const handleAddCategory = (type: keyof RunnSettings, categoryId: string | number) => {
+  const handleAddCategory = async (type: keyof RunnSettings, categoryId: string | number) => {
     if (!selectedCategories) return;
 
     let categoryName: string;
     let categoryIdStr: string;
 
-    // Проверяем, является ли categoryId числом (из API) или строкой (из моковых данных)
     if (typeof categoryId === 'number' || !isNaN(Number(categoryId))) {
-      // Это ID из API
       const apiCategory = apiCategories.find((cat) => cat.id === Number(categoryId));
       if (!apiCategory) {
         console.error('Категория не найдена по ID:', categoryId);
@@ -433,12 +458,10 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
       categoryName = apiCategory.name;
       categoryIdStr = apiCategory.id.toString();
     } else {
-      // Это строка из моковых данных - ищем категорию по названию
       categoryName = categoryId as string;
       const apiCategory = apiCategories.find((cat) => cat.name === categoryName);
-      
+
       if (apiCategory) {
-        // Используем ID из API
         categoryIdStr = apiCategory.id.toString();
       } else {
         console.error(`Категория "${categoryName}" не найдена в API. Пропускаем добавление.`);
@@ -446,7 +469,6 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
       }
     }
 
-    // Проверяем, не добавлена ли уже эта категория в другой раздел
     const isAlreadyAdded = Object.values(selectedCategories).some((categories) =>
       categories.some((cat) => cat.name === categoryName)
     );
@@ -461,25 +483,27 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
       visible: true,
     };
 
-    hasChangesRef.current = true;
-    setHasChanges(true);
+    const newCategories: RunnSettings = {
+      ...selectedCategories,
+      [type]: [...selectedCategories[type], newCategory],
+    };
 
-    setSelectedCategories((prev) => {
-      const newCategories = {
-        ...prev!,
-        [type]: [...prev![type], newCategory],
-      };
-      
-      // Принудительно перезагружаем материалы после добавления категории
-      setTimeout(() => {
-        const token = localStorage.getItem('token');
-        if (token) {
-          loadMaterialsForCategories(newCategories, token);
-        }
-      }, 100);
-      
-      return newCategories;
-    });
+    setSelectedCategories(newCategories);
+
+    if (!skipMaterialsLoad) {
+      const token = localStorage.getItem('token');
+      if (token) {
+        loadMaterialsForCategories(newCategories, token);
+      }
+    }
+
+    try {
+      await persistRunnSettings(newCategories, {
+        successMessage: 'Категория добавлена',
+      });
+    } catch {
+      // persistRunnSettings уже показывает toast об ошибке
+    }
   };
 
   const handleRemoveCategory = async (type: keyof RunnSettings, categoryId: string) => {
@@ -496,8 +520,6 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
       [type]: selectedCategories[type].filter((cat) => String(cat.id) !== normalizedId),
     };
 
-    hasChangesRef.current = true;
-    setHasChanges(true);
     setSelectedCategories(newCategories);
 
     if (!skipMaterialsLoad) {
@@ -514,7 +536,7 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
     }
   };
 
-  const handleToggleVisibility = (type: keyof RunnSettings, categoryId: string) => {
+  const handleToggleVisibility = async (type: keyof RunnSettings, categoryId: string) => {
     if (!selectedCategories) return;
 
     const normalizedId = String(categoryId);
@@ -524,29 +546,28 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
     if (!categoryToToggle) return;
 
     const newVisible = !categoryToToggle.visible;
-    
 
-    hasChangesRef.current = true;
-    setHasChanges(true);
+    const newCategories: RunnSettings = {
+      ...selectedCategories,
+      [type]: selectedCategories[type].map((cat) =>
+        String(cat.id) === normalizedId ? { ...cat, visible: newVisible } : cat
+      ),
+    };
 
-    setSelectedCategories((prev) => {
-      const newCategories = {
-        ...prev!,
-        [type]: prev![type].map((cat) =>
-          String(cat.id) === normalizedId ? { ...cat, visible: newVisible } : cat
-        ),
-      };
-      
-      // Принудительно перезагружаем материалы после изменения
-      setTimeout(() => {
-        const token = localStorage.getItem('token');
-        if (token) {
-          loadMaterialsForCategories(newCategories, token);
-        }
-      }, 100); // Небольшая задержка для гарантии обновления состояния
-      
-      return newCategories;
-    });
+    setSelectedCategories(newCategories);
+
+    if (!skipMaterialsLoad) {
+      const token = localStorage.getItem('token');
+      if (token) {
+        loadMaterialsForCategories(newCategories, token);
+      }
+    }
+
+    try {
+      await persistRunnSettings(newCategories, { silent: true });
+    } catch {
+      // persistRunnSettings уже показывает toast об ошибке
+    }
   };
 
   const buildRunnSettingsPayload = (settings: RunnSettings) => {
@@ -589,8 +610,11 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
 
   const persistRunnSettings = async (
     settings: RunnSettings,
-    options: { successMessage?: string } = {}
+    options: { successMessage?: string; silent?: boolean } = {}
   ) => {
+    // Отменяем устаревшие GET-запросы, которые могли стартовать до сохранения
+    settingsRequestIdRef.current += 1;
+
     const token = localStorage.getItem('token');
     if (!token) {
       showToast('Ошибка авторизации', 'error');
@@ -613,13 +637,16 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
 
     await saveSettings(updatedSettings, token);
 
-    setSelectedCategories(settings);
-    setOriginalSettings(JSON.parse(JSON.stringify(settings)));
+    settingsLoadedRef.current = true;
     hasChangesRef.current = false;
     setHasChanges(false);
+    setSelectedCategories(settings);
+    setOriginalSettings(JSON.parse(JSON.stringify(settings)));
     invalidateRunnMaterialsCache();
 
-    showToast(options.successMessage ?? 'Настройки успешно сохранены', 'success');
+    if (!options.silent) {
+      showToast(options.successMessage ?? 'Настройки успешно сохранены', 'success');
+    }
   };
 
   const handleSave = async () => {

@@ -7,6 +7,14 @@ import { ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useUserStore } from '@/store/useUserStore';
 import { useBktpStore } from '@/store/useBktpStore';
+import { useBmzStore } from '@/store/useBmzStore';
+import { useTransformerStore } from '@/store/useTransformerStore';
+import { useRusnStore } from '@/store/useRusnStore';
+import { useRunnStore } from '@/store/useRunnStore';
+import { useDguStore } from '@/store/useDguStore';
+import { useAdditionalEquipmentStore } from '@/store/useAdditionalEquipmentStore';
+import { useWorksStore } from '@/store/useWorksStore';
+import { useRealtimeCalculationStore } from '@/store/useRealtimeCalculationStore';
 
 function getUserLabel(user: ReturnType<typeof useUserStore.getState>['user']) {
   if (user?.lastName && user?.firstName) {
@@ -31,9 +39,17 @@ function getUserInitials(user: ReturnType<typeof useUserStore.getState>['user'])
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const { taskNumber, client } = useBktpStore();
+  const { taskNumber, client, reset: resetBktp } = useBktpStore();
   const router = useRouter();
   const { user } = useUserStore();
+  const resetBmz = useBmzStore((s) => s.reset);
+  const resetTransformer = useTransformerStore((s) => s.reset);
+  const resetRusn = useRusnStore((s) => s.reset);
+  const resetRunn = useRunnStore((s) => s.reset);
+  const resetDgu = useDguStore((s) => s.reset);
+  const resetAdditionalEquipment = useAdditionalEquipmentStore((s) => s.reset);
+  const resetWorks = useWorksStore((s) => s.reset);
+  const resetRealtimeCalculation = useRealtimeCalculationStore((s) => s.reset);
 
   const hasStarted = taskNumber.trim() !== '' || client.trim() !== '';
   const displayName = getUserLabel(user);
@@ -53,6 +69,20 @@ export default function Header() {
     localStorage.removeItem('token');
     setMenuOpen(false);
     router.push('/');
+  };
+
+  const handleStartNewBktp = () => {
+    resetBktp();
+    resetBmz();
+    resetTransformer();
+    resetRusn();
+    resetRunn();
+    resetDgu();
+    resetAdditionalEquipment();
+    resetWorks();
+    resetRealtimeCalculation();
+    router.push('/dashboard/bktp');
+    setMenuOpen(false);
   };
 
   return (
@@ -137,10 +167,7 @@ export default function Header() {
                   <li>
                     <button
                       type="button"
-                      onClick={() => {
-                        router.push('/dashboard/bktp');
-                        setMenuOpen(false);
-                      }}
+                      onClick={handleStartNewBktp}
                       className="w-full px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-[#8eba1e]/5 hover:text-[#8eba1e]"
                     >
                       БКТП

@@ -9,6 +9,11 @@ import { useBktpStore } from '@/store/useBktpStore';
 import { useBmzStore } from '@/store/useBmzStore';
 import { useTransformerStore } from '@/store/useTransformerStore';
 import { useRusnStore } from '@/store/useRusnStore';
+import { useRunnStore } from '@/store/useRunnStore';
+import { useDguStore } from '@/store/useDguStore';
+import { useAdditionalEquipmentStore } from '@/store/useAdditionalEquipmentStore';
+import { useWorksStore } from '@/store/useWorksStore';
+import { useRealtimeCalculationStore } from '@/store/useRealtimeCalculationStore';
 
 export default function SidebarLink({
   href,
@@ -28,6 +33,11 @@ export default function SidebarLink({
   const bmz = useBmzStore();
   const transformer = useTransformerStore();
   const rusn = useRusnStore();
+  const runn = useRunnStore();
+  const dgu = useDguStore();
+  const additionalEquipment = useAdditionalEquipmentStore();
+  const works = useWorksStore();
+  const realtimeCalculation = useRealtimeCalculationStore();
 
   const handleClick = () => {
     if (label === 'Главная') {
@@ -35,6 +45,11 @@ export default function SidebarLink({
       bmz.reset();
       transformer.reset();
       rusn.reset();
+      runn.reset();
+      dgu.reset();
+      additionalEquipment.reset();
+      works.reset();
+      realtimeCalculation.reset();
     }
   };
 

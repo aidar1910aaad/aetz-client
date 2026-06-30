@@ -2,10 +2,13 @@
 
 import Link from 'next/link';
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { useMaterialHistory } from '@/hooks/useMaterialHistory';
 import HeroSection from './components/HeroSection';
 import { Select } from '@/components/ui/select';
+import { useBktpStore } from '@/store/useBktpStore';
+import { resetBktpWizard } from '@/utils/resetBktpWizard';
 
 const quickActions = [
   { title: 'Формирование БКТП', desc: 'Новая заявка и расчёт', href: '/dashboard/bktp' },
@@ -60,14 +63,17 @@ function getUserLabel(user: any) {
 }
 
 export default function DashboardHome() {
+  const router = useRouter();
   const stats = useDashboardStats();
   const materialHistory = useMaterialHistory();
+  const { taskNumber, client, furthestStepIndex } = useBktpStore();
   const [sortModeIndex, setSortModeIndex] = useState(0);
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [minAmount, setMinAmount] = useState<number>(0);
   const [showClientFilters, setShowClientFilters] = useState(false);
   const [showMaterialFilters, setShowMaterialFilters] = useState(false);
+  const [showBktpModal, setShowBktpModal] = useState(false);
 
   const [materialPeriodFilter, setMaterialPeriodFilter] = useState<PeriodFilter>('all');
   const [materialChangeTypeFilter, setMaterialChangeTypeFilter] = useState<MaterialChangeTypeFilter>('all');
@@ -245,6 +251,27 @@ export default function DashboardHome() {
     materialPeriodFilter !== 'all' || materialChangeTypeFilter !== 'all' || materialUserFilter !== 'all';
 
   const getRequestHref = (app: any) => (app.id ? `/dashboard/requests/${app.id}` : '/dashboard/requests');
+  const hasCurrentBktp =
+    taskNumber.trim() !== '' || client.trim() !== '' || Number(furthestStepIndex || 0) > 0;
+
+  const handleOpenBktp = () => {
+    if (hasCurrentBktp) {
+      setShowBktpModal(true);
+      return;
+    }
+    router.push('/dashboard/bktp');
+  };
+
+  const handleStartFreshBktp = () => {
+    resetBktpWizard();
+    setShowBktpModal(false);
+    router.push('/dashboard/bktp');
+  };
+
+  const handleGoToCurrentBktp = () => {
+    setShowBktpModal(false);
+    router.push('/dashboard/final');
+  };
 
   const metrics = [
     { label: 'Всего заявок', hint: 'в системе', value: stats.totalApplications },
@@ -257,7 +284,50 @@ export default function DashboardHome() {
 
   return (
     <div className="h-[calc(100vh-64px)] overflow-y-auto bg-gray-50">
-      <HeroSection />
+      <HeroSection onNewBktpClick={handleOpenBktp} />
+
+      {showBktpModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
+          onClick={() => setShowBktpModal(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl border border-gray-200 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-gray-100 px-6 py-5">
+              <p className="text-sm font-semibold text-gray-900">Есть незавершённая заявка</p>
+              <p className="mt-1 text-sm leading-relaxed text-gray-600">
+                Обнаружена текущая заявка БКТП. Можно вернуться к ней или начать новую с полным
+                сбросом данных.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 px-6 py-5">
+              <button
+                type="button"
+                onClick={handleGoToCurrentBktp}
+                className="rounded-xl bg-[#8eba1e] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#7aa31a]"
+              >
+                Перейти к текущей
+              </button>
+              <button
+                type="button"
+                onClick={handleStartFreshBktp}
+                className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100"
+              >
+                Создать новую
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowBktpModal(false)}
+                className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px] lg:items-start">
@@ -631,7 +701,11 @@ export default function DashboardHome() {
                   <li>4. Итоговая спецификация</li>
                 </ul>
                 <Link
-                  href="/dashboard/bktp"
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleOpenBktp();
+                  }}
                   className="flex w-full items-center justify-center rounded-lg bg-[#8eba1e] py-2.5 text-[15px] font-medium text-white transition-colors hover:bg-[#7aa31a]"
                 >
                   Открыть БКТП

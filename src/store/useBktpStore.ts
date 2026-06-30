@@ -9,7 +9,10 @@ interface BktpFormState {
   time: string;
   taskNumber: string;
   client: string;
+  /** Индекс самого дальнего достигнутого шага в конфигураторе (0 = «Заявка») */
+  furthestStepIndex: number;
   setField: <K extends keyof BktpFormState>(key: K, value: BktpFormState[K]) => void;
+  markStepReached: (stepIndex: number) => void;
   /** Проставить текущие дату и время (при старте и при сохранении заявки) */
   stampDateTime: () => { date: string; time: string };
   reset: () => void;
@@ -25,7 +28,12 @@ export const useBktpStore = create<BktpFormState>()(
       time: initialMeta.time,
       taskNumber: '',
       client: '',
+      furthestStepIndex: 0,
       setField: (key, value) => set({ [key]: value }),
+      markStepReached: (stepIndex) =>
+        set((state) => ({
+          furthestStepIndex: Math.max(state.furthestStepIndex, stepIndex),
+        })),
       stampDateTime: () => {
         const { date, time } = getBktpNow();
         set({ date, time });
@@ -39,11 +47,20 @@ export const useBktpStore = create<BktpFormState>()(
           time,
           taskNumber: '',
           client: '',
+          furthestStepIndex: 0,
         });
       },
     }),
     {
       name: 'bktp-storage',
+      partialize: (state) => ({
+        executor: state.executor,
+        date: state.date,
+        time: state.time,
+        taskNumber: state.taskNumber,
+        client: state.client,
+        furthestStepIndex: state.furthestStepIndex,
+      }),
     }
   )
 );
