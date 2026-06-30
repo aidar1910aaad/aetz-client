@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useCalculations } from '@/hooks/useCalculations';
@@ -44,10 +45,6 @@ export default function GroupCalculationsPage() {
   }, [groupSlug, groups, setSelectedGroup]);
 
 
-
-  const handleOpenCalc = (calcSlug: string) => {
-    router.push(`/dashboard/calc/${groupSlug}/${calcSlug}`);
-  };
 
   const handleCreateNew = () => {
     router.push(`/dashboard/calc/${groupSlug}/new`);
@@ -175,9 +172,9 @@ export default function GroupCalculationsPage() {
                 </button>
                 
                 {/* Основной контент */}
-                <div
-                  onClick={() => handleOpenCalc(calc.slug)}
-                  className="cursor-pointer"
+                <Link
+                  href={`/dashboard/calc/${groupSlug}/${calc.slug}`}
+                  className="block cursor-pointer rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8eba1e] focus-visible:ring-offset-2"
                 >
                   <div className="flex items-center gap-3 mb-4">
                     <div className="p-2 bg-gray-100 group-hover:bg-[#8eba1e] rounded-lg transition-all duration-300">
@@ -191,7 +188,7 @@ export default function GroupCalculationsPage() {
                     </p>
                     <p className="text-xs text-gray-500">Slug: {calc.slug}</p>
                   </div>
-                </div>
+                </Link>
               </div>
             ))}
           </div>

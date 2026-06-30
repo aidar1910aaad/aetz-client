@@ -2,8 +2,8 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import LoginForm from '../components/Auth/LoginForm';
-import { LoginHero } from '../components/Auth/LoginHero';
+import LoginForm from '@/components/Auth/LoginForm';
+import { LoginHero } from '@/components/Auth/LoginHero';
 
 export default function LoginPage() {
   const router = useRouter();

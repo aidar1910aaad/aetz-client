@@ -56,10 +56,10 @@ export const useBusbarBridgeCalculation = () => {
   // Определяем группу на основе выбранного материала
   const getMaterialGroup = (material: BusMaterial) => {
     if (material === 'АД' || material === 'АД2') {
-      return ['АД', 'АД2'];
+      return ['АД', 'АД2', 'АД3'];
     }
     if (material === 'МТ' || material === 'МТ2') {
-      return ['МТ', 'МТ2'];
+      return ['МТ', 'МТ2', 'МТ3'];
     }
     return [];
   };

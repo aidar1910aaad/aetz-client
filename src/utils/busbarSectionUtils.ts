@@ -82,3 +82,18 @@ export function sortBusbarSections(sections: string[]): string[] {
     (a, b) => parseBusbarSectionArea(a) - parseBusbarSectionArea(b)
   );
 }
+
+/** Уникальные сечения из конфигураций таблицы коммутационных аппаратов */
+export function getBusbarSectionsFromConfigs(
+  configs: { busbar: string }[]
+): string[] {
+  const unique = new Map<string, string>();
+  for (const config of configs) {
+    if (!config.busbar) continue;
+    const normalized = normalizeBusbarSection(config.busbar);
+    if (!unique.has(normalized)) {
+      unique.set(normalized, config.busbar);
+    }
+  }
+  return sortBusbarSections([...unique.values()]);
+}

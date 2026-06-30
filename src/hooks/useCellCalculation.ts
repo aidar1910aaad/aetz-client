@@ -444,7 +444,8 @@ export const useCellCalculation = ({
         tnId: tempTnId,
       },
       cell.purpose,
-      Boolean(cell.meterType)
+      Boolean(cell.meterType),
+      global.bodyType
     );
 
     // Определяем основную калькуляцию
@@ -599,7 +600,8 @@ export const useCellCalculation = ({
         tnId: tempTnId,
       },
       cell.purpose,
-      Boolean(cell.meterType)
+      Boolean(cell.meterType),
+      global.bodyType
     );
   }, [
     calculations.cell,

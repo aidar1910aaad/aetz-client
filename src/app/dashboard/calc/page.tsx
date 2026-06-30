@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCalculations } from '@/hooks/useCalculations';
 import { Plus, Trash2, Layers, Pencil } from 'lucide-react';
@@ -104,10 +105,6 @@ export default function CalculationsPage() {
       {} as Record<number, number>
     );
   }, [groups]);
-
-  const handleOpenGroup = (slug: string) => {
-    router.push(`/dashboard/calc/${encodeURIComponent(slug)}`);
-  };
 
   const handleCreate = async () => {
     if (!newGroupName.trim()) {
@@ -313,12 +310,9 @@ export default function CalculationsPage() {
                     <Trash2 size={16} />
                   </button>
 
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleOpenGroup(group.slug)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleOpenGroup(group.slug)}
-                    className="cursor-pointer"
+                  <Link
+                    href={`/dashboard/calc/${encodeURIComponent(group.slug)}`}
+                    className="block cursor-pointer rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8eba1e] focus-visible:ring-offset-2"
                   >
                     <div className="mb-4 flex items-start gap-3 pr-8">
                       <div className="rounded-lg bg-gray-100 p-2.5 transition-colors duration-300 group-hover:bg-[#8eba1e]">
@@ -342,16 +336,15 @@ export default function CalculationsPage() {
                         <code className="text-gray-500">{group.slug}</code>
                       </p>
                     </div>
-                  </div>
+                  </Link>
 
                   <div className="mt-4 flex gap-2 border-t border-gray-100 pt-4">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenGroup(group.slug)}
-                      className="flex-1 rounded-lg bg-[#8eba1e]/10 py-2 text-xs font-medium text-[#7aa31a] transition-colors hover:bg-[#8eba1e]/20"
+                    <Link
+                      href={`/dashboard/calc/${encodeURIComponent(group.slug)}`}
+                      className="flex-1 rounded-lg bg-[#8eba1e]/10 py-2 text-center text-xs font-medium text-[#7aa31a] transition-colors hover:bg-[#8eba1e]/20"
                     >
                       Открыть
-                    </button>
+                    </Link>
                     <button
                       type="button"
                       onClick={() => handleEdit(group)}

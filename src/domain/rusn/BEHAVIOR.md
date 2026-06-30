@@ -36,7 +36,11 @@ Because `cellSummaries` are UI snapshots, refactors should avoid relying on them
   - `Камера КСО 366 ШМР 14, 15`: main ID `42`, additional ID `44`.
 - `Камера 8DJH` calculates `R` and `L` parts by calculation names `8DJH (R) `, `8DJH (L)` and `8DJH (L) РЗиА`.
 - `Кабельная перемычка` and `Изоляционный адаптер` select `10кВ` or `20кВ` variants from the selected transformer voltage.
-- `Камера КСО А12-10` uses material-based calculation by default. When `cell.bhaMode === true` on `Ввод`, `Трансформаторная`, or `Отходящая`, the cell uses a fixed BHA calculation selected primarily by `cellConfig.type`:
+- `Камера КСО А12-10` uses material-based calculation by default. Breaker (vacuum switch) calculations are matched by material ID and `cellConfig.type`:
+  - `Ввод`: `input`, then fallback `10kv`.
+  - `Отходящая` and `Трансформаторная`: `outgoing` only (same cell type; e.g. `900x1000` OTH/TR calc).
+  - `Секционный выключатель`: `section_switch` only (e.g. `900x1000` SV power-part calc).
+- When `cell.bhaMode === true` on `Ввод`, `Трансформаторная`, or `Отходящая`, the cell uses a fixed BHA calculation selected primarily by `cellConfig.type`:
   - `bha_input` → `Ввод`
   - `bha_transformer` → `Трансформаторная`
   - `bha_outgoing` → `Отходящая`

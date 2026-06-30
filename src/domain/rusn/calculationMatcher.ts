@@ -1,5 +1,10 @@
 import { Calculation } from '@/hooks/useRusnCalculation';
-import { isBhaCalculationType, RUSN_CELL_PURPOSE } from './rusnConstants';
+import {
+  isBhaCalculationType,
+  KSO_A12_BREAKER_CELL_CONFIG_TYPES,
+  RUSN_CAMERA,
+  RUSN_CELL_PURPOSE,
+} from './rusnConstants';
 
 function excludeBhaCalculations(calculations: Calculation[]): Calculation[] {
   return calculations.filter(
@@ -31,33 +36,66 @@ function asMaterialArray(value: unknown): Array<{ id?: string | number }> {
   return Array.isArray(value) ? value : [value as { id?: string | number }];
 }
 
+function matchesMaterialId(
+  calc: Calculation,
+  materialType: string,
+  materialId: string
+): boolean {
+  if (isBhaCalculationType(calc.data?.cellConfig?.type)) return false;
+  const materials = calc.data?.cellConfig?.materials?.[materialType];
+  return asMaterialArray(materials).some(
+    (material) => String(material.id) === String(materialId)
+  );
+}
+
 function findByMaterialId(
   calculations: Calculation[],
   materialType: string,
-  materialId?: string
+  materialId?: string,
+  preferredCellConfigTypes?: string[]
 ): Calculation | null {
   if (!materialId) return null;
 
-  return (
-    calculations.find((calc) => {
-      if (isBhaCalculationType(calc.data?.cellConfig?.type)) return false;
-      const materials = calc.data?.cellConfig?.materials?.[materialType];
-      return asMaterialArray(materials).some(
-        (material) => String(material.id) === String(materialId)
+  if (preferredCellConfigTypes?.length) {
+    for (const configType of preferredCellConfigTypes) {
+      const match = calculations.find(
+        (calc) =>
+          calc.data?.cellConfig?.type === configType &&
+          matchesMaterialId(calc, materialType, materialId)
       );
-    }) || null
+      if (match) return match;
+    }
+    return null;
+  }
+
+  return (
+    calculations.find((calc) => matchesMaterialId(calc, materialType, materialId)) || null
   );
+}
+
+function getKsoA12BreakerCellConfigTypes(cellPurpose: string): string[] | undefined {
+  return KSO_A12_BREAKER_CELL_CONFIG_TYPES[cellPurpose];
 }
 
 export function resolveRusnCellCalculations(
   calculations: Calculation[],
   materialIds: RusnMaterialIds,
   cellPurpose: string,
-  hasMeterType: boolean
+  hasMeterType: boolean,
+  bodyType?: string
 ): RusnResolvedCalculations {
   const materialCalculations = excludeBhaCalculations(calculations);
+  const preferredBreakerCellConfigTypes =
+    bodyType === RUSN_CAMERA.KSO_A12_10
+      ? getKsoA12BreakerCellConfigTypes(cellPurpose)
+      : undefined;
 
-  const breakerCalculation = findByMaterialId(materialCalculations, 'switch', materialIds.breakerId);
+  const breakerCalculation = findByMaterialId(
+    materialCalculations,
+    'switch',
+    materialIds.breakerId,
+    preferredBreakerCellConfigTypes
+  );
   const rzaCalculation = findByMaterialId(calculations, 'rza', materialIds.rzaId);
   const disconnectorCalculation = findByMaterialId(
     calculations,

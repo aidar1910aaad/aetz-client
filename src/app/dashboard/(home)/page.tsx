@@ -5,7 +5,7 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { useMaterialHistory } from '@/hooks/useMaterialHistory';
-import HeroSection from './components/HeroSection';
+import HeroSection from '../components/HeroSection';
 import { Select } from '@/components/ui/select';
 import { useBktpStore } from '@/store/useBktpStore';
 import { resetBktpWizard } from '@/utils/resetBktpWizard';
