@@ -3,10 +3,10 @@
 import { useRunnStore } from '@/store/useRunnStore';
 import { Material } from '@/api/material';
 import PageLoader from '@/shared/loader/PageLoader';
-import type { useRunnSettings } from '@/hooks/useRunnSettings';
+import type { useRunnCategories } from '@/hooks/useRunnCategories';
 import { Select } from '@/components/ui/select';
 
-type RunnSettingsResult = ReturnType<typeof useRunnSettings>;
+type RunnSettingsResult = ReturnType<typeof useRunnCategories>;
 
 interface RunnGlobalConfigProps {
   materials?: Material[];
@@ -23,9 +23,12 @@ export default function RunnGlobalConfig({
   const loading = settingsLoading;
 
   // Получаем категории из настроек РУНН
-  const withdrawableOptions = selectedCategories?.avtomatVyk?.map((cat) => cat.name) || [];
-  const moldedOptions = selectedCategories?.avtomatLity?.map((cat) => cat.name) || [];
-  const meterOptions = selectedCategories?.counter?.map((cat) => cat.name) || [];
+  const withdrawableOptions =
+    selectedCategories?.avtomatVyk?.filter((cat) => cat.visible).map((cat) => cat.name) || [];
+  const moldedOptions =
+    selectedCategories?.avtomatLity?.filter((cat) => cat.visible).map((cat) => cat.name) || [];
+  const meterOptions =
+    selectedCategories?.counter?.filter((cat) => cat.visible).map((cat) => cat.name) || [];
 
 
 

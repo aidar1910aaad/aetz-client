@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Category } from '@/api/categories';
 import { getAllCategories } from '@/api/categories';
-import { getSettings, saveSettings } from '@/api/settings/index';
+import { getSettings } from '@/api/settings/index';
+import { writeCategorySettings } from '@/api/settings/writeCategorySettings';
 import { showToast } from '@/shared/modals/ToastProvider';
-import { RusnSettings, fetchCategories, fetchRusnSettings } from '@/utils/rusnSettings';
 import { invalidateRusnMaterialsCache } from '@/hooks/useRusnMaterials';
+import { invalidateRusnCategoriesCache } from '@/domain/rusn/rusnCategoriesLoader';
 
 interface RusnCategorySetting {
   id: string;
@@ -32,60 +33,11 @@ const EMPTY_RUSN_SETTINGS: RusnSectionSettings = {
   tt: [],
 };
 
-export const useRusnSettings = () => {
-  const [rusnSettings, setRusnSettings] = useState<RusnSettings>({
-    switch: [],
-    rza: [],
-    counter: [],
-    sr: [],
-    tsn: [],
-    tn: [],
-    tt: [],
-  });
-  const [allCategories, setAllCategories] = useState<{ id: number; name: string }[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const token = localStorage.getItem('token') || '';
-        if (!token) {
-          throw new Error('Токен не найден');
-        }
-
-        const categories = await fetchCategories(token);
-        setAllCategories(categories);
-
-        if (categories.length > 0) {
-          const settings = await fetchRusnSettings(token, categories);
-          if (settings) {
-            setRusnSettings(settings);
-          }
-        }
-      } catch (err) {
-        console.error('Ошибка при загрузке настроек РУСН:', err);
-        setError(err instanceof Error ? err.message : 'Неизвестная ошибка');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, []);
-
-  return {
-    rusnSettings,
-    allCategories,
-    loading,
-    error,
-  };
-};
-
-export function useRusnSettingsOld() {
+/**
+ * Редактор настроек РУСН — только для страниц /dashboard/settings/rusn и /dashboard/bktp/settings/rusn.
+ * Конфигуратор БКТП должен использовать useRusnCategories (только чтение).
+ */
+export function useRusnSettingsEditor() {
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<RusnSectionSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -310,7 +262,7 @@ export function useRusnSettingsOld() {
       throw new Error('Invalid category ids');
     }
 
-    await saveSettings({ settings: { rusn: rusnSettings } }, token);
+    await writeCategorySettings({ settings: { rusn: rusnSettings } }, token);
 
     settingsLoadedRef.current = true;
     hasChangesRef.current = false;
@@ -318,6 +270,7 @@ export function useRusnSettingsOld() {
     setSelectedCategories(settings);
     setOriginalSettings(JSON.parse(JSON.stringify(settings)));
     invalidateRusnMaterialsCache();
+    invalidateRusnCategoriesCache();
 
     if (!options.silent) {
       showToast(options.successMessage ?? 'Настройки успешно сохранены', 'success');
@@ -356,12 +309,6 @@ export function useRusnSettingsOld() {
     };
 
     setSelectedCategories(newCategories);
-
-    try {
-      await persistRusnSettings(newCategories, { successMessage: 'Категория добавлена' });
-    } catch {
-      // persistRusnSettings уже показывает toast об ошибке
-    }
   };
 
   const handleRemoveCategory = async (type: string, categoryId: string) => {
@@ -376,12 +323,6 @@ export function useRusnSettingsOld() {
     };
 
     setSelectedCategories(newCategories);
-
-    try {
-      await persistRusnSettings(newCategories, { successMessage: 'Категория удалена' });
-    } catch {
-      // persistRusnSettings уже показывает toast об ошибке
-    }
   };
 
   const handleToggleVisibility = async (type: string, categoryId: string) => {
@@ -397,12 +338,6 @@ export function useRusnSettingsOld() {
     };
 
     setSelectedCategories(newCategories);
-
-    try {
-      await persistRusnSettings(newCategories, { silent: true });
-    } catch {
-      // persistRusnSettings уже показывает toast об ошибке
-    }
   };
 
   const handleSave = async () => {

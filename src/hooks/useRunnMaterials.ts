@@ -1,13 +1,10 @@
 import { useState, useEffect } from 'react';
-import { getSettings } from '@/api/settings';
 import { getMaterialsByCategoryId, Material } from '@/api/material';
 import { fetchWithDedup, invalidateCacheSlot } from '@/lib/materialsFetchCache';
-
-interface RunnSetting {
-  type: string;
-  isVisible: boolean;
-  categoryId: number;
-}
+import {
+  invalidateRunnCategoriesCache,
+  loadRunnCategories,
+} from '@/domain/runn/runnCategoriesLoader';
 
 export interface RunnMaterials {
   avtomatVyk: Material[];
@@ -42,28 +39,35 @@ async function loadRunnMaterialsFromApi(): Promise<RunnMaterials> {
     throw new Error('Токен не найден');
   }
 
-  const settingsResponse = await getSettings(token);
-  const runnSettings = settingsResponse.settings.runn as RunnSetting[];
+  const categories = await loadRunnCategories(token);
+  const visibleSettings = Object.entries(categories).flatMap(([type, items]) =>
+    items
+      .filter((item) => item.visible)
+      .map((item) => ({
+        type,
+        categoryId: Number(item.id),
+        isVisible: true,
+      }))
+  );
 
-  if (!runnSettings?.length) {
+  if (!visibleSettings.length) {
     return EMPTY_RUNN_MATERIALS;
   }
 
-  const visible = runnSettings.filter((s) => s.isVisible);
-  const cacheKey = `runn:${visible
+  const cacheKey = `runn:${visibleSettings
     .map((s) => `${s.type}:${s.categoryId}`)
     .sort()
     .join('|')}`;
 
   return fetchWithDedup(runnMaterialsSlot, cacheKey, async () => {
     const settingsByType = {
-      avtomatVyk: visible.filter((s) => s.type === 'avtomatVyk'),
-      avtomatLity: visible.filter((s) => s.type === 'avtomatLity'),
-      counter: visible.filter((s) => s.type === 'counter'),
-      rpsLeft: visible.filter((s) => s.type === 'rpsLeft'),
-      fusesPn: visible.filter((s) => s.type === 'fusesPn'),
-      currentTransformer: visible.filter((s) => s.type === 'currentTransformer'),
-      moldedCaseSwitch: visible.filter((s) => s.type === 'moldedCaseSwitch'),
+      avtomatVyk: visibleSettings.filter((s) => s.type === 'avtomatVyk'),
+      avtomatLity: visibleSettings.filter((s) => s.type === 'avtomatLity'),
+      counter: visibleSettings.filter((s) => s.type === 'counter'),
+      rpsLeft: visibleSettings.filter((s) => s.type === 'rpsLeft'),
+      fusesPn: visibleSettings.filter((s) => s.type === 'fusesPn'),
+      currentTransformer: visibleSettings.filter((s) => s.type === 'currentTransformer'),
+      moldedCaseSwitch: visibleSettings.filter((s) => s.type === 'moldedCaseSwitch'),
     };
 
     const materialPromises = Object.entries(settingsByType).map(async ([type, settings]) => {
@@ -101,6 +105,7 @@ async function loadRunnMaterialsFromApi(): Promise<RunnMaterials> {
 
 export function invalidateRunnMaterialsCache(): void {
   invalidateCacheSlot(runnMaterialsSlot);
+  invalidateRunnCategoriesCache();
 }
 
 export function useRunnMaterials() {

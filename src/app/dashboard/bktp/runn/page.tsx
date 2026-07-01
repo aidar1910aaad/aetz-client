@@ -42,10 +42,11 @@ export default function RunnConfigurator() {
     cellConfigs.length > 0 ? 'configured' : 'not-configured'
   );
 
-  // Синхронизируем режим с состоянием store при изменении cellConfigs
+  // Синхронизируем режим только при появлении конфигурации (не сбрасываем в «не предусмотрено» автоматически)
   useEffect(() => {
-    const hasConfiguration = cellConfigs.length > 0;
-    setMode(hasConfiguration ? 'configured' : 'not-configured');
+    if (cellConfigs.length > 0) {
+      setMode('configured');
+    }
   }, [cellConfigs]);
   
   const handleModeChange = (newMode: RunnMode) => {

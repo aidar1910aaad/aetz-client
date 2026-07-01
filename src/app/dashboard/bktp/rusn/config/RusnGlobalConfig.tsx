@@ -1,7 +1,7 @@
 'use client';
 
 import { useRusnStore } from '@/store/useRusnStore';
-import { useRusnSettings } from '@/hooks/useRusnSettings';
+import { useRusnCategories } from '@/hooks/useRusnCategories';
 import { useTransformerStore } from '@/store/useTransformerStore';
 import { useCalculationGroups } from '@/hooks/useCalculationGroups';
 import CameraTypeSelector from './CameraTypeSelector';
@@ -120,20 +120,28 @@ function TogglerWithInput({
 
 export default function RusnGlobalConfig() {
   const { global, setGlobal, clearAllCells, clearCellSummaries, setBusbarSummary, setBusBridgeSummary, setBusBridgeSummaries, removeCell } = useRusnStore();
-  const { rusnSettings, loading, error } = useRusnSettings();
+  const { rusnSettings, loading, error } = useRusnCategories();
   const { selectedTransformer } = useTransformerStore();
   const { groups } = useCalculationGroups();
   
   // Отслеживаем изменения напряжения трансформатора
-  const prevVoltageRef = useRef(selectedTransformer?.voltage || '10');
+  const prevVoltageRef = useRef<string | null>(null);
   
-  // Очищаем данные при изменении напряжения трансформатора
+  // Очищаем данные только при реальной смене напряжения пользователем, не при первой загрузке store
   useEffect(() => {
-    const currentVoltage = selectedTransformer?.voltage || '10';
-    const prevVoltage = prevVoltageRef.current;
-    
-    if (prevVoltage !== currentVoltage) {
-      console.log(`🔄 [RusnGlobalConfig] Смена напряжения трансформатора: ${prevVoltage} → ${currentVoltage}`);
+    const currentVoltage = selectedTransformer?.voltage ?? null;
+
+    if (prevVoltageRef.current === null) {
+      prevVoltageRef.current = currentVoltage;
+      return;
+    }
+
+    if (
+      currentVoltage !== null &&
+      prevVoltageRef.current !== null &&
+      prevVoltageRef.current !== currentVoltage
+    ) {
+      console.log(`🔄 [RusnGlobalConfig] Смена напряжения трансформатора: ${prevVoltageRef.current} → ${currentVoltage}`);
       
       // Очищаем все данные при смене напряжения
       clearAllCells();
@@ -152,7 +160,7 @@ export default function RusnGlobalConfig() {
       setGlobal('tn', null);
       setGlobal('tt', null);
       
-      console.log(`🔄 [RusnGlobalConfig] ▶️ ВСЕ ДАННЫЕ ОЧИЩЕНЫ при смене напряжения: ${prevVoltage} → ${currentVoltage}`);
+      console.log(`🔄 [RusnGlobalConfig] ▶️ ВСЕ ДАННЫЕ ОЧИЩЕНЫ при смене напряжения: ${prevVoltageRef.current} → ${currentVoltage}`);
     }
     
     prevVoltageRef.current = currentVoltage;

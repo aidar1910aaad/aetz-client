@@ -1,8 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
-import { getSettings } from '@/api/settings';
+import { useState, useEffect } from 'react';
+import { getSettings } from '@/api/settings/index';
 import { getMaterialsByCategoryId } from '@/api/material';
 import { Material } from '@/api/material';
-import { useRusnStore } from '@/store/useRusnStore';
 import { fetchWithDedup, invalidateCacheSlot } from '@/lib/materialsFetchCache';
 
 interface RusnSetting {
@@ -44,33 +43,41 @@ export function invalidateRusnMaterialsCache(): void {
   invalidateCacheSlot(rusnMaterialsSlot);
 }
 
+function buildSettingsCacheKey(settings: RusnSetting[]): string {
+  return settings
+    .filter((s) => s.isVisible)
+    .map((s) => `${s.type}:${s.categoryId}`)
+    .sort()
+    .join('|');
+}
+
+async function loadMaterialsBySettingType(
+  settings: RusnSetting[],
+  type: RusnSetting['type'],
+  token: string
+): Promise<Material[]> {
+  const categoryIds = [
+    ...new Set(
+      settings.filter((s) => s.type === type && s.isVisible).map((s) => s.categoryId)
+    ),
+  ];
+
+  const materials: Material[] = [];
+  for (const categoryId of categoryIds) {
+    try {
+      materials.push(...(await getMaterialsByCategoryId(categoryId, token)));
+    } catch (error) {
+      console.error(`RUSN Materials — ошибка categoryId ${categoryId} (${type}):`, error);
+    }
+  }
+
+  return materials;
+}
+
 export function useRusnMaterials() {
-  const { global } = useRusnStore();
   const [materials, setMaterials] = useState<RusnMaterialsState>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const categoryKey = useMemo(
-    () =>
-      [
-        global.breaker?.id,
-        global.rza?.id,
-        global.meterType?.id,
-        global.sr?.id,
-        global.tsn?.id,
-        global.tn?.id,
-        global.tt?.id,
-      ].join(':'),
-    [
-      global.breaker?.id,
-      global.rza?.id,
-      global.meterType?.id,
-      global.sr?.id,
-      global.tsn?.id,
-      global.tn?.id,
-      global.tt?.id,
-    ]
-  );
 
   useEffect(() => {
     let cancelled = false;
@@ -82,9 +89,24 @@ export function useRusnMaterials() {
 
         const token = localStorage.getItem('token') || '';
         const settingsResponse = await getSettings(token);
+        if (!settingsResponse?.settings?.rusn) {
+          if (!cancelled) {
+            setMaterials(EMPTY);
+            setLoading(false);
+          }
+          return;
+        }
+
         const rusnSettings = settingsResponse.settings.rusn as RusnSetting[];
+        const visibleSettings = rusnSettings.filter((s) => s.isVisible);
+        const cacheKey = buildSettingsCacheKey(rusnSettings);
 
-        if (!rusnSettings?.length) {
+        const hasRequiredCategories =
+          visibleSettings.some((s) => s.type === 'switch') &&
+          visibleSettings.some((s) => s.type === 'rza') &&
+          visibleSettings.some((s) => s.type === 'counter');
+
+        if (!hasRequiredCategories) {
           if (!cancelled) {
             setMaterials(EMPTY);
             setLoading(false);
@@ -92,42 +114,7 @@ export function useRusnMaterials() {
           return;
         }
 
-        const switchSettings = rusnSettings.filter((s) => s.type === 'switch');
-        const rzaSetting = rusnSettings.find((s) => s.type === 'rza');
-        const counterSetting = rusnSettings.find((s) => s.type === 'counter');
-        const transformerSetting = rusnSettings.find((s) => s.type === 'tn');
-        const ttSetting = rusnSettings.find((s) => s.type === 'tt');
-        const srSetting = rusnSettings.find((s) => s.type === 'sr');
-        const tsnSetting = rusnSettings.find((s) => s.type === 'tsn');
-        const tnSetting = rusnSettings.find((s) => s.type === 'tn');
-
-        const validCategoryIds = {
-          breaker:
-            global.breaker?.id || (switchSettings.length > 0 ? switchSettings[0].categoryId : null),
-          rza: global.rza?.id || rzaSetting?.categoryId || null,
-          meter: global.meterType?.id || counterSetting?.categoryId || null,
-          transformer: global.tn?.id || transformerSetting?.categoryId || null,
-          sr: global.sr?.id || srSetting?.categoryId || null,
-          tsn: global.tsn?.id || tsnSetting?.categoryId || null,
-          tn: global.tn?.id || tnSetting?.categoryId || null,
-          tt: global.tt?.id || ttSetting?.categoryId || null,
-        };
-
-        if (!switchSettings.length || !rzaSetting || !counterSetting) {
-          if (!cancelled) {
-            setMaterials(EMPTY);
-            setLoading(false);
-          }
-          return;
-        }
-
-        const ids = Object.values(validCategoryIds)
-          .filter(Boolean)
-          .sort((a, b) => Number(a) - Number(b))
-          .join(',');
-        const cacheKey = `rusn:${categoryKey}:${ids}`;
-
-        const result = await fetchWithDedup(rusnMaterialsSlot, cacheKey, async () => {
+        const result = await fetchWithDedup(rusnMaterialsSlot, `rusn:${cacheKey}`, async () => {
           const [
             breakerMaterials,
             rzaMaterials,
@@ -138,30 +125,14 @@ export function useRusnMaterials() {
             tnMaterials,
             ttMaterials,
           ] = await Promise.all([
-            validCategoryIds.breaker
-              ? getMaterialsByCategoryId(validCategoryIds.breaker, token).catch(() => [])
-              : Promise.resolve([]),
-            validCategoryIds.rza
-              ? getMaterialsByCategoryId(validCategoryIds.rza, token).catch(() => [])
-              : Promise.resolve([]),
-            validCategoryIds.meter
-              ? getMaterialsByCategoryId(validCategoryIds.meter, token).catch(() => [])
-              : Promise.resolve([]),
-            validCategoryIds.transformer
-              ? getMaterialsByCategoryId(validCategoryIds.transformer, token).catch(() => [])
-              : Promise.resolve([]),
-            validCategoryIds.sr
-              ? getMaterialsByCategoryId(validCategoryIds.sr, token).catch(() => [])
-              : Promise.resolve([]),
-            validCategoryIds.tsn
-              ? getMaterialsByCategoryId(validCategoryIds.tsn, token).catch(() => [])
-              : Promise.resolve([]),
-            validCategoryIds.tn
-              ? getMaterialsByCategoryId(validCategoryIds.tn, token).catch(() => [])
-              : Promise.resolve([]),
-            validCategoryIds.tt
-              ? getMaterialsByCategoryId(validCategoryIds.tt, token).catch(() => [])
-              : Promise.resolve([]),
+            loadMaterialsBySettingType(visibleSettings, 'switch', token),
+            loadMaterialsBySettingType(visibleSettings, 'rza', token),
+            loadMaterialsBySettingType(visibleSettings, 'counter', token),
+            loadMaterialsBySettingType(visibleSettings, 'tn', token),
+            loadMaterialsBySettingType(visibleSettings, 'sr', token),
+            loadMaterialsBySettingType(visibleSettings, 'tsn', token),
+            loadMaterialsBySettingType(visibleSettings, 'tn', token),
+            loadMaterialsBySettingType(visibleSettings, 'tt', token),
           ]);
 
           return {
@@ -195,7 +166,7 @@ export function useRusnMaterials() {
     return () => {
       cancelled = true;
     };
-  }, [categoryKey]);
+  }, []);
 
   return { materials, loading, error };
 }

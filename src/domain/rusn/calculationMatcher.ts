@@ -1,7 +1,7 @@
 import { Calculation } from '@/hooks/useRusnCalculation';
 import {
+  BREAKER_CELL_CONFIG_TYPE_PREFERENCES,
   isBhaCalculationType,
-  KSO_A12_BREAKER_CELL_CONFIG_TYPES,
   RUSN_CAMERA,
   RUSN_CELL_PURPOSE,
 } from './rusnConstants';
@@ -65,7 +65,6 @@ function findByMaterialId(
       );
       if (match) return match;
     }
-    return null;
   }
 
   return (
@@ -73,8 +72,19 @@ function findByMaterialId(
   );
 }
 
-function getKsoA12BreakerCellConfigTypes(cellPurpose: string): string[] | undefined {
-  return KSO_A12_BREAKER_CELL_CONFIG_TYPES[cellPurpose];
+function getPreferredBreakerCellConfigTypes(
+  cellPurpose: string,
+  bodyType?: string
+): string[] | undefined {
+  if (cellPurpose === RUSN_CELL_PURPOSE.SECTION_SWITCH) {
+    return BREAKER_CELL_CONFIG_TYPE_PREFERENCES[cellPurpose];
+  }
+
+  if (bodyType === RUSN_CAMERA.KSO_A12_10) {
+    return BREAKER_CELL_CONFIG_TYPE_PREFERENCES[cellPurpose];
+  }
+
+  return undefined;
 }
 
 export function resolveRusnCellCalculations(
@@ -85,10 +95,10 @@ export function resolveRusnCellCalculations(
   bodyType?: string
 ): RusnResolvedCalculations {
   const materialCalculations = excludeBhaCalculations(calculations);
-  const preferredBreakerCellConfigTypes =
-    bodyType === RUSN_CAMERA.KSO_A12_10
-      ? getKsoA12BreakerCellConfigTypes(cellPurpose)
-      : undefined;
+  const preferredBreakerCellConfigTypes = getPreferredBreakerCellConfigTypes(
+    cellPurpose,
+    bodyType
+  );
 
   const breakerCalculation = findByMaterialId(
     materialCalculations,

@@ -52,8 +52,8 @@ export function isBhaCalculationType(cellConfigType?: string): boolean {
   return Boolean(cellConfigType?.startsWith('bha_'));
 }
 
-/** Приоритет cellConfig.type при подборе калькуляции по вакуумному выключателю (КСО А12-10). */
-export const KSO_A12_BREAKER_CELL_CONFIG_TYPES: Partial<Record<string, string[]>> = {
+/** Приоритет `cellConfig.type` при подборе калькуляции по выключателю. */
+export const BREAKER_CELL_CONFIG_TYPE_PREFERENCES: Partial<Record<string, string[]>> = {
   [RUSN_CELL_PURPOSE.INPUT]: ['input', '10kv'],
   [RUSN_CELL_PURPOSE.OUTGOING]: ['outgoing'],
   [RUSN_CELL_PURPOSE.TRANSFORMER]: ['outgoing'],

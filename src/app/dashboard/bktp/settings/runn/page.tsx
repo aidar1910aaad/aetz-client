@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, Save, Power, Settings2, Gauge, Zap, Shield, Activity, ToggleLeft } from 'lucide-react';
-import { useRunnSettings } from '@/hooks/useRunnSettings';
+import { useRunnSettingsEditor } from '@/hooks/settings/useRunnSettingsEditor';
 import { RunnSettingsSection } from '@/components/settings/RunnSettingsSection';
 import { ZeroBusbarSection } from '@/components/runn/ZeroBusbarSection';
 import RoleGuard from '@/components/common/RoleGuard';
@@ -20,7 +20,7 @@ export default function RunnSettingsPage() {
     handleRemoveCategory,
     handleToggleVisibility,
     handleSave,
-  } = useRunnSettings();
+  } = useRunnSettingsEditor();
 
   if (loading) {
     return (

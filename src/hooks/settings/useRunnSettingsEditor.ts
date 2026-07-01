@@ -1,9 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import { getSettings, saveSettings } from '@/api/settings/index';
+import { getSettings } from '@/api/settings/index';
+import { writeCategorySettings } from '@/api/settings/writeCategorySettings';
 import { getAllCategories, Category } from '@/api/categories';
 import { getMaterialsByCategoryId } from '@/api/material/index';
 import { showToast } from '@/shared/modals/ToastProvider';
 import { invalidateRunnMaterialsCache } from '@/hooks/useRunnMaterials';
+import {
+  transformRunnSettings,
+  RunnCategoriesByType,
+  invalidateRunnCategoriesCache,
+} from '@/domain/runn/runnCategoriesLoader';
 
 interface CategorySetting {
   id: string;
@@ -25,15 +31,7 @@ interface Material {
   updatedAt?: string;
 }
 
-interface RunnSettings {
-  avtomatVyk: CategorySetting[];
-  avtomatLity: CategorySetting[];
-  counter: CategorySetting[];
-  rpsLeft: CategorySetting[];
-  fusesPn: CategorySetting[];
-  currentTransformer: CategorySetting[];
-  moldedCaseSwitch: CategorySetting[];
-}
+interface RunnSettings extends RunnCategoriesByType {}
 
 interface AllCategories {
   avtomatVyk: string[];
@@ -55,13 +53,11 @@ interface RunnMaterials {
   moldedCaseSwitch: Material[];
 }
 
-interface UseRunnSettingsOptions {
-  /** На странице конфигуратора достаточно useRunnMaterials — не дублировать запросы */
-  skipMaterialsLoad?: boolean;
-}
-
-export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
-  const { skipMaterialsLoad = false } = options;
+/**
+ * Редактор настроек РУНН — только для страниц /dashboard/settings/runn и /dashboard/bktp/settings/runn.
+ * Конфигуратор БКТП должен использовать useRunnCategories (только чтение).
+ */
+export function useRunnSettingsEditor() {
   const [allCategories, setAllCategories] = useState<AllCategories>({
     avtomatVyk: [],
     avtomatLity: [],
@@ -273,7 +269,7 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
         if (requestId !== settingsRequestIdRef.current) return;
 
         // Обрабатываем настройки РУНН (если они есть)
-        if (apiResponse.settings?.runn) {
+        if (apiResponse.settings?.runn?.length) {
           await processRunnSettings(apiResponse.settings.runn, apiCategories, requestId);
         } else if (
           !hasChangesRef.current &&
@@ -334,58 +330,7 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
       }
 
       // Преобразуем API формат в наш формат
-      const transformedSettings: RunnSettings = {
-        avtomatVyk: [],
-        avtomatLity: [],
-        counter: [],
-        rpsLeft: [],
-        fusesPn: [],
-        currentTransformer: [],
-        moldedCaseSwitch: [],
-      };
-
-      // Группируем настройки по типам и находим названия категорий
-      apiRunnSettings.forEach(
-        (setting: { categoryId: number; type: string; isVisible: boolean }) => {
-          const categoryId = Number(setting.categoryId);
-          const category = categories.find((cat) => cat.id === categoryId);
-          const categoryName = category?.name || `Категория ${categoryId}`;
-
-          const categorySetting: CategorySetting = {
-            id: String(categoryId),
-            name: categoryName,
-            visible: setting.isVisible ?? true,
-          };
-
-          switch (setting.type) {
-            case 'avtomatVyk':
-              transformedSettings.avtomatVyk.push(categorySetting);
-              break;
-            case 'avtomatLity':
-              transformedSettings.avtomatLity.push(categorySetting);
-              break;
-            case 'counter':
-              transformedSettings.counter.push(categorySetting);
-              break;
-            case 'rpsLeft':
-              transformedSettings.rpsLeft.push(categorySetting);
-              break;
-            case 'fusesPn':
-              transformedSettings.fusesPn.push(categorySetting);
-              break;
-            case 'currentTransformer':
-              transformedSettings.currentTransformer.push(categorySetting);
-              break;
-            case 'moldedCaseSwitch':
-              transformedSettings.moldedCaseSwitch.push(categorySetting);
-              break;
-            default:
-              console.warn('Неизвестный тип настройки:', setting.type);
-          }
-        }
-      );
-
-
+      const transformedSettings = transformRunnSettings(apiRunnSettings, categories);
       if (!canApplyFetchedSettings(requestId, transformedSettings)) {
         return;
       }
@@ -393,12 +338,10 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
       setSelectedCategories(transformedSettings);
       setOriginalSettings(JSON.parse(JSON.stringify(transformedSettings)));
       settingsLoadedRef.current = true;
-      
-      if (!skipMaterialsLoad) {
-        const token = localStorage.getItem('token');
-        if (token) {
-          await loadMaterialsForCategories(transformedSettings, token);
-        }
+
+      const token = localStorage.getItem('token');
+      if (token) {
+        await loadMaterialsForCategories(transformedSettings, token);
       }
     };
 
@@ -406,7 +349,7 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
     if (settingsLoadedRef.current) return;
 
     fetchSettings();
-  }, [apiCategories.length, skipMaterialsLoad]);
+  }, [apiCategories.length]);
 
   // Проверка изменений
   useEffect(() => {
@@ -419,7 +362,6 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
   }, [selectedCategories, originalSettings]);
 
   useEffect(() => {
-    if (skipMaterialsLoad) return;
     if (selectedCategories) {
       const token = localStorage.getItem('token');
       if (token) {
@@ -490,19 +432,9 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
 
     setSelectedCategories(newCategories);
 
-    if (!skipMaterialsLoad) {
-      const token = localStorage.getItem('token');
-      if (token) {
-        loadMaterialsForCategories(newCategories, token);
-      }
-    }
-
-    try {
-      await persistRunnSettings(newCategories, {
-        successMessage: 'Категория добавлена',
-      });
-    } catch {
-      // persistRunnSettings уже показывает toast об ошибке
+    const token = localStorage.getItem('token');
+    if (token) {
+      loadMaterialsForCategories(newCategories, token);
     }
   };
 
@@ -522,17 +454,9 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
 
     setSelectedCategories(newCategories);
 
-    if (!skipMaterialsLoad) {
-      const token = localStorage.getItem('token');
-      if (token) {
-        loadMaterialsForCategories(newCategories, token);
-      }
-    }
-
-    try {
-      await persistRunnSettings(newCategories, { successMessage: 'Категория удалена' });
-    } catch {
-      // persistRunnSettings уже показывает toast об ошибке
+    const token = localStorage.getItem('token');
+    if (token) {
+      loadMaterialsForCategories(newCategories, token);
     }
   };
 
@@ -556,17 +480,9 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
 
     setSelectedCategories(newCategories);
 
-    if (!skipMaterialsLoad) {
-      const token = localStorage.getItem('token');
-      if (token) {
-        loadMaterialsForCategories(newCategories, token);
-      }
-    }
-
-    try {
-      await persistRunnSettings(newCategories, { silent: true });
-    } catch {
-      // persistRunnSettings уже показывает toast об ошибке
+    const token = localStorage.getItem('token');
+    if (token) {
+      loadMaterialsForCategories(newCategories, token);
     }
   };
 
@@ -635,7 +551,7 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
       },
     };
 
-    await saveSettings(updatedSettings, token);
+    await writeCategorySettings(updatedSettings, token);
 
     settingsLoadedRef.current = true;
     hasChangesRef.current = false;
@@ -643,6 +559,7 @@ export function useRunnSettings(options: UseRunnSettingsOptions = {}) {
     setSelectedCategories(settings);
     setOriginalSettings(JSON.parse(JSON.stringify(settings)));
     invalidateRunnMaterialsCache();
+    invalidateRunnCategoriesCache();
 
     if (!options.silent) {
       showToast(options.successMessage ?? 'Настройки успешно сохранены', 'success');

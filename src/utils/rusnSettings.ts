@@ -1,4 +1,4 @@
-import { getSettings } from '@/api/settings';
+import { getSettings } from '@/api/settings/index';
 import { getAllCategories } from '@/api/categories';
 
 export interface RusnSetting {

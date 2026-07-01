@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRunnStore } from '@/store/useRunnStore';
-import { useRunnSettings } from '@/hooks/useRunnSettings';
+import { useRunnCategories } from '@/hooks/useRunnCategories';
 import { useRunnMaterials } from '@/hooks/useRunnMaterials';
 import { useRunnBreakerCalculation, useRunnCounterCalculation, useRunnSectionSwitchCalculation, useRunnOutgoingCalculation } from '@/hooks/useRunnInputCalculation';
 import { useRunnBusbarBridgeCalculation } from '@/hooks/useRunnBusbarBridgeCalculation';
@@ -25,9 +25,7 @@ interface RunnFormFieldsProps {
 
 export default function RunnFormFields({ activeTab, onTabChange }: RunnFormFieldsProps) {
   const { global, cellConfigs } = useRunnStore();
-  const { selectedCategories, loading: settingsLoading } = useRunnSettings({
-    skipMaterialsLoad: true,
-  });
+  const { selectedCategories, loading: settingsLoading } = useRunnCategories();
   const { materials: runnMaterials, loading: runnMaterialsLoading } = useRunnMaterials();
   
   // Инициализируем расчеты для шинных мостов
@@ -78,7 +76,9 @@ export default function RunnFormFields({ activeTab, onTabChange }: RunnFormField
         return;
       }
 
-      const category = selectedCategories[categoryType]?.find((cat) => cat.name === categoryName);
+      const category = selectedCategories[categoryType]?.find(
+        (cat) => cat.name === categoryName && cat.visible
+      );
       
       if (!category) {
         setter([]);

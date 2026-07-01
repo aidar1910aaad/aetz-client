@@ -12,7 +12,7 @@ import {
   Cable,
   Activity,
 } from 'lucide-react';
-import { useRusnSettingsOld } from '@/hooks/useRusnSettings';
+import { useRusnSettingsEditor } from '@/hooks/settings/useRusnSettingsEditor';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import RoleGuard from '@/components/common/RoleGuard';
 import { UserRole } from '@/types/user';
@@ -29,7 +29,7 @@ export default function RusnSettingsPage() {
     handleRemoveCategory,
     handleToggleVisibility,
     handleSave,
-  } = useRusnSettingsOld();
+  } = useRusnSettingsEditor();
 
   if (loading) {
     return (
