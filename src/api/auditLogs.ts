@@ -1,13 +1,13 @@
 import { api } from './baseUrl';
 
-export type AuditEntityType = 'material' | 'calculation' | 'currency_settings';
-export type AuditActionType = 'CREATE' | 'UPDATE' | 'DELETE';
+export type AuditEntityType = 'material' | 'calculation' | 'currency_settings' | 'auth';
+export type AuditActionType = 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN';
 
 export interface AuditLogItem {
   id: number;
   entityType: AuditEntityType;
   entityTypeRu?: string;
-  entityId: number;
+  entityId: number | string | null;
   action: AuditActionType;
   actionRu?: string;
   fieldChanged: string | null;

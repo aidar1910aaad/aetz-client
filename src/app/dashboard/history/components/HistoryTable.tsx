@@ -19,17 +19,20 @@ const ENTITY_LABELS: Record<string, string> = {
   material: 'Материал',
   calculation: 'Калькуляция',
   currency_settings: 'Курсы валют',
+  auth: 'Авторизация',
 };
 
 const ACTION_LABELS: Record<string, string> = {
   CREATE: 'Создание',
   UPDATE: 'Изменение',
   DELETE: 'Удаление',
+  LOGIN: 'Вход',
 };
 
 const PREVIEW_LENGTH = 160;
 const PREVIEW_LINES = 4;
 const FIELD_LABELS_RU: Record<string, string> = {
+  session: 'Сессия',
   name: 'Название',
   slug: 'Слаг',
   data: 'Данные',
@@ -62,6 +65,8 @@ const getEntityBadgeClass = (entityType: string) => {
       return 'bg-blue-50 text-blue-800 ring-blue-200/60';
     case 'currency_settings':
       return 'bg-violet-50 text-violet-800 ring-violet-200/60';
+    case 'auth':
+      return 'bg-cyan-50 text-cyan-800 ring-cyan-200/60';
     default:
       return 'bg-gray-50 text-gray-700 ring-gray-200';
   }
@@ -75,6 +80,8 @@ const getActionBadgeClass = (action: string) => {
       return 'bg-amber-50 text-amber-800 ring-amber-200/60';
     case 'DELETE':
       return 'bg-red-50 text-red-700 ring-red-200/60';
+    case 'LOGIN':
+      return 'bg-cyan-50 text-cyan-800 ring-cyan-200/60';
     default:
       return 'bg-gray-50 text-gray-700 ring-gray-200';
   }

@@ -25,6 +25,7 @@ const entityOptions: Array<{ value: '' | AuditEntityType; label: string }> = [
   { value: 'material', label: 'Материал' },
   { value: 'calculation', label: 'Калькуляция' },
   { value: 'currency_settings', label: 'Курсы валют' },
+  { value: 'auth', label: 'Авторизация' },
 ];
 
 const actionOptions: Array<{ value: '' | AuditActionType; label: string }> = [
@@ -32,6 +33,7 @@ const actionOptions: Array<{ value: '' | AuditActionType; label: string }> = [
   { value: 'CREATE', label: 'Создание' },
   { value: 'UPDATE', label: 'Изменение' },
   { value: 'DELETE', label: 'Удаление' },
+  { value: 'LOGIN', label: 'Вход' },
 ];
 
 export default function HistoryFilters({
