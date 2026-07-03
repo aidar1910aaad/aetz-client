@@ -41,6 +41,7 @@ export interface Calculation {
     };
     cellConfig?: {
       type?: string;
+      rzaCellTargets?: string[];
       materials?: Record<string, unknown>;
     };
   };

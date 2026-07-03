@@ -8,6 +8,16 @@ import {
 } from '@heroicons/react/24/outline';
 import { CellConfiguration, CellType, MaterialType } from '@/types/calculation';
 import { BHA_CALCULATION_PRESETS, isBhaCellType, isKsoA12CalculationGroup } from '@/domain/calculation/bhaPresets';
+import {
+  isKsoA17CalculationGroup,
+  KSO_A17_20_CELL_TYPE_LABELS,
+} from '@/domain/calculation/ksoA17Presets';
+import {
+  formatRzaCellTargets,
+  getRzaCellTargetsForGroup,
+  RZA_CELL_TARGET_LABELS,
+  RzaCellTarget,
+} from '@/domain/calculation/rzaCellTargets';
 import { ALL_CELL_TYPES, STANDARD_CELL_TYPES } from '@/domain/calculation/cellTypes';
 import MaterialSearch from '@/app/dashboard/calc/[groupSlug]/[calcSlug]/components/MaterialSearch';
 import React, { useRef } from 'react';
@@ -114,6 +124,42 @@ const CORE_CELL_TYPE_GROUP = {
         ),
       },
     ],
+};
+
+const KSO_A17_20_CELL_TYPE_GROUP = {
+  label: 'КСО А17-20',
+  types: [
+    {
+      value: 'kso_a17_zssh',
+      label: KSO_A17_20_CELL_TYPE_LABELS.kso_a17_zssh,
+      icon: (
+        <svg
+          className="w-5 h-5 mr-1 text-teal-600"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      ),
+    },
+    {
+      value: 'busbar_grounding',
+      label: KSO_A17_20_CELL_TYPE_LABELS.busbar_grounding,
+      icon: (
+        <svg
+          className="w-5 h-5 mr-1 text-amber-600"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      ),
+    },
+  ],
 };
 
 const BHA_CELL_TYPE_GROUP = {
@@ -240,11 +286,17 @@ function getVisibleCellTypeGroups(groupSlug?: string) {
   if (isKsoA12CalculationGroup(groupSlug)) {
     return [CORE_CELL_TYPE_GROUP, BHA_CELL_TYPE_GROUP, EQUIPMENT_CELL_TYPE_GROUP];
   }
+  if (isKsoA17CalculationGroup(groupSlug)) {
+    return [CORE_CELL_TYPE_GROUP, KSO_A17_20_CELL_TYPE_GROUP, EQUIPMENT_CELL_TYPE_GROUP];
+  }
   return [CORE_CELL_TYPE_GROUP, EQUIPMENT_CELL_TYPE_GROUP];
 }
 
 function getAllowedCellTypes(groupSlug?: string): CellType[] {
-  return isKsoA12CalculationGroup(groupSlug) ? ALL_CELL_TYPES : STANDARD_CELL_TYPES;
+  if (isKsoA12CalculationGroup(groupSlug) || isKsoA17CalculationGroup(groupSlug)) {
+    return ALL_CELL_TYPES;
+  }
+  return STANDARD_CELL_TYPES;
 }
 
 const CELL_MATERIALS: Record<CellType, { type: MaterialType; label: string }[]> = {
@@ -351,6 +403,8 @@ const CELL_MATERIALS: Record<CellType, { type: MaterialType; label: string }[]> 
   bha_input: [],
   bha_transformer: [],
   bha_outgoing: [],
+  kso_a17_zssh: [],
+  busbar_grounding: [],
 };
 
 export default function CellConfig({
@@ -423,8 +477,28 @@ export default function CellConfig({
       ...configuration,
       type,
       materials: isBhaCellType(type) ? {} : configuration.materials,
+      rzaCellTargets: type === 'rza' ? configuration.rzaCellTargets || [] : undefined,
     });
   };
+
+  const availableRzaCellTargets = getRzaCellTargetsForGroup(groupSlug);
+  const isRzaSelected = selectedCellType === 'rza';
+
+  const toggleRzaCellTarget = (target: RzaCellTarget) => {
+    const current = configuration.rzaCellTargets || [];
+    const next = current.includes(target)
+      ? current.filter((item) => item !== target)
+      : [...current, target];
+
+    onConfigurationChange({
+      ...configuration,
+      rzaCellTargets: next,
+    });
+  };
+
+  const materialRows = isRzaSelected
+    ? [{ type: 'rza' as MaterialType, label: 'РЗА' }]
+    : CELL_MATERIALS[selectedCellType] || [];
 
   const handleMaterialSelect = (material: {
     id: string;
@@ -568,11 +642,57 @@ export default function CellConfig({
             visibleCellTypeGroups.flatMap((g) => g.types).find((t) => t.value === selectedCellType)
               ?.label || selectedCellType
           }
+          {isRzaSelected && configuration.rzaCellTargets?.length ? (
+            <span className="text-gray-500 font-normal">
+              {' '}
+              — {formatRzaCellTargets(configuration.rzaCellTargets)}
+            </span>
+          ) : null}
+        </div>
+      )}
+      {isRzaSelected && (
+        <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 space-y-3">
+          <div>
+            <span className="text-sm font-medium text-gray-800 block">
+              Ячейки для этой калькуляции РЗА
+            </span>
+            <p className="text-xs text-gray-500 mt-1">
+              Выберите одну или несколько ячеек, для которых применяется эта калькуляция РЗиА
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {availableRzaCellTargets.map((target) => {
+              const isChecked = configuration.rzaCellTargets?.includes(target) ?? false;
+              return (
+                <label
+                  key={target}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer transition-colors ${
+                    isChecked
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-300'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={isChecked}
+                    onChange={() => toggleRzaCellTarget(target)}
+                  />
+                  {RZA_CELL_TARGET_LABELS[target]}
+                </label>
+              );
+            })}
+          </div>
+          {!configuration.rzaCellTargets?.length && (
+            <p className="text-xs text-amber-700">
+              Выберите хотя бы одну ячейку — без этого калькуляция не будет подставляться в РУСН
+            </p>
+          )}
         </div>
       )}
       {!isBhaSelected && (
         <div className="space-y-4">
-          {CELL_MATERIALS[selectedCellType]?.map(({ type, label }) => (
+          {materialRows.map(({ type, label }) => (
             <div key={type}>{renderMaterialInput(label, type, configuration.materials[type])}</div>
           ))}
         </div>

@@ -43,10 +43,23 @@ export function useBktpRealtimeCalculation() {
   const bktp = useBktpStore();
   const bmz = useBmzStore();
   const transformer = useTransformerStore((s) => s.selectedTransformer);
-  const rusn = useRusnStore();
-  const runn = useRunnStore();
-  const additionalEquipment = useAdditionalEquipmentStore();
-  const works = useWorksStore();
+  const rusnGlobal = useRusnStore((s) => s.global);
+  const rusnCellConfigs = useRusnStore((s) => s.cellConfigs);
+  const rusnBusbarSummary = useRusnStore((s) => s.busbarSummary);
+  const rusnBusBridgeSummary = useRusnStore((s) => s.busBridgeSummary);
+  const rusnBusBridgeSummaries = useRusnStore((s) => s.busBridgeSummaries);
+  const rusnCellSummaries = useRusnStore((s) => s.cellSummaries);
+  const runnGlobal = useRunnStore((s) => s.global);
+  const runnCellConfigs = useRunnStore((s) => s.cellConfigs);
+  const runnCellSummaries = useRunnStore((s) => s.cellSummaries);
+  const runnBusbarSummary = useRunnStore((s) => s.busbarSummary);
+  const runnBusBridgeSummary = useRunnStore((s) => s.busBridgeSummary);
+  const runnBusBridgeSummaries = useRunnStore((s) => s.busBridgeSummaries);
+  const runnBusBridges = useRunnStore((s) => s.busBridges);
+  const additionalEquipmentSelected = useAdditionalEquipmentStore((s) => s.selected);
+  const additionalEquipmentList = useAdditionalEquipmentStore((s) => s.equipmentList);
+  const worksSelected = useWorksStore((s) => s.selected);
+  const worksList = useWorksStore((s) => s.worksList);
 
   const {
     customRowsByTable,
@@ -72,29 +85,29 @@ export function useBktpRealtimeCalculation() {
       },
       transformer: transformer ? { ...transformer } : null,
       rusn: {
-        global: rusn.global,
-        cellConfigs: rusn.cellConfigs,
-        busbarSummary: rusn.busbarSummary,
-        busBridgeSummary: rusn.busBridgeSummary,
-        busBridgeSummaries: rusn.busBridgeSummaries,
-        cellSummaries: rusn.cellSummaries,
+        global: rusnGlobal,
+        cellConfigs: rusnCellConfigs,
+        busbarSummary: rusnBusbarSummary,
+        busBridgeSummary: rusnBusBridgeSummary,
+        busBridgeSummaries: rusnBusBridgeSummaries,
+        cellSummaries: rusnCellSummaries,
       },
       runn: {
-        global: runn.global,
-        cellConfigs: runn.cellConfigs,
-        cellSummaries: runn.cellSummaries,
-        busbarSummary: runn.busbarSummary,
-        busBridgeSummary: runn.busBridgeSummary,
-        busBridgeSummaries: runn.busBridgeSummaries,
-        busBridges: runn.busBridges,
+        global: runnGlobal,
+        cellConfigs: runnCellConfigs,
+        cellSummaries: runnCellSummaries,
+        busbarSummary: runnBusbarSummary,
+        busBridgeSummary: runnBusBridgeSummary,
+        busBridgeSummaries: runnBusBridgeSummaries,
+        busBridges: runnBusBridges,
       },
       additionalEquipment: {
-        selected: additionalEquipment.selected,
-        equipmentList: additionalEquipment.equipmentList,
+        selected: additionalEquipmentSelected,
+        equipmentList: additionalEquipmentList,
       },
       works: {
-        selected: works.selected,
-        worksList: works.worksList,
+        selected: worksSelected,
+        worksList: worksList,
       },
       customRowsByTable,
       tableMarkupPercents,
@@ -120,23 +133,23 @@ export function useBktpRealtimeCalculation() {
       bmz.settings,
       bmz.equipmentState,
       transformer,
-      rusn.global,
-      rusn.cellConfigs,
-      rusn.busbarSummary,
-      rusn.busBridgeSummary,
-      rusn.busBridgeSummaries,
-      rusn.cellSummaries,
-      runn.global,
-      runn.cellConfigs,
-      runn.cellSummaries,
-      runn.busbarSummary,
-      runn.busBridgeSummary,
-      runn.busBridgeSummaries,
-      runn.busBridges,
-      additionalEquipment.selected,
-      additionalEquipment.equipmentList,
-      works.selected,
-      works.worksList,
+      rusnGlobal,
+      rusnCellConfigs,
+      rusnBusbarSummary,
+      rusnBusBridgeSummary,
+      rusnBusBridgeSummaries,
+      rusnCellSummaries,
+      runnGlobal,
+      runnCellConfigs,
+      runnCellSummaries,
+      runnBusbarSummary,
+      runnBusBridgeSummary,
+      runnBusBridgeSummaries,
+      runnBusBridges,
+      additionalEquipmentSelected,
+      additionalEquipmentList,
+      worksSelected,
+      worksList,
       customRowsByTable,
       tableMarkupPercents,
       tableMarkupTotals,

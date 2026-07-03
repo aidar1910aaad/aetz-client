@@ -1,5 +1,6 @@
 import { CellType } from '@/types/calculation';
 import { BHA_CELL_TYPES } from '@/domain/calculation/bhaPresets';
+import { KSO_A17_20_CELL_TYPES } from '@/domain/calculation/ksoA17Presets';
 
 export const STANDARD_CELL_TYPES: CellType[] = [
   '0.4kv',
@@ -18,7 +19,11 @@ export const STANDARD_CELL_TYPES: CellType[] = [
   'outgoing',
 ];
 
-export const ALL_CELL_TYPES: CellType[] = [...STANDARD_CELL_TYPES, ...BHA_CELL_TYPES];
+export const ALL_CELL_TYPES: CellType[] = [
+  ...STANDARD_CELL_TYPES,
+  ...BHA_CELL_TYPES,
+  ...KSO_A17_20_CELL_TYPES,
+];
 
 export function isValidCellType(type?: string): type is CellType {
   return ALL_CELL_TYPES.includes(type as CellType);
@@ -43,6 +48,8 @@ export const CELL_TYPE_LABELS: Record<string, string> = {
   input: 'Ввод',
   section_switch: 'Секционный выключатель',
   outgoing: 'Отходящая',
+  kso_a17_zssh: 'ТН с ЗСШ',
+  busbar_grounding: 'Заземление сборных шин',
   bha_input: 'BHA — Вводная',
   bha_transformer: 'BHA — Трансформаторная',
   bha_outgoing: 'BHA — Отходящая',

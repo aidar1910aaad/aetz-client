@@ -8,6 +8,7 @@ type Props = {
   defaultEnabled?: boolean;
   toggled?: boolean;
   onToggle?: () => void;
+  hideToggle?: boolean;
 };
 
 export default function CellSectionToggler({
@@ -16,12 +17,14 @@ export default function CellSectionToggler({
   defaultEnabled = false,
   toggled,
   onToggle,
+  hideToggle = false,
 }: Props) {
   const [internalEnabled, setInternalEnabled] = useState(defaultEnabled);
   const isControlled = toggled !== undefined;
-  const isEnabled = isControlled ? toggled : internalEnabled;
+  const isEnabled = hideToggle ? true : isControlled ? toggled : internalEnabled;
 
   const handleClick = () => {
+    if (hideToggle) return;
     if (isControlled && onToggle) {
       onToggle();
     } else {
@@ -51,7 +54,7 @@ export default function CellSectionToggler({
             isEnabled
               ? 'text-red-700 bg-red-50 hover:bg-red-100 border border-red-200'
               : 'text-[#5a7a12] bg-[#8eba1e]/15 hover:bg-[#8eba1e]/25 border border-[#8eba1e]/30'
-          }`}
+          } ${hideToggle ? 'hidden' : ''}`}
         >
           {isEnabled ? 'Скрыть' : 'Добавить'}
         </button>

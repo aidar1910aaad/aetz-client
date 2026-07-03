@@ -11,13 +11,21 @@ import RusnMaterialsSummary from '@/components/bktp/rusn/RusnMaterialsSummary';
 import CellSectionToggler from '@/components/bktp/shared/CellSectionToggler';
 import { createCellByConfig } from '@/utils/autoCellUtils';
 import { autoCellConfigs } from '@/config/autoCellConfigs';
+import { RUSN_CAMERA, RUSN_CELL_PURPOSE, isVoltageTransformerCellPurpose } from '@/domain/rusn/rusnConstants';
 
 const OUTGOING_CELL_PURPOSE = 'Отходящая';
+const isA17ZsshCell = (type: string, bodyType: string) =>
+  type === RUSN_CELL_PURPOSE.VOLTAGE_TRANSFORMER_ZSSH && bodyType === RUSN_CAMERA.KSO_A17_20;
 
 export default function RusnCellTable() {
   const cellManager = useCellManager();
   const { cellConfigs, addCell, updateCell, materials, global } = cellManager;
+  const pruneCellSummaries = useRusnStore((s) => s.pruneCellSummaries);
   useMaterialUpdaterWithManager(cellManager); // Автоматически обновляет материалы
+
+  useEffect(() => {
+    pruneCellSummaries();
+  }, [cellConfigs, pruneCellSummaries]);
   
   const [openCellMap, setOpenCellMap] = useState<Record<string, string>>(() => {
     if (typeof window !== 'undefined') {
@@ -95,9 +103,19 @@ export default function RusnCellTable() {
     }
   }, [global.bodyType, cellConfigs]);
 
-  // Автоматически открываем ячейки для КСО А12-10 при наличии глобальных материалов
+  const MATERIAL_BASED_CAMERAS = [
+    RUSN_CAMERA.KSO_A12_10,
+    RUSN_CAMERA.KM1_AF,
+    RUSN_CAMERA.KSO_A17_20,
+  ] as const;
+
+  // Автоматически открываем ячейки для камер с материалами при наличии глобальных настроек
   useEffect(() => {
-    if (global.bodyType === 'Камера КСО А12-10' && global.breaker && global.rza) {
+    if (
+      MATERIAL_BASED_CAMERAS.includes(global.bodyType as (typeof MATERIAL_BASED_CAMERAS)[number]) &&
+      global.breaker &&
+      global.rza
+    ) {
       const newOpenCellMap: Record<string, string> = {};
       
       // Проверяем, какие ячейки существуют и автоматически открываем их
@@ -108,7 +126,7 @@ export default function RusnCellTable() {
             cell.purpose === 'Ввод' || 
             cell.purpose === 'Трансформаторная' ||
             cell.purpose === OUTGOING_CELL_PURPOSE ||
-            cell.purpose === 'Трансформатор напряжения' ||
+            isVoltageTransformerCellPurpose(cell.purpose) ||
             cell.purpose === 'Трансформатор собственных нужд') {
           if (cell.purpose === OUTGOING_CELL_PURPOSE) {
             newOpenCellMap[OUTGOING_CELL_PURPOSE] = 'open';
@@ -119,9 +137,13 @@ export default function RusnCellTable() {
       });
       
       if (Object.keys(newOpenCellMap).length > 0) {
-        setOpenCellMap(newOpenCellMap);
-        // Сохраняем в localStorage
-        localStorage.setItem(`openCells_${global.bodyType}`, JSON.stringify(newOpenCellMap));
+        setOpenCellMap((prev) => {
+          const merged = { ...prev, ...newOpenCellMap };
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(`openCells_${global.bodyType}`, JSON.stringify(merged));
+          }
+          return merged;
+        });
       }
     }
   }, [global.bodyType, global.breaker, global.rza, global.meterType, cellConfigs]);
@@ -196,7 +218,7 @@ export default function RusnCellTable() {
           }
         });
         if (Object.keys(validOpenCells).length > 0) {
-          setOpenCellMap(validOpenCells);
+          setOpenCellMap((prev) => ({ ...validOpenCells, ...prev }));
         }
       }
     }
@@ -240,6 +262,10 @@ export default function RusnCellTable() {
   };
 
   const handleToggle = (type: string) => {
+    if (isA17ZsshCell(type, global.bodyType || '')) {
+      return;
+    }
+
     if (type === OUTGOING_CELL_PURPOSE) {
       const isOpen = !!openCellMap[OUTGOING_CELL_PURPOSE];
 
@@ -284,6 +310,25 @@ export default function RusnCellTable() {
     } else {
       // Создаем ячейку, если ее нет, или открываем существующую
       if (!existingCell) {
+        const autoConfig = autoCellConfigs[type];
+        if (autoConfig) {
+          createCellByConfig(type, autoConfig, materials, global, addCell);
+          const createdCell = useRusnStore
+            .getState()
+            .cellConfigs.find((cell) => cell.purpose === type);
+          if (createdCell) {
+            setOpenCellMap((prev) => ({ ...prev, [type]: createdCell.id }));
+            setDeletedCells((prev) => {
+              const next = new Set(prev);
+              next.delete(type);
+              return next;
+            });
+          } else {
+            setPendingCellType(type);
+          }
+          return;
+        }
+
         // Для КСО 366 и "Секционный разъединитель" создаем ячейку с выбором типа
         if (global.bodyType === 'Камера КСО 366' && type === 'Секционный разьединитель') {
           const newCell = {
@@ -373,7 +418,8 @@ export default function RusnCellTable() {
 
       {staticCellTypes.map((cellType) => {
         const existingCell = cellConfigs.find(cell => cell.purpose === cellType);
-        const isOpen = !!openCellMap[cellType];
+        const isPermanentA17Zssh = isA17ZsshCell(cellType, global.bodyType || '');
+        const isOpen = isPermanentA17Zssh || !!openCellMap[cellType];
         const isDeleted = deletedCells.has(cellType);
 
         // Отладочная информация для 8DJH
@@ -391,7 +437,9 @@ export default function RusnCellTable() {
             key={cellType}
             label={`Ячейка: ${cellType}`}
             toggled={isOpen && !isDeleted}
-            onToggle={() => handleToggle(cellType)}
+            onToggle={isPermanentA17Zssh ? undefined : () => handleToggle(cellType)}
+            hideToggle={isPermanentA17Zssh}
+            defaultEnabled={isPermanentA17Zssh}
           >
             {existingCell && (
               <RusnCell

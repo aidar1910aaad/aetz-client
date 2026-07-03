@@ -1,4 +1,5 @@
 import React from 'react';
+import { isVoltageTransformerCellPurpose } from '@/domain/rusn/rusnConstants';
 import { Switchgear } from '@/api/switchgear';
 import { BusMaterial } from '@/types/rusn';
 
@@ -84,7 +85,7 @@ export const CalculationResults: React.FC<CalculationResultsProps> = ({
                     break;
                   case 'ТН':
                     cellCount = cellConfigs
-                      .filter((c) => c.purpose === 'Трансформатор напряжения')
+                      .filter((c) => isVoltageTransformerCellPurpose(c.purpose))
                       .reduce((total, cell) => total + (cell.count || 1), 0);
                     break;
                   case 'ТСН':

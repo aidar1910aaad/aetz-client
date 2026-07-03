@@ -8,11 +8,13 @@ import { CalculationEditForm } from './components/CalculationEditForm';
 import { Toast } from './components/Toast';
 import { updateCalculation } from '@/api/calculations';
 import { normalizeCellType, getCellTypeLabel } from '@/domain/calculation/cellTypes';
+import { formatRzaCellTargets } from '@/domain/calculation/rzaCellTargets';
 import { CalculationSummary } from './components/CalculationSummary';
 import RoleGuard from '@/components/common/RoleGuard';
 import { UserRole } from '@/types/user';
 import { API_FALLBACK_CALCULATION_RATES } from '@/utils/calculationSettings';
 import { CellType } from '@/types/calculation';
+import type { RzaCellTarget } from '@/domain/calculation/rzaCellTargets';
 
 interface CalculationMaterial {
   id?: number;
@@ -38,6 +40,7 @@ interface CellMaterial {
 
 interface CellConfiguration {
   type: CellType;
+  rzaCellTargets?: RzaCellTarget[];
   materials: {
     switch?: CellMaterial[];
     rza?: CellMaterial[];
@@ -310,7 +313,9 @@ export default function CalculationDetailPage() {
                     manufacturingHours: selectedCalculation.data.calculation?.manufacturingHours || 1,
                   },
                   cellConfig: selectedCalculation.data.cellConfig ? {
-                    type: (selectedCalculation.data.cellConfig.type as any) || '10kv',
+                    type: (selectedCalculation.data.cellConfig.type as CellType) || '10kv',
+                    rzaCellTargets: (selectedCalculation.data.cellConfig as CellConfiguration)
+                      .rzaCellTargets,
                     materials: selectedCalculation.data.cellConfig.materials || {},
                   } as CellConfiguration : undefined,
                 },
@@ -334,6 +339,18 @@ export default function CalculationDetailPage() {
                         {getCellTypeLabel(selectedCalculation.data.cellConfig.type)}
                       </span>
                     </div>
+                    {selectedCalculation.data.cellConfig.type === 'rza' &&
+                      (selectedCalculation.data.cellConfig as CellConfiguration).rzaCellTargets
+                        ?.length ? (
+                      <div className="flex items-start text-sm">
+                        <span className="text-gray-700 w-28 shrink-0">Ячейки РЗА:</span>
+                        <span className="font-medium text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md">
+                          {formatRzaCellTargets(
+                            (selectedCalculation.data.cellConfig as CellConfiguration).rzaCellTargets
+                          )}
+                        </span>
+                      </div>
+                    ) : null}
                     <div className="space-y-2">
                       <h3 className="text-base font-medium text-gray-900">Материалы</h3>
                       <div className="overflow-x-auto rounded-md border border-gray-100">

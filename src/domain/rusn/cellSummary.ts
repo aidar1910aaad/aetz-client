@@ -6,6 +6,18 @@ export function getRusnCellSummaryIds(cellId: string): string[] {
   return [cellId, `${cellId}_main`, `${cellId}_additional`];
 }
 
+export function resolveSummaryToCellId(summaryCellId: string): string {
+  return summaryCellId.replace(/_(main|additional)$/, '');
+}
+
+export function pruneOrphanRusnCellSummaries(
+  cellConfigs: { id: string }[],
+  summaries: RusnCellSummary[]
+): RusnCellSummary[] {
+  const validIds = new Set(cellConfigs.map((cell) => cell.id));
+  return summaries.filter((summary) => validIds.has(resolveSummaryToCellId(summary.cellId)));
+}
+
 export function buildRusnCellSummaries(
   cell: RusnCell,
   materials: RusnMaterials,

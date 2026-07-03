@@ -94,6 +94,7 @@ export default function CreateCalculationPage() {
           },
           cellConfig: calculation.data.cellConfig ? {
             type: normalizeCellType(calculation.data.cellConfig.type),
+            rzaCellTargets: calculation.data.cellConfig.rzaCellTargets,
             materials: calculation.data.cellConfig.materials && typeof calculation.data.cellConfig.materials === 'object' && !Array.isArray(calculation.data.cellConfig.materials)
               ? calculation.data.cellConfig.materials
               : {},

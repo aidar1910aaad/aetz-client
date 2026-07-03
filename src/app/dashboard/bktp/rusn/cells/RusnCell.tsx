@@ -7,8 +7,8 @@ import MaterialSelect from './MaterialSelect';
 import DisconnectorTypeSelector from './DisconnectorTypeSelector';
 import CellFormGrid from '@/components/bktp/shared/CellFormGrid';
 import { CellFormField, inputClassName } from '@/components/bktp/shared/CellFormField';
-import { buildRusnCellSummaries, getRusnCellSummaryIds } from '@/domain/rusn/cellSummary';
-import { isKsoA12BhaEligible } from '@/domain/rusn/rusnConstants';
+import { buildRusnCellSummaries } from '@/domain/rusn/cellSummary';
+import { isKsoA12BhaEligible, RUSN_CELL_PURPOSE } from '@/domain/rusn/rusnConstants';
 import { getKsoA12BhaCellDescription } from '@/domain/calculation/bhaPresets';
 import { useDebugPanelsEnabled } from '@/components/common/DebugToggle';
 
@@ -157,6 +157,7 @@ export default function RusnCell({
   }
 
   const { global } = useRusnStore();
+  const replaceCellSummariesForCell = useRusnStore((s) => s.replaceCellSummariesForCell);
   const selectedTransformer = useTransformerStore((state) => state.selectedTransformer);
   const { enabled: debugPanelsEnabled } = useDebugPanelsEnabled();
   
@@ -204,17 +205,14 @@ export default function RusnCell({
 
 
 
-  const { setCellSummary, removeCellSummary } = useRusnStore();
-
   // Обновляем totalPrice ячейки при изменении total
   React.useEffect(() => {
-    
     if (total !== cell.totalPrice) {
       onUpdate(cell.id, 'totalPrice', total);
     }
   }, [total, cell.totalPrice, cell.id, onUpdate]);
 
-  // Сохраняем summary данные ячейки в store
+  // Сохраняем summary данные ячейки в store одной атомарной операцией
   React.useEffect(() => {
     const summaries = buildRusnCellSummaries(
       cell,
@@ -223,8 +221,7 @@ export default function RusnCell({
       total,
       selectedTransformer?.voltage
     );
-    getRusnCellSummaryIds(cell.id).forEach(removeCellSummary);
-    summaries.forEach(setCellSummary);
+    replaceCellSummariesForCell(cell.id, summaries);
   }, [
     cell.id,
     cell.cellType,
@@ -249,19 +246,24 @@ export default function RusnCell({
     total,
     materials,
     selectedTransformer?.voltage,
-    setCellSummary,
-    removeCellSummary,
+    global.bodyType,
+    replaceCellSummariesForCell,
   ]);
 
   const isBhaActive =
     Boolean(cell.bhaMode) && isKsoA12BhaEligible(global.bodyType, cell.purpose);
 
-  const cellFields = getCellFieldConfig(cell.purpose, materials, cell.cellType, selectedGroupName);
+  const cellFields = getCellFieldConfig(
+    cell.purpose,
+    materials,
+    cell.cellType,
+    global.bodyType || selectedGroupName,
+    global
+  );
   
 
   const handleRemove = () => {
-    // Удаляем summary и саму ячейку
-    removeCellSummary(cell.id);
+    replaceCellSummariesForCell(cell.id, []);
     onRemove(cell.id);
   };
 
@@ -272,7 +274,12 @@ export default function RusnCell({
     }
 
     // Не показываем предупреждение для специальных ячеек, которые не требуют ТТ
-    const specialCells = ['Кабельная перемычка', 'Изоляционный адаптер', 'Камера Siemens 8DJH'];
+    const specialCells = [
+      'Кабельная перемычка',
+      'Изоляционный адаптер',
+      'Камера Siemens 8DJH',
+      RUSN_CELL_PURPOSE.BUSBAR_GROUNDING,
+    ];
     if (specialCells.includes(cell.purpose)) {
       return false;
     }
@@ -380,6 +387,15 @@ export default function RusnCell({
           </CellFormField>
           <QuantityInput cell={cell} onUpdate={handleUpdate} />
         </CellFormGrid>
+      ) : cell.purpose === RUSN_CELL_PURPOSE.BUSBAR_GROUNDING ? (
+        <CellFormGrid footer={<CellActionButtons cell={cell} onRemove={handleRemove} />}>
+          <CellFormField label="Наименование" className="sm:col-span-2">
+            <div className={`${inputClassName} flex items-center text-gray-700 bg-gray-50`}>
+              Заземление сборных шин
+            </div>
+          </CellFormField>
+          <QuantityInput cell={cell} onUpdate={handleUpdate} />
+        </CellFormGrid>
       ) : isBhaActive ? (
         <CellFormGrid footer={<CellActionButtons cell={cell} onRemove={handleRemove} />}>
           <CellFormField label="Наименование" className="sm:col-span-2 lg:col-span-3">
@@ -398,7 +414,7 @@ export default function RusnCell({
 
               return (
                 <MaterialSelect
-                  key={field}
+                  key={`${cell.id}-${field}`}
                   field={field}
                   label={label}
                   materials={materials}

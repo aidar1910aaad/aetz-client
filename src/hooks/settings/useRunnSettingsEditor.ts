@@ -10,6 +10,7 @@ import {
   RunnCategoriesByType,
   invalidateRunnCategoriesCache,
 } from '@/domain/runn/runnCategoriesLoader';
+import { appendSettingsDebugEvent } from '@/utils/settingsDebugLog';
 
 interface CategorySetting {
   id: string;
@@ -92,17 +93,54 @@ export function useRunnSettingsEditor() {
   const countRunnCategories = (settings: RunnSettings) =>
     Object.values(settings).reduce((sum, categories) => sum + categories.length, 0);
 
-  const canApplyFetchedSettings = (requestId: number, fetched: RunnSettings) => {
-    if (requestId !== settingsRequestIdRef.current) return false;
-    if (hasChangesRef.current) return false;
+  const logEvent = (
+    reason: string,
+    options: {
+      details?: string;
+      requestId?: number;
+      stateBeforeCount?: number;
+      stateAfterCount?: number;
+      fetchedCount?: number;
+    } = {}
+  ) => {
+    appendSettingsDebugEvent('runn', { reason, ...options });
+  };
 
+  const canApplyFetchedSettings = (requestId: number, fetched: RunnSettings) => {
     const uiCount = selectedCategoriesRef.current
       ? countRunnCategories(selectedCategoriesRef.current)
       : 0;
     const fetchedCount = countRunnCategories(fetched);
 
+    if (requestId !== settingsRequestIdRef.current) {
+      logEvent('Пропущен устаревший ответ РУНН', {
+        requestId,
+        stateBeforeCount: uiCount,
+        fetchedCount,
+        details: 'Ответ API пришёл не для последнего запроса и не был применён.',
+      });
+      return false;
+    }
+    if (hasChangesRef.current) {
+      logEvent('Пропущен ответ РУНН из-за несохранённых изменений', {
+        requestId,
+        stateBeforeCount: uiCount,
+        fetchedCount,
+        details: 'Локальные изменения в форме имеют приоритет над пришедшими данными API.',
+      });
+      return false;
+    }
+
     // Не затираем уже выбранные категории пустым устаревшим ответом API
-    if (fetchedCount === 0 && uiCount > 0) return false;
+    if (fetchedCount === 0 && uiCount > 0) {
+      logEvent('Заблокировано затирание РУНН пустым ответом API', {
+        requestId,
+        stateBeforeCount: uiCount,
+        fetchedCount,
+        details: 'Пришёл пустой ответ, но в UI уже были категории. Состояние не перезаписано.',
+      });
+      return false;
+    }
 
     return true;
   };
@@ -140,6 +178,9 @@ export function useRunnSettingsEditor() {
         setAllCategories(categorized);
       } catch (error) {
         console.error('Ошибка загрузки категорий:', error);
+        logEvent('Ошибка загрузки справочника категорий РУНН', {
+          details: error instanceof Error ? error.message : 'Unknown error',
+        });
 
         // При ошибке показываем пустые категории
         const emptyCategories: AllCategories = {
@@ -248,6 +289,12 @@ export function useRunnSettingsEditor() {
   useEffect(() => {
     const fetchSettings = async () => {
       const requestId = ++settingsRequestIdRef.current;
+      logEvent('Запрошены настройки РУНН', {
+        requestId,
+        stateBeforeCount: selectedCategoriesRef.current
+          ? countRunnCategories(selectedCategoriesRef.current)
+          : 0,
+      });
 
       try {
         // Не показываем лоадер повторно — иначе форма размонтируется и теряется ввод
@@ -260,13 +307,20 @@ export function useRunnSettingsEditor() {
 
         if (!token) {
           console.error('Токен не найден в localStorage');
+          logEvent('Загрузка РУНН прервана: нет токена', { requestId });
           throw new Error('Токен не найден');
         }
         
         // Выполняем GET запрос к API
         const apiResponse = await getSettings(token);
 
-        if (requestId !== settingsRequestIdRef.current) return;
+        if (requestId !== settingsRequestIdRef.current) {
+          logEvent('Игнорирован устаревший fetch РУНН после getSettings', {
+            requestId,
+            details: 'Пока шёл запрос, был запущен более новый.',
+          });
+          return;
+        }
 
         // Обрабатываем настройки РУНН (если они есть)
         if (apiResponse.settings?.runn?.length) {
@@ -290,9 +344,19 @@ export function useRunnSettingsEditor() {
           setSelectedCategories(emptySettings);
           setOriginalSettings(JSON.parse(JSON.stringify(emptySettings)));
           settingsLoadedRef.current = true;
+          logEvent('Настройки РУНН сброшены в пустое состояние', {
+            requestId,
+            stateAfterCount: 0,
+            fetchedCount: 0,
+            details: 'В ответе API отсутствовали настройки runn при первой загрузке.',
+          });
         }
       } catch (error) {
         console.error('Ошибка загрузки настроек РУНН:', error);
+        logEvent('Ошибка загрузки настроек РУНН', {
+          requestId,
+          details: error instanceof Error ? error.message : 'Unknown error',
+        });
 
         if (requestId !== settingsRequestIdRef.current || hasChangesRef.current) {
           return;
@@ -312,6 +376,11 @@ export function useRunnSettingsEditor() {
           setSelectedCategories(emptySettings);
           setOriginalSettings(JSON.parse(JSON.stringify(emptySettings)));
           settingsLoadedRef.current = true;
+          logEvent('Настройки РУНН сброшены в пустое состояние после ошибки', {
+            requestId,
+            stateAfterCount: 0,
+            details: 'После ошибки загрузки форма инициализирована пустым состоянием.',
+          });
         }
       } finally {
         if (requestId === settingsRequestIdRef.current) {
@@ -326,6 +395,17 @@ export function useRunnSettingsEditor() {
       requestId: number
     ) => {
       if (requestId !== settingsRequestIdRef.current || hasChangesRef.current) {
+        logEvent('Обработка ответа РУНН отменена до применения', {
+          requestId,
+          stateBeforeCount: selectedCategoriesRef.current
+            ? countRunnCategories(selectedCategoriesRef.current)
+            : 0,
+          fetchedCount: apiRunnSettings.length,
+          details:
+            requestId !== settingsRequestIdRef.current
+              ? 'Появился более новый запрос.'
+              : 'В форме есть несохранённые изменения.',
+        });
         return;
       }
 
@@ -335,9 +415,18 @@ export function useRunnSettingsEditor() {
         return;
       }
 
+      const nextCount = countRunnCategories(transformedSettings);
       setSelectedCategories(transformedSettings);
       setOriginalSettings(JSON.parse(JSON.stringify(transformedSettings)));
       settingsLoadedRef.current = true;
+      logEvent('Применены настройки РУНН из API', {
+        requestId,
+        stateBeforeCount: selectedCategoriesRef.current
+          ? countRunnCategories(selectedCategoriesRef.current)
+          : 0,
+        stateAfterCount: nextCount,
+        fetchedCount: nextCount,
+      });
 
       const token = localStorage.getItem('token');
       if (token) {
@@ -530,9 +619,16 @@ export function useRunnSettingsEditor() {
   ) => {
     // Отменяем устаревшие GET-запросы, которые могли стартовать до сохранения
     settingsRequestIdRef.current += 1;
+    logEvent('Запущено сохранение настроек РУНН', {
+      requestId: settingsRequestIdRef.current,
+      stateBeforeCount: countRunnCategories(settings),
+    });
 
     const token = localStorage.getItem('token');
     if (!token) {
+      logEvent('Сохранение РУНН прервано: нет токена', {
+        requestId: settingsRequestIdRef.current,
+      });
       showToast('Ошибка авторизации', 'error');
       throw new Error('Токен не найден');
     }
@@ -541,6 +637,11 @@ export function useRunnSettingsEditor() {
     const totalInUi = Object.values(settings).reduce((sum, categories) => sum + categories.length, 0);
 
     if (totalInUi > 0 && runnSettings.length === 0) {
+      logEvent('Сохранение РУНН отклонено: категории не преобразовались в payload', {
+        requestId: settingsRequestIdRef.current,
+        stateBeforeCount: totalInUi,
+        fetchedCount: runnSettings.length,
+      });
       showToast('Не удалось сохранить: проверьте выбранные категории', 'error');
       throw new Error('Invalid category ids');
     }
@@ -560,6 +661,10 @@ export function useRunnSettingsEditor() {
     setOriginalSettings(JSON.parse(JSON.stringify(settings)));
     invalidateRunnMaterialsCache();
     invalidateRunnCategoriesCache();
+    logEvent('Настройки РУНН успешно сохранены', {
+      requestId: settingsRequestIdRef.current,
+      stateAfterCount: countRunnCategories(settings),
+    });
 
     if (!options.silent) {
       showToast(options.successMessage ?? 'Настройки успешно сохранены', 'success');
@@ -582,6 +687,10 @@ export function useRunnSettingsEditor() {
       await persistRunnSettings(selectedCategories);
     } catch (error) {
       console.error('Ошибка сохранения настроек БКТП РУНН:', error);
+      logEvent('Ошибка сохранения настроек РУНН', {
+        requestId: settingsRequestIdRef.current,
+        details: error instanceof Error ? error.message : 'Unknown error',
+      });
       if (error instanceof Error && error.message !== 'Invalid category ids') {
         showToast(`Ошибка при сохранении: ${error.message}`, 'error');
       } else if (!(error instanceof Error)) {

@@ -1,4 +1,6 @@
 import { AutoCellConfig } from '../config/autoCellConfigs';
+import { isRusnCameraWithPerCellMeter } from '@/domain/rusn/rusnConstants';
+import { filterMaterialsByCategory } from './rusnMaterials';
 
 // Функция для поиска материала по названию
 export const findMaterialByName = (materialList: any[], searchTerms: string[]) => {
@@ -33,14 +35,12 @@ export const createCellByConfig = (
   // Добавляем выключатель
   if (config.materials.breaker) {
     let targetBreaker = null;
-    
-    if (config.useGlobalBreaker && global.breaker) {
-      targetBreaker = materials.breaker.find(breaker => breaker.id.toString() === global.breaker.id.toString());
-    }
-    
-    if (!targetBreaker) {
-      targetBreaker = findMaterialByName(materials.breaker, config.materials.breaker);
-    }
+    const breakerPool =
+      config.useGlobalBreaker && global.breaker
+        ? filterMaterialsByCategory(materials.breaker, global.breaker)
+        : materials.breaker;
+
+    targetBreaker = findMaterialByName(breakerPool, config.materials.breaker);
     
     if (targetBreaker) {
       cellData.breaker = {
@@ -54,14 +54,12 @@ export const createCellByConfig = (
   // Добавляем РЗА
   if (config.materials.rza) {
     let targetRza = null;
-    
-    if (config.useGlobalRza && global.rza) {
-      targetRza = materials.rza.find(rza => rza.id.toString() === global.rza.id.toString());
-    }
-    
-    if (!targetRza) {
-      targetRza = findMaterialByName(materials.rza, config.materials.rza);
-    }
+    const rzaPool =
+      config.useGlobalRza && global.rza
+        ? filterMaterialsByCategory(materials.rza, global.rza)
+        : materials.rza;
+
+    targetRza = findMaterialByName(rzaPool, config.materials.rza);
     
     if (targetRza) {
       cellData.rza = {
@@ -75,14 +73,9 @@ export const createCellByConfig = (
   // Добавляем разъединитель
   if (config.materials.sr) {
     let targetSr = null;
-    
-    if (global.sr) {
-      targetSr = materials.sr.find(sr => sr.id.toString() === global.sr.id.toString());
-    }
-    
-    if (!targetSr) {
-      targetSr = findMaterialByName(materials.sr, config.materials.sr);
-    }
+    const srPool = global.sr ? filterMaterialsByCategory(materials.sr, global.sr) : materials.sr;
+
+    targetSr = findMaterialByName(srPool, config.materials.sr);
     
     if (targetSr) {
       cellData.sr = {
@@ -94,21 +87,20 @@ export const createCellByConfig = (
   }
 
   // Добавляем счетчик
-  if (config.materials.meter && config.useGlobalMeter) {
+  if (
+    config.materials.meter &&
+    config.useGlobalMeter &&
+    !isRusnCameraWithPerCellMeter(global.bodyType)
+  ) {
     let targetMeter = null;
-    
-    // Приоритетно используем глобально выбранный счетчик
-    if (global.meterType) {
-      targetMeter = materials.meter.find(meter => meter.id.toString() === global.meterType.id.toString());
-    }
-    
-    // Если глобальный счетчик не найден, ищем по названию
-    if (!targetMeter) {
-      targetMeter = findMaterialByName(materials.meter, config.materials.meter);
-      
-      if (!targetMeter && config.materials.meterFallback) {
-        targetMeter = findMaterialByName(materials.meter, config.materials.meterFallback);
-      }
+    const meterPool = global.meterType
+      ? filterMaterialsByCategory(materials.meter, global.meterType)
+      : materials.meter;
+
+    targetMeter = findMaterialByName(meterPool, config.materials.meter);
+
+    if (!targetMeter && config.materials.meterFallback) {
+      targetMeter = findMaterialByName(meterPool, config.materials.meterFallback);
     }
     
     if (targetMeter) {
@@ -122,7 +114,8 @@ export const createCellByConfig = (
 
   // Добавляем трансформатор тока
   if (config.materials.tt) {
-    const targetTt = findMaterialByName(materials.tt, config.materials.tt);
+    const ttPool = global.tt ? filterMaterialsByCategory(materials.tt, global.tt) : materials.tt;
+    const targetTt = findMaterialByName(ttPool, config.materials.tt);
     if (targetTt) {
       cellData.transformerCurrent = {
         id: targetTt.id.toString(),
@@ -134,7 +127,10 @@ export const createCellByConfig = (
 
   // Добавляем трансформатор напряжения
   if ((config.materials as any).transformerVoltage) {
-    const targetTv = findMaterialByName(materials.tn, (config.materials as any).transformerVoltage);
+    const tnPool = global.tn
+      ? filterMaterialsByCategory(materials.tn, global.tn)
+      : materials.tn;
+    const targetTv = findMaterialByName(tnPool, (config.materials as any).transformerVoltage);
     
     if (targetTv) {
       cellData.transformerVoltage = {
@@ -147,7 +143,10 @@ export const createCellByConfig = (
 
   // Добавляем силовой трансформатор (для трансформатора собственных нужд)
   if ((config.materials as any).transformerPower) {
-    const targetTp = findMaterialByName(materials.tsn, (config.materials as any).transformerPower);
+    const tsnPool = global.tsn
+      ? filterMaterialsByCategory(materials.tsn, global.tsn)
+      : materials.tsn;
+    const targetTp = findMaterialByName(tsnPool, (config.materials as any).transformerPower);
     
     if (targetTp) {
       cellData.transformerPower = {

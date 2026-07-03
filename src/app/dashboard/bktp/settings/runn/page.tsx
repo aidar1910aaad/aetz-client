@@ -5,6 +5,7 @@ import { ChevronLeft, Save, Power, Settings2, Gauge, Zap, Shield, Activity, Togg
 import { useRunnSettingsEditor } from '@/hooks/settings/useRunnSettingsEditor';
 import { RunnSettingsSection } from '@/components/settings/RunnSettingsSection';
 import { ZeroBusbarSection } from '@/components/runn/ZeroBusbarSection';
+import { SettingsDebugJournal } from '@/components/settings/SettingsDebugJournal';
 import RoleGuard from '@/components/common/RoleGuard';
 import { UserRole } from '@/types/user';
 import PageLoader from '@/shared/loader/PageLoader';
@@ -86,6 +87,8 @@ export default function RunnSettingsPage() {
 
         {/* Content */}
         <div className="space-y-6">
+          <SettingsDebugJournal scope="runn" />
+
           <RunnSettingsSection
             title="Автомат выкатной"
             type="avtomatVyk"

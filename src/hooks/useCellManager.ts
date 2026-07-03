@@ -4,6 +4,7 @@ import { useTransformerStore } from '@/store/useTransformerStore';
 import { useRusnMaterials } from '@/hooks/useRusnMaterials';
 import { createCellByConfig } from '@/utils/autoCellUtils';
 import { autoCellConfigs } from '@/config/autoCellConfigs';
+import { RUSN_CAMERA, RUSN_CELL_PURPOSE } from '@/domain/rusn/rusnConstants';
 
 // Единый хук для управления ячейками
 export const useCellManager = () => {
@@ -148,6 +149,10 @@ export const useCellManager = () => {
       
       if (needsGlobalMaterials) {
         Object.entries(autoCellConfigs).forEach(([cellType, config]) => {
+          if (config.createOnDemand) {
+            return;
+          }
+
           const existingCell = cellConfigs.find(cell => cell.purpose === cellType);
           
           if (!existingCell) {
@@ -158,9 +163,14 @@ export const useCellManager = () => {
             
             // Создаем ячейку если есть все необходимые глобальные материалы для этой конкретной ячейки
             // Для КСО А12-10 создаем ячейки при наличии breaker и rza, meterType добавляется позже
-            const hasRequiredMaterials = 
-              (!config.useGlobalBreaker || global.breaker) &&
-              (!config.useGlobalRza || global.rza);
+            const isA17Zssh =
+              cellType === RUSN_CELL_PURPOSE.VOLTAGE_TRANSFORMER_ZSSH &&
+              global.bodyType === RUSN_CAMERA.KSO_A17_20;
+
+            const hasRequiredMaterials =
+              isA17Zssh ||
+              ((!config.useGlobalBreaker || global.breaker) &&
+                (!config.useGlobalRza || global.rza));
             
             if (hasRequiredMaterials) {
               createCellByConfig(cellType, config, materials, global, addCell);

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useRusnSettingsEditor } from '@/hooks/settings/useRusnSettingsEditor';
 import { SettingsSection } from '@/components/settings/SettingsSection';
+import { SettingsDebugJournal } from '@/components/settings/SettingsDebugJournal';
 import RoleGuard from '@/components/common/RoleGuard';
 import { UserRole } from '@/types/user';
 import PageLoader from '@/shared/loader/PageLoader';
@@ -93,6 +94,8 @@ export default function RusnSettingsPage() {
           </div>
 
           <div className="space-y-6">
+            <SettingsDebugJournal scope="rusn" />
+
             <SettingsSection
               title="Вакуумный выключатель"
               type="switch"

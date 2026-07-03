@@ -1,3 +1,5 @@
+import type { RzaCellTarget } from '@/domain/calculation/rzaCellTargets';
+
 export interface Material {
   id: number;
   name: string;
@@ -22,6 +24,8 @@ export type CellType =
   | 'input'
   | 'section_switch'
   | 'outgoing'
+  | 'kso_a17_zssh'
+  | 'busbar_grounding'
   | 'bha_input'
   | 'bha_transformer'
   | 'bha_outgoing';
@@ -52,6 +56,7 @@ export interface CellMaterial {
 
 export interface CellConfiguration {
   type: CellType;
+  rzaCellTargets?: RzaCellTarget[];
   materials: {
     switch?: CellMaterial[];
     rza?: CellMaterial[];

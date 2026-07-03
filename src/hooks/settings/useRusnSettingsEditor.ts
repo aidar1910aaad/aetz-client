@@ -6,6 +6,7 @@ import { writeCategorySettings } from '@/api/settings/writeCategorySettings';
 import { showToast } from '@/shared/modals/ToastProvider';
 import { invalidateRusnMaterialsCache } from '@/hooks/useRusnMaterials';
 import { invalidateRusnCategoriesCache } from '@/domain/rusn/rusnCategoriesLoader';
+import { appendSettingsDebugEvent } from '@/utils/settingsDebugLog';
 
 interface RusnCategorySetting {
   id: string;
@@ -52,16 +53,53 @@ export function useRusnSettingsEditor() {
   const countRusnCategories = (settings: RusnSectionSettings) =>
     Object.values(settings).reduce((sum, categories) => sum + categories.length, 0);
 
-  const canApplyFetchedSettings = (requestId: number, fetched: RusnSectionSettings) => {
-    if (requestId !== settingsRequestIdRef.current) return false;
-    if (hasChangesRef.current) return false;
+  const logEvent = (
+    reason: string,
+    options: {
+      details?: string;
+      requestId?: number;
+      stateBeforeCount?: number;
+      stateAfterCount?: number;
+      fetchedCount?: number;
+    } = {}
+  ) => {
+    appendSettingsDebugEvent('rusn', reason ? { reason, ...options } : { reason: '—', ...options });
+  };
 
+  const canApplyFetchedSettings = (requestId: number, fetched: RusnSectionSettings) => {
     const uiCount = selectedCategoriesRef.current
       ? countRusnCategories(selectedCategoriesRef.current)
       : 0;
     const fetchedCount = countRusnCategories(fetched);
 
-    if (fetchedCount === 0 && uiCount > 0) return false;
+    if (requestId !== settingsRequestIdRef.current) {
+      logEvent('Пропущен устаревший ответ РУСН', {
+        requestId,
+        stateBeforeCount: uiCount,
+        fetchedCount,
+        details: 'Ответ API пришёл не для последнего запроса и не был применён.',
+      });
+      return false;
+    }
+    if (hasChangesRef.current) {
+      logEvent('Пропущен ответ РУСН из-за несохранённых изменений', {
+        requestId,
+        stateBeforeCount: uiCount,
+        fetchedCount,
+        details: 'Локальные изменения в форме имеют приоритет над пришедшими данными API.',
+      });
+      return false;
+    }
+
+    if (fetchedCount === 0 && uiCount > 0) {
+      logEvent('Заблокировано затирание РУСН пустым ответом API', {
+        requestId,
+        stateBeforeCount: uiCount,
+        fetchedCount,
+        details: 'Пришёл пустой ответ, но в UI уже были категории. Состояние не перезаписано.',
+      });
+      return false;
+    }
 
     return true;
   };
@@ -80,6 +118,9 @@ export function useRusnSettingsEditor() {
         setAllCategories(categories);
       } catch (error) {
         console.error('Error fetching categories:', error);
+        logEvent('Ошибка загрузки справочника категорий РУСН', {
+          details: error instanceof Error ? error.message : 'Unknown error',
+        });
         showToast('Ошибка при загрузке категорий', 'error');
       }
     };
@@ -94,6 +135,17 @@ export function useRusnSettingsEditor() {
       requestId: number
     ) => {
       if (requestId !== settingsRequestIdRef.current || hasChangesRef.current) {
+        logEvent('Обработка ответа РУСН отменена до применения', {
+          requestId,
+          stateBeforeCount: selectedCategoriesRef.current
+            ? countRusnCategories(selectedCategoriesRef.current)
+            : 0,
+          fetchedCount: apiRusnSettings.length,
+          details:
+            requestId !== settingsRequestIdRef.current
+              ? 'Появился более новый запрос.'
+              : 'В форме есть несохранённые изменения.',
+        });
         return;
       }
 
@@ -149,13 +201,28 @@ export function useRusnSettingsEditor() {
         return;
       }
 
+      const nextCount = countRusnCategories(transformedSettings);
       setSelectedCategories(transformedSettings);
       setOriginalSettings(JSON.parse(JSON.stringify(transformedSettings)));
       settingsLoadedRef.current = true;
+      logEvent('Применены настройки РУСН из API', {
+        requestId,
+        stateBeforeCount: selectedCategoriesRef.current
+          ? countRusnCategories(selectedCategoriesRef.current)
+          : 0,
+        stateAfterCount: nextCount,
+        fetchedCount: nextCount,
+      });
     };
 
     const fetchSettings = async () => {
       const requestId = ++settingsRequestIdRef.current;
+      logEvent('Запрошены настройки РУСН', {
+        requestId,
+        stateBeforeCount: selectedCategoriesRef.current
+          ? countRusnCategories(selectedCategoriesRef.current)
+          : 0,
+      });
 
       try {
         if (!selectedCategories) {
@@ -167,7 +234,13 @@ export function useRusnSettingsEditor() {
 
         const settings = await getSettings(token);
 
-        if (requestId !== settingsRequestIdRef.current) return;
+        if (requestId !== settingsRequestIdRef.current) {
+          logEvent('Игнорирован устаревший fetch РУСН после getSettings', {
+            requestId,
+            details: 'Пока шёл запрос, был запущен более новый.',
+          });
+          return;
+        }
 
         if (settings.settings?.rusn) {
           processRusnSettings(settings.settings.rusn, allCategories, requestId);
@@ -179,9 +252,20 @@ export function useRusnSettingsEditor() {
           setSelectedCategories(EMPTY_RUSN_SETTINGS);
           setOriginalSettings(JSON.parse(JSON.stringify(EMPTY_RUSN_SETTINGS)));
           settingsLoadedRef.current = true;
+          logEvent('Настройки РУСН сброшены в пустое состояние', {
+            requestId,
+            stateBeforeCount: 0,
+            stateAfterCount: 0,
+            fetchedCount: 0,
+            details: 'В ответе API отсутствовал блок settings.rusn при первой загрузке.',
+          });
         }
       } catch (error) {
         console.error('Error fetching RUSN settings:', error);
+        logEvent('Ошибка загрузки настроек РУСН', {
+          requestId,
+          details: error instanceof Error ? error.message : 'Unknown error',
+        });
         showToast('Ошибка при загрузке настроек', 'error');
 
         if (requestId !== settingsRequestIdRef.current || hasChangesRef.current) {
@@ -192,6 +276,11 @@ export function useRusnSettingsEditor() {
           setSelectedCategories(EMPTY_RUSN_SETTINGS);
           setOriginalSettings(JSON.parse(JSON.stringify(EMPTY_RUSN_SETTINGS)));
           settingsLoadedRef.current = true;
+          logEvent('Настройки РУСН сброшены в пустое состояние после ошибки', {
+            requestId,
+            stateAfterCount: 0,
+            details: 'После ошибки загрузки форма инициализирована пустым состоянием.',
+          });
         }
       } finally {
         if (requestId === settingsRequestIdRef.current) {
@@ -247,9 +336,16 @@ export function useRusnSettingsEditor() {
     options: { successMessage?: string; silent?: boolean } = {}
   ) => {
     settingsRequestIdRef.current += 1;
+    logEvent('Запущено сохранение настроек РУСН', {
+      requestId: settingsRequestIdRef.current,
+      stateBeforeCount: countRusnCategories(settings),
+    });
 
     const token = localStorage.getItem('token');
     if (!token) {
+      logEvent('Сохранение РУСН прервано: нет токена', {
+        requestId: settingsRequestIdRef.current,
+      });
       showToast('Ошибка авторизации', 'error');
       throw new Error('Токен не найден');
     }
@@ -258,6 +354,11 @@ export function useRusnSettingsEditor() {
     const totalInUi = countRusnCategories(settings);
 
     if (totalInUi > 0 && rusnSettings.length === 0) {
+      logEvent('Сохранение РУСН отклонено: категории не преобразовались в payload', {
+        requestId: settingsRequestIdRef.current,
+        stateBeforeCount: totalInUi,
+        fetchedCount: rusnSettings.length,
+      });
       showToast('Не удалось сохранить: проверьте выбранные категории', 'error');
       throw new Error('Invalid category ids');
     }
@@ -271,6 +372,10 @@ export function useRusnSettingsEditor() {
     setOriginalSettings(JSON.parse(JSON.stringify(settings)));
     invalidateRusnMaterialsCache();
     invalidateRusnCategoriesCache();
+    logEvent('Настройки РУСН успешно сохранены', {
+      requestId: settingsRequestIdRef.current,
+      stateAfterCount: countRusnCategories(settings),
+    });
 
     if (!options.silent) {
       showToast(options.successMessage ?? 'Настройки успешно сохранены', 'success');
@@ -347,6 +452,10 @@ export function useRusnSettingsEditor() {
       await persistRusnSettings(selectedCategories);
     } catch (error) {
       console.error('Error saving settings:', error);
+      logEvent('Ошибка сохранения настроек РУСН', {
+        requestId: settingsRequestIdRef.current,
+        details: error instanceof Error ? error.message : 'Unknown error',
+      });
       showToast('Ошибка при сохранении настроек', 'error');
     }
   };

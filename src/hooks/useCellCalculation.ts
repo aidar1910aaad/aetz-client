@@ -15,6 +15,8 @@ import {
   RUSN_CAMERA,
   RUSN_CELL_PURPOSE,
   SIEMENS_8DJH_CALCULATION_NAMES,
+  findKsoA17ZsshCalculation,
+  findKsoA17BusbarGroundingCalculation,
 } from '@/domain/rusn/rusnConstants';
 
 interface UseCellCalculationProps {
@@ -263,6 +265,147 @@ export const useCellCalculation = ({
       return;
     }
 
+    // Ячейка ТН с ЗСШ для КСО А17-20: база ЗСШ + выбранные ТН и РЗА
+    if (
+      global.bodyType === RUSN_CAMERA.KSO_A17_20 &&
+      cell.purpose === RUSN_CELL_PURPOSE.VOLTAGE_TRANSFORMER_ZSSH
+    ) {
+      const tempTnId = cell.transformerVoltage?.id;
+      const tempRzaId = cell.rza?.id;
+
+      if (!tempTnId && !tempRzaId) {
+        if (total !== 0) {
+          setTotal(0);
+        }
+        if (currentCalculation !== '') {
+          setCurrentCalculation('');
+        }
+        setRzaCalc(null);
+        return;
+      }
+
+      const calculateMaterialCost = (
+        calculation: {
+          data: {
+            calculation?: {
+              hourlyRate?: number;
+              manufacturingHours?: number;
+              overheadPercentage?: number;
+              adminPercentage?: number;
+              plannedProfitPercentage?: number;
+              ndsPercentage?: number;
+            };
+            categories: Array<{
+              items: Array<{
+                price: number;
+                quantity: number;
+              }>;
+            }>;
+          };
+        },
+        materialId: string,
+        materialType: string
+      ) => {
+        if (!calculation || !materialId) return 0;
+
+        const calculationData = getApiBackedCalculationData(calculation.data.calculation);
+        const materialsTotal = calculation.data.categories.reduce(
+          (sum: number, category: { items: Array<{ price: number; quantity: number }> }) =>
+            sum +
+            category.items.reduce(
+              (itemSum: number, item: { price: number; quantity: number }) =>
+                itemSum + item.price * item.quantity,
+              0
+            ),
+          0
+        );
+        const selectedMaterialsTotal = Number(
+          getRusnMaterialById(materials, materialType, materialId)?.price || 0
+        );
+
+        return calculateCost(materialsTotal, calculationData, selectedMaterialsTotal).finalPrice;
+      };
+
+      let totalCost = 0;
+      const zsshCalculation = findKsoA17ZsshCalculation(calculations.cell);
+
+      if (zsshCalculation) {
+        const calcData = getApiBackedCalculationData(zsshCalculation.data.calculation);
+        const base = zsshCalculation.data.categories.reduce(
+          (sum: number, category: { items: Array<{ price: number; quantity: number }> }) =>
+            sum +
+            category.items.reduce(
+              (itemSum: number, item: { price: number; quantity: number }) =>
+                itemSum + item.price * item.quantity,
+              0
+            ),
+          0
+        );
+        totalCost += calculateCost(base, calcData, 0).finalPrice;
+      }
+
+      const { rzaCalculation, tnCalculation } = resolveRusnCellCalculations(
+        calculations.cell,
+        {
+          breakerId: undefined,
+          rzaId: tempRzaId,
+          disconnectorId: undefined,
+          puId: undefined,
+          tsnId: undefined,
+          tnId: tempTnId,
+        },
+        cell.purpose,
+        false,
+        global.bodyType
+      );
+
+      if (tempTnId && tnCalculation) {
+        totalCost += calculateMaterialCost(tnCalculation, tempTnId, 'tn');
+      }
+
+      if (tempRzaId && rzaCalculation) {
+        totalCost += calculateMaterialCost(rzaCalculation, tempRzaId, 'rza');
+      }
+
+      const result = totalCost * (cell.count || 1);
+
+      if (total !== result) {
+        setTotal(result);
+      }
+      if (currentCalculation !== 'Камера КСО-А17-20 500x1450 (ТН с ЗСШ)') {
+        setCurrentCalculation('Камера КСО-А17-20 500x1450 (ТН с ЗСШ)');
+      }
+      setRzaCalc((prev) => (prev?.id === rzaCalculation?.id ? prev : rzaCalculation || null));
+      return;
+    }
+
+    // Заземление сборных шин для КСО А17-20: фиксированная калькуляция
+    if (
+      global.bodyType === RUSN_CAMERA.KSO_A17_20 &&
+      cell.purpose === RUSN_CELL_PURPOSE.BUSBAR_GROUNDING
+    ) {
+      const groundingCalculation = findKsoA17BusbarGroundingCalculation(calculations.cell);
+
+      if (groundingCalculation) {
+        const price = calculateCellTotal(groundingCalculation.id);
+        const result = price * (cell.count || 1);
+
+        if (total !== result) {
+          setTotal(result);
+        }
+        if (currentCalculation !== groundingCalculation.name) {
+          setCurrentCalculation(groundingCalculation.name);
+        }
+        setRzaCalc(null);
+        return;
+      }
+
+      if (total !== 0) {
+        setTotal(0);
+      }
+      return;
+    }
+
     // Получаем ID всех материалов ячейки
     const tempBreakerId = cell.breaker?.id;
     const tempRzaId = cell.rza?.id;
@@ -371,19 +514,24 @@ export const useCellCalculation = ({
             
             // Складываем итоговые стоимости
             const totalFinalPrice = mainFinalPrice + additionalFinalPrice;
-            
-            // Сохраняем разбивку для отображения
-            onUpdate(cell.id, 'calculationBreakdown', {
+            const nextBreakdown = {
               main: {
                 name: 'Камера КСО 366-14, 15 (Секционная с разъединителем)',
-                price: mainFinalPrice
+                price: mainFinalPrice,
               },
               additional: {
                 name: 'Шинный мост с разъединителем',
-                price: additionalFinalPrice
+                price: additionalFinalPrice,
               },
-              total: totalFinalPrice
-            });
+              total: totalFinalPrice,
+            };
+
+            if (
+              !cell.calculationBreakdown ||
+              JSON.stringify(cell.calculationBreakdown) !== JSON.stringify(nextBreakdown)
+            ) {
+              onUpdate(cell.id, 'calculationBreakdown', nextBreakdown);
+            }
             
             // Обновляем base для дальнейшего расчета
             base = totalFinalPrice;

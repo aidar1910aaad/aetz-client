@@ -320,6 +320,21 @@ export default function CellSummaryTable({
     );
   }
 
+  // Специальная логика для Заземление сборных шин (КСО А17-20)
+  if (cell.purpose === 'Заземление сборных шин') {
+    return (
+      <div className="space-y-2 animate-fade-in">
+        <CellPriceSummary
+          name="Заземление сборных шин"
+          quantity={cell.count || 1}
+          pricePerUnit={(total || 0) / (cell.count || 1)}
+          total={total || 0}
+          isCalculating={isCalculating}
+        />
+      </div>
+    );
+  }
+
   const pricePerUnit = (total || 0) / (cell.count || 1);
   const summaryName = Array.isArray(description) ? description.join(' · ') : String(description);
 

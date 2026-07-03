@@ -5,6 +5,7 @@ import CalculationCategoriesEditor from './CalculationCategoriesEditor';
 import CalculationEditActions from './CalculationEditActions';
 import { CellConfiguration, CellType } from '@/types/calculation';
 import { getBhaPreset, isBhaCellType, isKsoA12CalculationGroup } from '@/domain/calculation/bhaPresets';
+import { isKsoA17CalculationGroup, isKsoA17CellType } from '@/domain/calculation/ksoA17Presets';
 import { normalizeCellType } from '@/domain/calculation/cellTypes';
 import { generateCalculationSlug } from '@/utils/calculationSlug';
 
@@ -64,6 +65,7 @@ export function CalculationEditForm({
     calculation.data.cellConfig
   );
   const [calculationValues, setCalculationValues] = useState(calculation.data.calculation);
+  const [isSaving, setIsSaving] = useState(false);
 
   const getValidCellType = (type: string | undefined): CellType => normalizeCellType(type);
 
@@ -99,7 +101,9 @@ export function CalculationEditForm({
   const isNameValid = name.trim().length >= 3;
   const isSlugValid = slug.trim().length >= 3;
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (isSaving) return;
+
     if (!isNameValid) {
       alert('Название калькуляции должно содержать минимум 3 символа.');
       return;
@@ -121,10 +125,17 @@ export function CalculationEditForm({
         calculation: calculationValues,
       },
     };
-    onSave(updatedCalculation);
+
+    setIsSaving(true);
+    try {
+      await onSave(updatedCalculation);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const isKsoA12Group = isKsoA12CalculationGroup(groupSlug);
+  const isKsoA17Group = isKsoA17CalculationGroup(groupSlug);
   const isBhaConfig = isKsoA12Group && isBhaCellType(cellConfig?.type);
 
   const handleCellConfigChange = (newConfig: CellConfiguration) => {
@@ -143,6 +154,14 @@ export function CalculationEditForm({
           setName(preset.name);
         }
       }
+      return;
+    }
+
+    if (isKsoA17Group && isKsoA17CellType(newConfig.type)) {
+      setCellConfig({
+        ...newConfig,
+        materials: {},
+      });
       return;
     }
 
@@ -241,39 +260,20 @@ export function CalculationEditForm({
       />
 
       {/* Кнопки действий */}
-      <div className="rounded-xl border border-[#8eba1e]/20 bg-white p-4 flex flex-wrap items-center justify-end gap-3">
-        {!isNameValid && (
-          <span className="text-xs text-red-500 mr-auto">Название должно содержать минимум 3 символа</span>
-        )}
-        {isNameValid && !isSlugValid && (
-          <span className="text-xs text-red-500 mr-auto">Slug должен содержать минимум 3 символа</span>
-        )}
-        <button
-          onClick={onCancel}
-          className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
-        >
-          Отмена
-        </button>
-        {onFinishEditing && (
-          <button
-            onClick={onFinishEditing}
-            className="px-5 py-2.5 bg-white text-[#8eba1e] border border-[#8eba1e]/40 rounded-lg hover:bg-[#8eba1e]/10 transition-colors text-sm"
-          >
-            Завершить редактирование
-          </button>
-        )}
-        <button
-          onClick={handleSave}
-          disabled={!isNameValid || !isSlugValid}
-          className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-            !isNameValid || !isSlugValid
-              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              : 'bg-[#8eba1e] text-white hover:bg-[#7aa31a] shadow-sm'
-          }`}
-        >
-          Сохранить
-        </button>
-      </div>
+      <CalculationEditActions
+        onCancel={onCancel}
+        onSave={handleSave}
+        onFinishEditing={onFinishEditing}
+        isSaveDisabled={!isNameValid || !isSlugValid}
+        saveDisabledMessage={
+          !isNameValid
+            ? 'Название должно содержать минимум 3 символа'
+            : !isSlugValid
+              ? 'Slug должен содержать минимум 3 символа'
+              : undefined
+        }
+        isSaving={isSaving}
+      />
     </div>
   );
 }

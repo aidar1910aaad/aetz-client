@@ -11,6 +11,7 @@ import {
   getBusbarSectionsFromConfigs,
   normalizeBusbarSection,
 } from '@/utils/busbarSectionUtils';
+import { isVoltageTransformerCellPurpose } from '@/domain/rusn/rusnConstants';
 
 function buildEffectiveConfig(
   baseConfig: Switchgear,
@@ -197,7 +198,10 @@ export const useBusbarCalculation = () => {
       : null;
 
     if (!selectedNorm || !available.includes(selectedNorm)) {
-      setBusbarSection(baseMatchingConfig.busbar);
+      const nextSection = baseMatchingConfig.busbar;
+      if (busBridge.selectedBusbarSection !== nextSection) {
+        setBusbarSection(nextSection);
+      }
     }
   }, [
     baseMatchingConfig,
@@ -241,7 +245,7 @@ export const useBusbarCalculation = () => {
               break;
             case 'ТН':
               cellCount = rusn.cellConfigs
-                .filter((c) => c.purpose === 'Трансформатор напряжения')
+                .filter((c) => isVoltageTransformerCellPurpose(c.purpose))
                 .reduce((total, cell) => total + (cell.count || 1), 0);
               break;
             case 'ТСН':

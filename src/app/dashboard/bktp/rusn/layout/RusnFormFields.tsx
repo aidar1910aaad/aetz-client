@@ -9,12 +9,15 @@ import RusnMaterialsSummary from '@/components/bktp/rusn/RusnMaterialsSummary';
 import DebugToggle from '@/components/common/DebugToggle';
 import { useRusnStore } from '@/store/useRusnStore';
 const RusnFormFields = () => {
-  const rusn = useRusnStore();
+  const cellConfigs = useRusnStore((s) => s.cellConfigs);
+  const bodyType = useRusnStore((s) => s.global.bodyType);
+  const busBridgeMaterial = useRusnStore((s) => s.global.busBridge.material);
+  const updateBusBridge = useRusnStore((s) => s.updateBusBridge);
 
   // Обновляем расчет шинного моста при изменении конфигурации
   useEffect(() => {
-    rusn.updateBusBridge();
-  }, [rusn.cellConfigs, rusn.global.bodyType, rusn.global.busBridge.material]);
+    updateBusBridge();
+  }, [cellConfigs, bodyType, busBridgeMaterial, updateBusBridge]);
 
   return (
     <div className="space-y-8">

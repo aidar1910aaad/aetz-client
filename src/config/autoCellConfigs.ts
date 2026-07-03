@@ -14,6 +14,8 @@ export interface AutoCellConfig {
   useGlobalMeter: boolean;
   useGlobalBreaker?: boolean;
   useGlobalRza?: boolean;
+  /** Не создавать автоматически — только по кнопке «Добавить» в таблице ячеек */
+  createOnDemand?: boolean;
 }
 
 export const autoCellConfigs: Record<string, AutoCellConfig> = {
@@ -80,6 +82,16 @@ export const autoCellConfigs: Record<string, AutoCellConfig> = {
     useGlobalBreaker: false,
     useGlobalRza: false
   },
+  'ТН с ЗСШ': {
+    materials: {
+      transformerVoltage: ['3*3НОЛП-10кВ', '3НОЛП-10кВ', 'НОЛП-10кВ'],
+      rza: ['РЗиА по напряжению РС83 В1', 'РС83 В1', 'РС83']
+    },
+    count: 1,
+    useGlobalMeter: false,
+    useGlobalBreaker: false,
+    useGlobalRza: false
+  },
   'Трансформатор собственных нужд': {
     materials: {
       transformerPower: ['ТСН-10/0,4', 'ТСН', 'трансформатор собственных нужд']
@@ -127,6 +139,14 @@ export const autoCellConfigs: Record<string, AutoCellConfig> = {
     useGlobalMeter: false,
     useGlobalBreaker: false,
     useGlobalRza: false
+  },
+  'Заземление сборных шин': {
+    materials: {},
+    count: 2,
+    useGlobalMeter: false,
+    useGlobalBreaker: false,
+    useGlobalRza: false,
+    createOnDemand: true,
   }
 };
 

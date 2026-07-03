@@ -1,5 +1,5 @@
 import { Material } from '@/api/material';
-import { RusnCell } from '@/store/useRusnStore';
+import { RusnCell, useRusnStore } from '@/store/useRusnStore';
 import { getMaterialArrayForField, RusnMaterials } from '@/utils/rusnMaterials';
 import { CellFormField, inputClassName } from '@/components/bktp/shared/CellFormField';
 import { Select } from '@/components/ui/select';
@@ -21,7 +21,14 @@ export default function MaterialSelect({
   selectedId,
   onUpdate,
 }: MaterialSelectProps) {
-  const materialList = getMaterialArrayForField(materials, field, cell.purpose);
+  const { global } = useRusnStore();
+  const materialList = getMaterialArrayForField(
+    materials,
+    field,
+    cell.purpose,
+    global,
+    global.bodyType
+  );
   const selectedMaterial = materialList.find((m) => m.id.toString() === selectedId);
 
   return (

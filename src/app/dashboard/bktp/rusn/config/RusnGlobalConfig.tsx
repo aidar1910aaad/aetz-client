@@ -6,7 +6,7 @@ import { useTransformerStore } from '@/store/useTransformerStore';
 import { useCalculationGroups } from '@/hooks/useCalculationGroups';
 import CameraTypeSelector from './CameraTypeSelector';
 import EquipmentSelector from './EquipmentSelector';
-import { useState, ReactNode, useEffect, useRef } from 'react';
+import { useState, ReactNode, useEffect, useRef, useCallback } from 'react';
 import { Select } from '@/components/ui/select';
 
 // Компонент SelectWithLabel
@@ -203,10 +203,12 @@ export default function RusnGlobalConfig() {
     }
   };
 
-  const handleGlobalChange = (key: string, value: { id: number; name: string } | null) => {
-
-    setGlobal(key as keyof typeof global, value);
-  };
+  const handleGlobalChange = useCallback(
+    (key: string, value: { id: number; name: string } | null) => {
+      setGlobal(key as keyof typeof global, value);
+    },
+    [setGlobal]
+  );
 
   if (loading) {
     return <div className="text-sm text-gray-600">Загрузка настроек...</div>;

@@ -4,8 +4,9 @@ import {
   isBhaCalculationType,
   RUSN_CAMERA,
   RUSN_CELL_PURPOSE,
+  isVoltageTransformerCellPurpose,
 } from './rusnConstants';
-
+import { getRzaCellTargetForPurpose } from '@/domain/calculation/rzaCellTargets';
 function excludeBhaCalculations(calculations: Calculation[]): Calculation[] {
   return calculations.filter(
     (calc) => !isBhaCalculationType(calc.data?.cellConfig?.type)
@@ -39,20 +40,27 @@ function asMaterialArray(value: unknown): Array<{ id?: string | number }> {
 function matchesMaterialId(
   calc: Calculation,
   materialType: string,
-  materialId: string
+  materialId: string,
+  alternateMaterialTypes: string[] = []
 ): boolean {
   if (isBhaCalculationType(calc.data?.cellConfig?.type)) return false;
-  const materials = calc.data?.cellConfig?.materials?.[materialType];
-  return asMaterialArray(materials).some(
-    (material) => String(material.id) === String(materialId)
-  );
+
+  const typesToCheck = [materialType, ...alternateMaterialTypes];
+
+  return typesToCheck.some((type) => {
+    const materials = calc.data?.cellConfig?.materials?.[type];
+    return asMaterialArray(materials).some(
+      (material) => String(material.id) === String(materialId)
+    );
+  });
 }
 
 function findByMaterialId(
   calculations: Calculation[],
   materialType: string,
   materialId?: string,
-  preferredCellConfigTypes?: string[]
+  preferredCellConfigTypes?: string[],
+  alternateMaterialTypes: string[] = []
 ): Calculation | null {
   if (!materialId) return null;
 
@@ -61,18 +69,20 @@ function findByMaterialId(
       const match = calculations.find(
         (calc) =>
           calc.data?.cellConfig?.type === configType &&
-          matchesMaterialId(calc, materialType, materialId)
+          matchesMaterialId(calc, materialType, materialId, alternateMaterialTypes)
       );
       if (match) return match;
     }
   }
 
   return (
-    calculations.find((calc) => matchesMaterialId(calc, materialType, materialId)) || null
+    calculations.find((calc) =>
+      matchesMaterialId(calc, materialType, materialId, alternateMaterialTypes)
+    ) || null
   );
 }
 
-function getPreferredBreakerCellConfigTypes(
+function getPreferredCellConfigTypes(
   cellPurpose: string,
   bodyType?: string
 ): string[] | undefined {
@@ -80,11 +90,56 @@ function getPreferredBreakerCellConfigTypes(
     return BREAKER_CELL_CONFIG_TYPE_PREFERENCES[cellPurpose];
   }
 
-  if (bodyType === RUSN_CAMERA.KSO_A12_10) {
+  if (
+    bodyType === RUSN_CAMERA.KSO_A12_10 ||
+    bodyType === RUSN_CAMERA.KSO_A17_20
+  ) {
     return BREAKER_CELL_CONFIG_TYPE_PREFERENCES[cellPurpose];
   }
 
   return undefined;
+}
+
+function getLegacyRzaPreferredTypes(
+  cellPurpose: string,
+  bodyType?: string
+): string[] | undefined {
+  if (
+    bodyType === RUSN_CAMERA.KSO_A12_10 ||
+    bodyType === RUSN_CAMERA.KSO_A17_20
+  ) {
+    return BREAKER_CELL_CONFIG_TYPE_PREFERENCES[cellPurpose];
+  }
+  return undefined;
+}
+
+function findRzaCalculation(
+  calculations: Calculation[],
+  rzaId: string | undefined,
+  cellPurpose: string,
+  bodyType?: string
+): Calculation | null {
+  if (!rzaId) return null;
+
+  const rzaTarget = getRzaCellTargetForPurpose(cellPurpose);
+
+  if (rzaTarget) {
+    const typedRzaMatch = calculations.find((calc) => {
+      if (calc.data?.cellConfig?.type !== 'rza') return false;
+      const targets = calc.data?.cellConfig?.rzaCellTargets;
+      if (!targets?.length || !targets.includes(rzaTarget)) return false;
+      return matchesMaterialId(calc, 'rza', rzaId);
+    });
+    if (typedRzaMatch) return typedRzaMatch;
+  }
+
+  const legacyPreferred = getLegacyRzaPreferredTypes(cellPurpose, bodyType);
+  if (legacyPreferred?.length) {
+    const legacyMatch = findByMaterialId(calculations, 'rza', rzaId, legacyPreferred);
+    if (legacyMatch) return legacyMatch;
+  }
+
+  return findByMaterialId(calculations, 'rza', rzaId);
 }
 
 export function resolveRusnCellCalculations(
@@ -95,22 +150,26 @@ export function resolveRusnCellCalculations(
   bodyType?: string
 ): RusnResolvedCalculations {
   const materialCalculations = excludeBhaCalculations(calculations);
-  const preferredBreakerCellConfigTypes = getPreferredBreakerCellConfigTypes(
-    cellPurpose,
-    bodyType
-  );
+  const preferredCellConfigTypes = getPreferredCellConfigTypes(cellPurpose, bodyType);
 
   const breakerCalculation = findByMaterialId(
     materialCalculations,
     'switch',
     materialIds.breakerId,
-    preferredBreakerCellConfigTypes
+    preferredCellConfigTypes
   );
-  const rzaCalculation = findByMaterialId(calculations, 'rza', materialIds.rzaId);
-  const disconnectorCalculation = findByMaterialId(
+  const rzaCalculation = findRzaCalculation(
     calculations,
+    materialIds.rzaId,
+    cellPurpose,
+    bodyType
+  );
+  const disconnectorCalculation = findByMaterialId(
+    materialCalculations,
     'disconnector',
-    materialIds.disconnectorId
+    materialIds.disconnectorId,
+    preferredCellConfigTypes,
+    ['sr']
   );
   const puCalculation = findByMaterialId(calculations, 'pu', materialIds.puId);
   const tsnCalculation = findByMaterialId(calculations, 'tsn', materialIds.tsnId);
@@ -124,7 +183,15 @@ export function resolveRusnCellCalculations(
   let finalDisconnectorCalculation = disconnectorCalculation;
   if (!finalDisconnectorCalculation && materialIds.disconnectorId) {
     finalDisconnectorCalculation =
-      calculations.find((calc) => calc.data?.cellConfig?.type === 'disconnector') || null;
+      findByMaterialId(
+        materialCalculations,
+        'disconnector',
+        materialIds.disconnectorId,
+        ['disconnector'],
+        ['sr']
+      ) ||
+      calculations.find((calc) => calc.data?.cellConfig?.type === 'disconnector') ||
+      null;
   }
 
   let finalTnCalculation = tnCalculation;
@@ -132,6 +199,9 @@ export function resolveRusnCellCalculations(
     finalTnCalculation = calculations.find((calc) => calc.data?.cellConfig?.type === 'tn') || null;
   }
   if (!finalTnCalculation && cellPurpose === RUSN_CELL_PURPOSE.VOLTAGE_TRANSFORMER) {
+    finalTnCalculation = calculations.find((calc) => calc.data?.cellConfig?.type === 'tn') || null;
+  }
+  if (!finalTnCalculation && cellPurpose === RUSN_CELL_PURPOSE.VOLTAGE_TRANSFORMER_ZSSH) {
     finalTnCalculation = calculations.find((calc) => calc.data?.cellConfig?.type === 'tn') || null;
   }
 
@@ -162,7 +232,7 @@ export function resolveRusnCellCalculations(
     cellType = 'Разъединитель';
   } else if (cellPurpose === RUSN_CELL_PURPOSE.AUX_TRANSFORMER) {
     cellType = 'ТСН';
-  } else if (cellPurpose === RUSN_CELL_PURPOSE.VOLTAGE_TRANSFORMER) {
+  } else if (isVoltageTransformerCellPurpose(cellPurpose)) {
     cellType = 'ТН';
   } else if (hasMeterType && !finalPuCalculation) {
     cellType = 'ПУ';

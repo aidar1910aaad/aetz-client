@@ -9,6 +9,20 @@ import {
   BUS_SPECS,
   BUS_CONSUMPTION,
 } from '@/types/rusn';
+import { getRusnCellSummaryIds, pruneOrphanRusnCellSummaries } from '@/domain/rusn/cellSummary';
+import { RUSN_CAMERA, RUSN_CELL_PURPOSE } from '@/domain/rusn/rusnConstants';
+
+function isSameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a !== null && b !== null && typeof a === 'object' && typeof b === 'object') {
+    try {
+      return JSON.stringify(a) === JSON.stringify(b);
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
 
 export interface RusnGlobalOptions {
   voltage: 6 | 10 | 20;
@@ -137,6 +151,8 @@ interface RusnState {
   setBusBridgeSummaries: (summaries: RusnBusbarSummary[]) => void;
   setCellSummary: (summary: RusnCellSummary) => void;
   removeCellSummary: (cellId: string) => void;
+  replaceCellSummariesForCell: (cellId: string, summaries: RusnCellSummary[]) => void;
+  pruneCellSummaries: () => void;
   clearCellSummaries: () => void;
   clearOldKso366Summaries: () => void;
   busBridges: BusbarBridge[];
@@ -195,7 +211,24 @@ const migrateState = (persistedState: Partial<RusnState> | null): Partial<RusnSt
 
   return {
     global,
-    cellConfigs: persistedState.cellConfigs || [],
+    cellConfigs: (persistedState.cellConfigs || []).map((cell) => {
+      const legacyZsshPurposes = new Set([
+        'Трансформатор напряжения с ЗСШ',
+        'ЗСШ',
+      ]);
+
+      if (
+        global.bodyType === RUSN_CAMERA.KSO_A17_20 &&
+        (cell.purpose === RUSN_CELL_PURPOSE.VOLTAGE_TRANSFORMER ||
+          legacyZsshPurposes.has(cell.purpose))
+      ) {
+        return {
+          ...cell,
+          purpose: RUSN_CELL_PURPOSE.VOLTAGE_TRANSFORMER_ZSSH,
+        };
+      }
+      return cell;
+    }),
   };
 };
 
@@ -213,6 +246,9 @@ export const useRusnStore = create<RusnState>()(
 
       setGlobal: (key, value) =>
         set((state) => {
+          if (isSameValue(state.global[key], value)) {
+            return state;
+          }
           return {
             global: { ...state.global, [key]: value },
           };
@@ -279,15 +315,20 @@ export const useRusnStore = create<RusnState>()(
         })),
 
       setBusbarSection: (section: string | null) =>
-        set((state) => ({
-          global: {
-            ...state.global,
-            busBridge: {
-              ...state.global.busBridge,
-              selectedBusbarSection: section,
+        set((state) => {
+          if (state.global.busBridge.selectedBusbarSection === section) {
+            return state;
+          }
+          return {
+            global: {
+              ...state.global,
+              busBridge: {
+                ...state.global.busBridge,
+                selectedBusbarSection: section,
+              },
             },
-          },
-        })),
+          };
+        }),
 
       updateBusBridge: () => {
         const state = get();
@@ -339,20 +380,33 @@ export const useRusnStore = create<RusnState>()(
         // Рассчитываем общий вес
         const totalWeight = consumption.reduce((sum, c) => sum + c.weight, 0);
 
-        // Обновляем состояние
-        set((state) => ({
-          global: {
-            ...state.global,
-            busBridge: {
-              ...state.global.busBridge,
-              selectedBus,
-              totalWeight,
-              totalPrice:
-                totalWeight * (state.global.busBridge?.pricePerKg || BUS_MATERIAL_PRICES['АД']),
-              consumption,
+        const pricePerKg = global.busBridge?.pricePerKg || BUS_MATERIAL_PRICES['АД'];
+        const totalPrice = totalWeight * pricePerKg;
+        const nextBusBridge = {
+          ...global.busBridge,
+          selectedBus,
+          totalWeight,
+          totalPrice,
+          consumption,
+        };
+
+        set((state) => {
+          const current = state.global.busBridge;
+          if (
+            isSameValue(current.selectedBus, selectedBus) &&
+            current.totalWeight === totalWeight &&
+            current.totalPrice === totalPrice &&
+            isSameValue(current.consumption, consumption)
+          ) {
+            return state;
+          }
+          return {
+            global: {
+              ...state.global,
+              busBridge: nextBusBridge,
             },
-          },
-        }));
+          };
+        });
       },
 
       reset: () =>
@@ -383,7 +437,13 @@ export const useRusnStore = create<RusnState>()(
           }
           return { busBridgeSummary: summary };
         }),
-      setBusBridgeSummaries: (summaries) => set({ busBridgeSummaries: summaries }),
+      setBusBridgeSummaries: (summaries) =>
+        set((state) => {
+          if (isSameValue(state.busBridgeSummaries, summaries)) {
+            return state;
+          }
+          return { busBridgeSummaries: summaries };
+        }),
       setCellSummary: (summary) =>
         set((state) => {
           // Проверяем, есть ли уже такая ячейка с теми же данными
@@ -405,7 +465,28 @@ export const useRusnStore = create<RusnState>()(
       removeCellSummary: (cellId) =>
         set((state) => {
           const newSummaries = state.cellSummaries.filter((s) => s.cellId !== cellId);
+          if (newSummaries.length === state.cellSummaries.length) {
+            return state;
+          }
           return { cellSummaries: newSummaries };
+        }),
+      replaceCellSummariesForCell: (cellId, summaries) =>
+        set((state) => {
+          const idsToReplace = new Set(getRusnCellSummaryIds(cellId));
+          const filtered = state.cellSummaries.filter((s) => !idsToReplace.has(s.cellId));
+          const newSummaries = [...filtered, ...summaries];
+          if (isSameValue(state.cellSummaries, newSummaries)) {
+            return state;
+          }
+          return { cellSummaries: newSummaries };
+        }),
+      pruneCellSummaries: () =>
+        set((state) => {
+          const pruned = pruneOrphanRusnCellSummaries(state.cellConfigs, state.cellSummaries);
+          if (isSameValue(state.cellSummaries, pruned)) {
+            return state;
+          }
+          return { cellSummaries: pruned };
         }),
       clearCellSummaries: () => 
         set((state) => {
@@ -430,6 +511,10 @@ export const useRusnStore = create<RusnState>()(
           const migratedState = migrateState(state);
           state.global = migratedState.global;
           state.cellConfigs = migratedState.cellConfigs;
+          state.cellSummaries = pruneOrphanRusnCellSummaries(
+            state.cellConfigs,
+            state.cellSummaries ?? []
+          );
         }
       },
     }

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { RusnSettings } from '@/utils/rusnSettings';
 import { Select } from '@/components/ui/select';
 
@@ -106,15 +106,18 @@ export default function EquipmentSelector({
   voltage = 10, // Дефолтное значение
 }: EquipmentSelectorProps) {
   // Фильтруем категории по напряжению только для выключателя
-  const filteredSettings = {
-    switch: filterCategoriesByVoltage(rusnSettings.switch, voltage), // Только выключатель фильтруется
-    rza: rusnSettings.rza, // Остальное без фильтрации
-    counter: rusnSettings.counter,
-    sr: rusnSettings.sr,
-    tsn: rusnSettings.tsn,
-    tn: rusnSettings.tn,
-    tt: rusnSettings.tt,
-  };
+  const filteredSettings = useMemo(
+    () => ({
+      switch: filterCategoriesByVoltage(rusnSettings.switch, voltage),
+      rza: rusnSettings.rza,
+      counter: rusnSettings.counter,
+      sr: rusnSettings.sr,
+      tsn: rusnSettings.tsn,
+      tn: rusnSettings.tn,
+      tt: rusnSettings.tt,
+    }),
+    [rusnSettings, voltage]
+  );
 
   // Типы оборудования, для которых нужен выбор
   const selectableEquipment = [
@@ -139,7 +142,17 @@ export default function EquipmentSelector({
         onGlobalChange(key, { id: firstOption.id, name: firstOption.name });
       }
     });
-  }, [filteredSettings, global, onGlobalChange]);
+  }, [
+    filteredSettings.sr,
+    filteredSettings.tsn,
+    filteredSettings.tn,
+    filteredSettings.tt,
+    global.sr,
+    global.tsn,
+    global.tn,
+    global.tt,
+    onGlobalChange,
+  ]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

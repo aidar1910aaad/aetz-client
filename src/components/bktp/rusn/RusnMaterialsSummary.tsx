@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useRusnStore } from '@/store/useRusnStore';
+import { resolveSummaryToCellId } from '@/domain/rusn/cellSummary';
 import { useDebugPanelsEnabled } from '@/components/common/DebugToggle';
 
 interface RusnMaterialsSummaryProps {
@@ -9,61 +10,47 @@ interface RusnMaterialsSummaryProps {
   showClearButton?: boolean;
 }
 
-export default function RusnMaterialsSummary({ 
-  title = "Сводка по материалам", 
-  showClearButton = true 
+export default function RusnMaterialsSummary({
+  title = 'Сводка по материалам',
+  showClearButton = true,
 }: RusnMaterialsSummaryProps) {
-  const rusn = useRusnStore();
+  const cellSummaries = useRusnStore((s) => s.cellSummaries);
+  const cellConfigs = useRusnStore((s) => s.cellConfigs);
+  const busbarSummary = useRusnStore((s) => s.busbarSummary);
+  const busBridgeSummaries = useRusnStore((s) => s.busBridgeSummaries);
+  const removeCellSummary = useRusnStore((s) => s.removeCellSummary);
+  const clearCellSummaries = useRusnStore((s) => s.clearCellSummaries);
+  const clearOldKso366Summaries = useRusnStore((s) => s.clearOldKso366Summaries);
   const { enabled: debugPanelsEnabled } = useDebugPanelsEnabled();
-  const [, forceUpdate] = React.useReducer(x => x + 1, 0);
   const [key, setKey] = React.useState(0);
-  
-  // Принудительно обновляем компонент при изменении cellSummaries
-  React.useEffect(() => {
-    forceUpdate();
-  }, [rusn.cellSummaries]);
 
-  const groupedSummaries = useMemo(() => {
-    return rusn.cellSummaries.reduce((acc, summary) => {
-      const existing = acc.find(s => s.name === summary.name);
-      if (existing) {
-        existing.quantity += summary.quantity;
-        existing.totalPrice += summary.totalPrice;
-      } else {
-        acc.push({ ...summary });
-      }
-      return acc;
-    }, [] as typeof rusn.cellSummaries);
-  }, [rusn.cellSummaries]);
+  const validCellIds = useMemo(() => new Set(cellConfigs.map((cell) => cell.id)), [cellConfigs]);
 
   const filteredSummaries = useMemo(() => {
-    return groupedSummaries.filter(cellSummary => {
-      // Исключаем только старые записи КСО 366 без определенного типа
-      // Исключаем записи с названием "Ячейка Секционный разьединитель Камера КСО 366" (старый формат)
-      const isOldKso366Entry = cellSummary.name.includes('Ячейка Секционный разьединитель Камера КСО 366');
-      
-      // Показываем все записи кроме старых записей КСО 366
-      return !isOldKso366Entry;
-    });
-  }, [groupedSummaries]);
+    return cellSummaries.filter((cellSummary) => {
+      const isOldKso366Entry = cellSummary.name.includes(
+        'Ячейка Секционный разьединитель Камера КСО 366'
+      );
+      if (isOldKso366Entry) return false;
 
-  // Добавляем материалы сборных шин и шинных мостов
+      return validCellIds.has(resolveSummaryToCellId(cellSummary.cellId));
+    });
+  }, [cellSummaries, validCellIds]);
+
   const busbarSummaries = [];
-  
-  // Добавляем основные сборные шины
-  if (rusn.busbarSummary) {
+
+  if (busbarSummary) {
     busbarSummaries.push({
       cellId: 'busbar_main',
-      name: rusn.busbarSummary.name,
-      quantity: rusn.busbarSummary.quantity,
-      pricePerUnit: rusn.busbarSummary.pricePerUnit,
-      totalPrice: rusn.busbarSummary.totalPrice,
+      name: busbarSummary.name,
+      quantity: busbarSummary.quantity,
+      pricePerUnit: busbarSummary.pricePerUnit,
+      totalPrice: busbarSummary.totalPrice,
     });
   }
 
-  // Добавляем шинные мосты
-  if (rusn.busBridgeSummaries && rusn.busBridgeSummaries.length > 0) {
-    rusn.busBridgeSummaries.forEach((bridgeSummary, index) => {
+  if (busBridgeSummaries && busBridgeSummaries.length > 0) {
+    busBridgeSummaries.forEach((bridgeSummary, index) => {
       if (bridgeSummary.totalPrice > 0) {
         busbarSummaries.push({
           cellId: `busbridge_${index}`,
@@ -76,7 +63,6 @@ export default function RusnMaterialsSummary({
     });
   }
 
-  // Объединяем все материалы
   const allSummaries = [...filteredSummaries, ...busbarSummaries];
 
   return (
@@ -85,55 +71,49 @@ export default function RusnMaterialsSummary({
         <div className="flex items-center gap-3">
           <div className="p-2 bg-gray-100 rounded-lg">
             <svg className="w-5 h-5 text-[#8eba1e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
           </div>
           <h3 className="text-lg font-bold text-gray-900">{title}</h3>
         </div>
         {showClearButton && debugPanelsEnabled && (
           <div className="flex gap-2">
-            <button 
+            <button
               onClick={() => {
-                console.log('Текущие записи перед очисткой:', rusn.cellSummaries);
-                rusn.clearOldKso366Summaries();
-                setTimeout(() => {
-                  console.log('Записи после очистки:', rusn.cellSummaries);
-                  forceUpdate();
-                }, 100);
+                clearOldKso366Summaries();
+                setKey((prev) => prev + 1);
               }}
               className="px-3 py-1 text-xs bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200"
             >
               Очистить КСО 366
             </button>
-            <button 
+            <button
               onClick={() => {
-                console.log('Принудительное удаление всех записей КСО 366');
-                const allSummaries = rusn.cellSummaries;
-                const kso366Summaries = allSummaries.filter(summary => 
-                  summary.name.includes('Камера КСО 366') ||
-                  summary.name.includes('Шинный мост с разъединителем')
-                );
-                console.log('Найденные записи КСО 366:', kso366Summaries);
-                kso366Summaries.forEach(summary => {
-                  console.log('Удаляем:', summary.name, summary.cellId);
-                  rusn.removeCellSummary(summary.cellId);
+                const kso366Summaries = useRusnStore
+                  .getState()
+                  .cellSummaries.filter(
+                    (summary) =>
+                      summary.name.includes('Камера КСО 366') ||
+                      summary.name.includes('Шинный мост с разъединителем')
+                  );
+                kso366Summaries.forEach((summary) => {
+                  removeCellSummary(summary.cellId);
                 });
-                setTimeout(() => {
-                  console.log('Записи после удаления:', rusn.cellSummaries);
-                  forceUpdate();
-                  setKey(prev => prev + 1); // Принудительно перерендериваем весь компонент
-                }, 100);
+                setKey((prev) => prev + 1);
               }}
               className="px-3 py-1 text-xs bg-orange-100 text-orange-700 rounded hover:bg-orange-200"
             >
               Удалить КСО 366
             </button>
-            <button 
+            <button
               onClick={() => {
-                rusn.clearCellSummaries();
-                setTimeout(() => {
-                  window.location.reload();
-                }, 100);
+                clearCellSummaries();
+                setKey((prev) => prev + 1);
               }}
               className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
             >
@@ -181,7 +161,10 @@ export default function RusnMaterialsSummary({
                   Итого по материалам:
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-900 text-right">
-                  {allSummaries.reduce((sum, summary) => sum + summary.totalPrice, 0).toLocaleString('ru-RU')} ₸
+                  {allSummaries
+                    .reduce((sum, summary) => sum + summary.totalPrice, 0)
+                    .toLocaleString('ru-RU')}{' '}
+                  ₸
                 </td>
               </tr>
             )}

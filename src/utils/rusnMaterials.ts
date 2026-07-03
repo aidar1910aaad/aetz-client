@@ -1,6 +1,84 @@
 import { Material } from '@/api/material';
-import { RusnCell } from '@/store/useRusnStore';
+import { RusnCell, RusnGlobalOptions } from '@/store/useRusnStore';
 import { getKsoA12BhaCellDescription } from '@/domain/calculation/bhaPresets';
+import {
+  isRusnCameraWithPerCellMeter,
+  supportsCellMeterSelection,
+  RUSN_CAMERA,
+  RUSN_CELL_PURPOSE,
+} from '@/domain/rusn/rusnConstants';
+
+export type RusnGlobalCategorySelections = Pick<
+  RusnGlobalOptions,
+  'breaker' | 'rza' | 'meterType' | 'sr' | 'tsn' | 'tn' | 'tt'
+>;
+
+const MATERIAL_TYPE_TO_GLOBAL_KEY: Record<
+  keyof RusnMaterials,
+  keyof RusnGlobalCategorySelections | null
+> = {
+  breaker: 'breaker',
+  rza: 'rza',
+  meter: 'meterType',
+  transformer: null,
+  sr: 'sr',
+  tsn: 'tsn',
+  tn: 'tn',
+  tt: 'tt',
+};
+
+const FIELD_TO_GLOBAL_CATEGORY_KEY: Record<string, keyof RusnGlobalCategorySelections> = {
+  breaker: 'breaker',
+  rza: 'rza',
+  meterType: 'meterType',
+  sr: 'sr',
+  transformerCurrent: 'tt',
+  transformerVoltage: 'tn',
+  transformerPower: 'tsn',
+};
+
+export function filterMaterialsByCategory(
+  materialList: Material[],
+  categorySelection?: { id: number | string; name: string } | null
+): Material[] {
+  if (!categorySelection?.id) return materialList;
+
+  const categoryId = Number(categorySelection.id);
+  if (!Number.isFinite(categoryId)) return materialList;
+
+  return materialList.filter((material) => material.category?.id === categoryId);
+}
+
+export function getCategoryFilteredMaterials(
+  materials: RusnMaterials,
+  materialType: keyof RusnMaterials,
+  globalCategories?: RusnGlobalCategorySelections | null
+): Material[] {
+  const materialList = materials[materialType] ?? [];
+  if (!globalCategories) return materialList;
+
+  const globalKey = MATERIAL_TYPE_TO_GLOBAL_KEY[materialType];
+  if (!globalKey) return materialList;
+
+  return filterMaterialsByCategory(materialList, globalCategories[globalKey]);
+}
+
+function getCellMeterMaterials(
+  materials: RusnMaterials,
+  cellPurpose: string,
+  cameraName: string | undefined,
+  globalCategories?: RusnGlobalCategorySelections | null
+): Material[] | null {
+  if (!supportsCellMeterSelection(cameraName, cellPurpose)) {
+    return null;
+  }
+
+  if (!globalCategories?.meterType) {
+    return [];
+  }
+
+  return filterMaterialsByCategory(materials.meter, globalCategories.meterType);
+}
 
 export interface RusnMaterials {
   breaker: Material[];
@@ -43,9 +121,14 @@ export const CELL_FIELD_CONFIG = {
     { field: 'transformerVoltage', label: 'Трансформатор напряжения', materialType: 'tn' },
     { field: 'rza', label: 'РЗА', materialType: 'rza' },
   ],
+  'ТН с ЗСШ': [
+    { field: 'transformerVoltage', label: 'Трансформатор напряжения', materialType: 'tn' },
+    { field: 'rza', label: 'РЗА', materialType: 'rza' },
+  ],
   'Трансформатор собственных нужд': [
     { field: 'transformerPower', label: 'Силовой трансформатор', materialType: 'tsn' },
   ],
+  'Заземление сборных шин': [],
   'Кабельная перемычка': [
     { field: 'breaker', label: 'Выключатель', materialType: 'breaker' },
     { field: 'rza', label: 'РЗА', materialType: 'rza' },
@@ -54,7 +137,13 @@ export const CELL_FIELD_CONFIG = {
 } as const;
 
 // Получение конфигурации полей для ячейки
-export const getCellFieldConfig = (cellPurpose: string, materials: RusnMaterials, cameraType?: string, selectedGroupName?: string) => {
+export const getCellFieldConfig = (
+  cellPurpose: string,
+  materials: RusnMaterials,
+  cameraType?: string,
+  selectedGroupName?: string,
+  globalCategories?: RusnGlobalCategorySelections | null
+) => {
   // Для ячеек 8DJH не показываем поля выбора оборудования
   if (cellPurpose === 'Камера Siemens 8DJH') {
     return [];
@@ -74,9 +163,39 @@ export const getCellFieldConfig = (cellPurpose: string, materials: RusnMaterials
 
   const config = CELL_FIELD_CONFIG[cellPurpose as keyof typeof CELL_FIELD_CONFIG] || [];
 
-  return config.filter(({ materialType }) => {
-    const materialList = materials[materialType as keyof RusnMaterials];
-    return materialList && materialList.length > 0;
+  return config.filter(({ materialType, field }) => {
+    const baseList = materials[materialType as keyof RusnMaterials];
+    if (!baseList?.length) return false;
+
+    if (field === 'meterType') {
+      if (
+        isRusnCameraWithPerCellMeter(selectedGroupName) &&
+        !supportsCellMeterSelection(selectedGroupName, cellPurpose)
+      ) {
+        return false;
+      }
+
+      if (supportsCellMeterSelection(selectedGroupName, cellPurpose)) {
+        const meterMaterials = getCellMeterMaterials(
+          materials,
+          cellPurpose,
+          selectedGroupName,
+          globalCategories
+        );
+        return (meterMaterials?.length ?? 0) > 0;
+      }
+    }
+
+    if (!globalCategories) return true;
+
+    const materialList = getMaterialArrayForField(
+      materials,
+      field,
+      cellPurpose,
+      globalCategories,
+      selectedGroupName
+    );
+    return materialList.length > 0;
   });
 };
 
@@ -112,27 +231,54 @@ export const getFieldDisplayName = (field: string, cellPurpose: string): string 
 export const getMaterialArrayForField = (
   materials: RusnMaterials,
   field: string,
-  cellPurpose: string
+  cellPurpose: string,
+  globalCategories?: RusnGlobalCategorySelections | null,
+  cameraName?: string
 ): Material[] => {
+  if (field === 'meterType') {
+    const cellMeterMaterials = getCellMeterMaterials(
+      materials,
+      cellPurpose,
+      cameraName,
+      globalCategories
+    );
+    if (cellMeterMaterials !== null) {
+      return cellMeterMaterials;
+    }
+  }
+
+  let baseList: Material[];
+
   if (field === 'breaker' && cellPurpose === 'Секционный разьединитель') {
-    return materials.sr;
+    baseList = materials.sr;
+  } else if (field === 'sr') {
+    baseList = materials.sr;
+  } else {
+    const fieldToMaterialMap: Record<string, keyof RusnMaterials> = {
+      breaker: 'breaker',
+      rza: 'rza',
+      meterType: 'meter',
+      transformerCurrent: 'tt',
+      transformerVoltage: 'tn',
+      transformerPower: 'tsn',
+    };
+
+    const materialType = fieldToMaterialMap[field];
+    baseList = materialType ? materials[materialType] : [];
   }
 
-  if (field === 'sr') {
-    return materials.sr;
+  if (!globalCategories) return baseList;
+
+  if (field === 'breaker' && cellPurpose === 'Секционный разьединитель') {
+    return filterMaterialsByCategory(baseList, globalCategories.sr);
   }
 
-  const fieldToMaterialMap: Record<string, keyof RusnMaterials> = {
-    breaker: 'breaker',
-    rza: 'rza',
-    meterType: 'meter',
-    transformerCurrent: 'tt',
-    transformerVoltage: 'tn',
-    transformerPower: 'tsn',
-  };
+  const globalKey = FIELD_TO_GLOBAL_CATEGORY_KEY[field];
+  if (globalKey && globalCategories[globalKey]) {
+    return filterMaterialsByCategory(baseList, globalCategories[globalKey]);
+  }
 
-  const materialType = fieldToMaterialMap[field];
-  return materialType ? materials[materialType] : [];
+  return baseList;
 };
 
 const getSelectedMaterialName = (
@@ -164,6 +310,7 @@ const KSO_A12_CELL_LABELS: Record<string, { code: string; purpose: string }> = {
   Трансформаторная: { code: '2ВК', purpose: 'трансформаторная' },
   Отходящая: { code: 'ОТХ', purpose: 'отходящая' },
   'Трансформатор напряжения': { code: 'ТН', purpose: 'трансформатор напряжения' },
+  'ТН с ЗСШ': { code: 'ТН с ЗСШ', purpose: 'трансформатор напряжения с ЗСШ' },
   'Трансформатор собственных нужд': { code: 'ТСН', purpose: 'трансформатор собственных нужд' },
 };
 
@@ -267,6 +414,41 @@ export const formatCellDescription = (
       }
     }
     return formatKsoA12Description(cell, materials);
+  }
+
+  if (
+    cameraName === RUSN_CAMERA.KSO_A17_20 &&
+    cell.purpose === RUSN_CELL_PURPOSE.VOLTAGE_TRANSFORMER_ZSSH
+  ) {
+    const parts = ['Камера КСО-А17-20 500x1450 (ТН с ЗСШ)'];
+    const materialParts: string[] = [];
+
+    const transformerVoltageName = getSelectedMaterialName(materials, 'tn', cell.transformerVoltage);
+    if (transformerVoltageName) {
+      materialParts.push(withPrefix('Трансформатор напряжения', transformerVoltageName));
+    }
+
+    const rzaName = getSelectedMaterialName(materials, 'rza', cell.rza);
+    if (rzaName) {
+      materialParts.push(withPrefix('Микропроцессорная защита', rzaName));
+    }
+
+    if (materialParts.length > 0) {
+      parts.push(materialParts.join(', '));
+    }
+
+    return parts.join(', ');
+  }
+
+  if (cameraName === RUSN_CAMERA.KSO_A17_20) {
+    return formatKsoA12Description(cell, materials).replace(
+      'Камера КСО А12-10',
+      'Камера КСО А17-20'
+    );
+  }
+
+  if (cell.purpose === RUSN_CELL_PURPOSE.BUSBAR_GROUNDING) {
+    return 'Заземление сборных шин';
   }
 
   // Начинаем с назначения ячейки и типа
