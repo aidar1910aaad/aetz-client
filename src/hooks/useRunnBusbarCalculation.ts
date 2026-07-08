@@ -1,16 +1,26 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRunnStore, BusMaterial } from '@/store/useRunnStore';
 import { useTransformerStore } from '@/store/useTransformerStore';
 import { switchgearApi, Switchgear } from '@/api/switchgear';
 import { useRusnCalculation } from '@/hooks/useRusnCalculation';
-import { calculateCost } from '@/utils/calculationUtils';
 import { Material } from '@/api/material';
 import { api } from '@/api/baseUrl';
+import { normalizeBusbarSection } from '@/utils/busbarSectionUtils';
+import {
+  getPossibleGroupsFromTransformer,
+  resolveRunnBusbarConfig,
+} from '@/utils/runnBusbarOptions';
 
 export const useRunnBusbarCalculation = () => {
   const runn = useRunnStore();
+  const setBusbarVariant = useRunnStore((s) => s.setBusbarVariant);
   const { selectedTransformer } = useTransformerStore();
-  const busbar = runn.global.busbar || { enabled: false, material: null };
+  const busbar = runn.global.busbar || {
+    enabled: false,
+    material: null,
+    selectedBusbarGroup: null,
+    selectedBusbarSection: null,
+  };
   const [switchgearConfigs, setSwitchgearConfigs] = useState<Switchgear[]>([]);
   const [materialPrices, setMaterialPrices] = useState<{
     aluminum: number;
@@ -87,11 +97,11 @@ export const useRunnBusbarCalculation = () => {
   };
 
   // Получаем цену за кг
-  const getPricePerKg = (material: BusMaterial) => {
-    if (material === 'АД' || material === 'АД2') {
+  const getPricePerKg = (material: BusMaterial | string | null | undefined) => {
+    if (material === 'АД' || material === 'АД2' || material === 'АД3') {
       return materialPrices.aluminum;
     }
-    if (material === 'МТ' || material === 'МТ2') {
+    if (material === 'МТ' || material === 'МТ2' || material === 'МТ3') {
       return materialPrices.copper;
     }
     return 0;
@@ -124,18 +134,6 @@ export const useRunnBusbarCalculation = () => {
     }
     return [];
   };
-
-  // Получаем возможные группы на основе выбранного типа материала из трансформатора
-  const getPossibleGroupsFromTransformer = (busbarsType: string) => {
-    if (busbarsType === 'Алюминий') {
-      return ['АД', 'АД2', 'АД3'];
-    }
-    if (busbarsType === 'Медь') {
-      return ['МТ', 'МТ2', 'МТ3'];
-    }
-    return [];
-  };
-
 
   // Загружаем конфигурации коммутационных аппаратов
   useEffect(() => {
@@ -186,25 +184,78 @@ export const useRunnBusbarCalculation = () => {
     fetchBusbarCalculation();
   }, []);
 
-  // Находим подходящую конфигурацию для "Панель ЩО-70" по мощности трансформатора
-  const matchingConfig = transformerPower
-    ? switchgearConfigs.find((config) => {
-        // Используем тип материала из трансформатора, если он выбран
-        const possibleGroups = selectedTransformer?.busbars 
-          ? getPossibleGroupsFromTransformer(selectedTransformer.busbars)
-          : busbar.material 
-            ? getPossibleGroupsForMaterial(busbar.material) 
-            : [];
-        
-        // Ищем конфигурацию типа "Панель ЩО-70" с подходящими параметрами
-        // Используем мощность трансформатора для поиска по полю breaker
-        return (
-          config.type === 'Панель ЩО-70' &&
-          config.breaker === transformerPower.toString() &&
-          possibleGroups.includes(config.group)
-        );
-      })
-    : null;
+  const possibleGroups = useMemo(() => {
+    if (selectedTransformer?.busbars) {
+      return getPossibleGroupsFromTransformer(selectedTransformer.busbars);
+    }
+    if (busbar.material) {
+      return getPossibleGroupsForMaterial(busbar.material);
+    }
+    return [];
+  }, [selectedTransformer?.busbars, busbar.material]);
+
+  const selectedGroup = busbar.selectedBusbarGroup ?? null;
+  const selectedSection = busbar.selectedBusbarSection ?? null;
+
+  const {
+    matchingConfig,
+    recommendedConfig,
+    availableOptions: availableBusbarOptions,
+  } = useMemo(
+    () =>
+      resolveRunnBusbarConfig(
+        switchgearConfigs,
+        'Панель ЩО-70',
+        transformerPower,
+        possibleGroups,
+        selectedGroup,
+        selectedSection
+      ),
+    [switchgearConfigs, transformerPower, possibleGroups, selectedGroup, selectedSection]
+  );
+
+  useEffect(() => {
+    if (!recommendedConfig) return;
+
+    const recommendedGroup = recommendedConfig.group;
+    const recommendedSection = recommendedConfig.busbar;
+    if (!recommendedGroup || !recommendedSection) return;
+
+    const availableKeys = new Set(
+      availableBusbarOptions.map(
+        (option) => `${option.group}:${normalizeBusbarSection(option.section)}`
+      )
+    );
+    const recommendedKey = `${recommendedGroup}:${normalizeBusbarSection(recommendedSection)}`;
+    const selectedKey =
+      selectedGroup && selectedSection
+        ? `${selectedGroup}:${normalizeBusbarSection(selectedSection)}`
+        : null;
+
+    // Уже выбрано валидное сечение — ничего не пишем (иначе цикл)
+    if (selectedKey && availableKeys.has(selectedKey)) return;
+
+    // Рекомендуемый вариант уже выбран
+    if (
+      selectedGroup === recommendedGroup &&
+      selectedSection === recommendedSection
+    ) {
+      return;
+    }
+
+    // Не ставим то, чего нет в списке опций
+    if (availableKeys.size > 0 && !availableKeys.has(recommendedKey)) return;
+
+    setBusbarVariant(recommendedGroup, recommendedSection);
+  }, [
+    recommendedConfig?.id,
+    recommendedConfig?.group,
+    recommendedConfig?.busbar,
+    availableBusbarOptions,
+    selectedGroup,
+    selectedSection,
+    setBusbarVariant,
+  ]);
 
   // Рассчитываем общий вес и стоимость с детализацией
   const cellDetails: Array<{name: string, quantity: number, weightPerCell: number, totalWeight: number}> = [];
@@ -264,10 +315,18 @@ export const useRunnBusbarCalculation = () => {
 
   // Определяем материал на основе конфигурации
   const getMaterialFromConfig = () => {
-    if (matchingConfig?.group === 'МТ' || matchingConfig?.group === 'МТ2') {
+    if (
+      matchingConfig?.group === 'МТ' ||
+      matchingConfig?.group === 'МТ2' ||
+      matchingConfig?.group === 'МТ3'
+    ) {
       return 'МТ';
     }
-    if (matchingConfig?.group === 'АД' || matchingConfig?.group === 'АД2') {
+    if (
+      matchingConfig?.group === 'АД' ||
+      matchingConfig?.group === 'АД2' ||
+      matchingConfig?.group === 'АД3'
+    ) {
       return 'АД';
     }
     return busbar.material;
@@ -340,6 +399,11 @@ export const useRunnBusbarCalculation = () => {
   return {
     selectedBreaker: selectedTransformer?.model || null,
     matchingConfig,
+    recommendedConfig,
+    availableBusbarOptions,
+    selectedBusbarGroup: busbar.selectedBusbarGroup,
+    selectedBusbarSection: busbar.selectedBusbarSection,
+    setBusbarVariant,
     totalWeight,
     totalPrice,
     materialCost,
@@ -351,5 +415,6 @@ export const useRunnBusbarCalculation = () => {
     getPricePerKg,
     calculationsLoading,
     transformerPower,
+    selectedTransformer,
   };
 };

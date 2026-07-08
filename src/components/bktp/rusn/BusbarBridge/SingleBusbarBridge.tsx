@@ -34,13 +34,13 @@ export const SingleBusbarBridge: React.FC<SingleBusbarBridgeProps> = ({
   index,
   busbarBridgeCalculation,
 }) => {
-  const formatNumber = (num: number) => {
-    return num.toLocaleString('ru-RU');
+  const formatNumber = (num: number | null | undefined) => {
+    return Number(num ?? 0).toLocaleString('ru-RU');
   };
 
   // Рассчитываем стоимость для этого моста
   const calculateBridgePrice = () => {
-    const weight = weightPerMeter * bridge.length;
+    const weight = weightPerMeter;
     return weight * pricePerKg;
   };
 
@@ -70,16 +70,10 @@ export const SingleBusbarBridge: React.FC<SingleBusbarBridgeProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div className="space-y-2">
-          <label className="block text-sm text-gray-600">Длина (м):</label>
-          <input
-            type="number"
-            value={bridge.length}
-            onChange={(e) => onUpdate(bridge.id, 'length', Number(e.target.value))}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 transition-colors focus:border-[#8eba1e] focus:ring-2 focus:ring-[#8eba1e]/20"
-            placeholder="Введите длину"
-            min="0"
-            step="0.1"
-          />
+          <label className="block text-sm text-gray-600">Расход из таблицы:</label>
+          <div className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900">
+            {formatNumber(weightPerMeter)} кг/шт
+          </div>
         </div>
         <div className="space-y-2">
           <label className="block text-sm text-gray-600">Количество:</label>
@@ -96,7 +90,7 @@ export const SingleBusbarBridge: React.FC<SingleBusbarBridgeProps> = ({
       </div>
 
       {/* Расчет для этого моста */}
-      {bridge.length > 0 && (
+      {bridge.quantity > 0 && (
         <div className="bg-white border border-gray-200 rounded-md p-4 mb-4">
           <h5 className="text-sm font-semibold text-gray-900 mb-3">№{index + 1} Расчет моста</h5>
 
@@ -104,7 +98,7 @@ export const SingleBusbarBridge: React.FC<SingleBusbarBridgeProps> = ({
             <div className="text-center">
               <div className="text-sm text-gray-600 mb-1">Масса</div>
               <div className="text-lg font-bold text-gray-900">
-                {formatNumber(weightPerMeter * bridge.length)} кг
+                {formatNumber(weightPerMeter)} кг/шт
               </div>
             </div>
             <div className="text-center">
@@ -118,15 +112,15 @@ export const SingleBusbarBridge: React.FC<SingleBusbarBridgeProps> = ({
           </div>
 
           <div className="text-sm text-gray-600">
-            <strong>Формула:</strong> {formatNumber(weightPerMeter)} кг/м ×{' '}
-            {formatNumber(bridge.length)} м × {formatNumber(pricePerKg)} ₸/кг × {bridge.quantity} шт
+            <strong>Формула:</strong> {formatNumber(weightPerMeter)} кг/шт ×{' '}
+            {formatNumber(pricePerKg)} ₸/кг × {bridge.quantity} шт
             = {formatNumber(totalPrice)} ₸
           </div>
         </div>
       )}
 
       {/* Отдельная калькуляция для этого моста */}
-      {bridge.length > 0 && (
+      {bridge.quantity > 0 && (
         <SingleBusbarBridgeCalculation
           bridge={bridge}
           busBridgeMaterial={busBridgeMaterial}

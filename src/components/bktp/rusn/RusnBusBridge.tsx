@@ -35,7 +35,7 @@ export const RusnBusBridge = () => {
   };
 
   // Проверяем, есть ли мосты с длиной больше 0
-  const hasValidBridges = bridges.some((bridge) => bridge.length > 0);
+  const hasValidBridges = bridges.some((bridge) => bridge.quantity > 0);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -66,7 +66,7 @@ export const RusnBusBridge = () => {
         <ErrorMessages
           selectedMaterial={busBridgeMaterial}
           hasMatchingConfig={!!matchingConfig}
-          length={bridges[0]?.length || 0}
+          length={bridges.reduce((sum, bridge) => sum + bridge.quantity, 0)}
         />
 
         {/* Результаты расчета */}

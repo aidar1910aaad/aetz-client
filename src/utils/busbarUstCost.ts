@@ -20,7 +20,45 @@ export interface BusbarMaterialPrices {
 }
 
 export function isUst04CalculationName(name: string): boolean {
-  return name.includes('0.4кВ') || name.includes('УСТ-0.4кВ');
+  const normalized = String(name || '')
+    .toLowerCase()
+    .replace(/,/g, '.')
+    .replace(/\s+/g, '');
+  return (
+    normalized.includes('0.4кв') ||
+    normalized.includes('уст-0.4кв') ||
+    normalized.includes('уст-0-4кв')
+  );
+}
+
+/** УСТ по стороне ВН (10кВ / 20кВ), без путаницы с УСТ-0.4кВ */
+export function findUstCalculationByVoltage(
+  calculations: Array<{ name?: string; slug?: string }>,
+  voltage: string | number | null | undefined
+): (typeof calculations)[number] | undefined {
+  if (voltage == null || String(voltage).trim() === '') return undefined;
+  const volts = String(voltage).replace(/[^\d]/g, '');
+  if (!volts) return undefined;
+
+  return calculations.find((calc) => {
+    const name = String(calc.name || '');
+    const slug = String(calc.slug || '').toLowerCase();
+    if (isUst04CalculationName(name) || isUst04CalculationName(slug)) return false;
+    return (
+      name.includes(`УСТ-${volts}кВ`) ||
+      name.includes(`${volts}кВ`) ||
+      slug.includes(`уст-${volts}`) ||
+      slug.includes(`${volts}кв`)
+    );
+  });
+}
+
+export function findUst04Calculation(
+  calculations: Array<{ name?: string; slug?: string }>
+): (typeof calculations)[number] | undefined {
+  return calculations.find(
+    (calc) => isUst04CalculationName(String(calc.name || '')) || isUst04CalculationName(String(calc.slug || ''))
+  );
 }
 
 export function isAluminumBusbarMaterial(material: string): boolean {

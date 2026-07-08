@@ -27,6 +27,11 @@ export const BusbarSystemContainer = () => {
 
   const {
     matchingConfig,
+    recommendedConfig,
+    availableBusbarOptions,
+    selectedBusbarGroup,
+    selectedBusbarSection,
+    setBusbarVariant,
     totalWeight,
     totalPrice,
     materialCost,
@@ -41,6 +46,11 @@ export const BusbarSystemContainer = () => {
 
   const {
     matchingConfig: zeroMatchingConfig,
+    recommendedConfig: zeroRecommendedConfig,
+    availableBusbarOptions: zeroAvailableBusbarOptions,
+    selectedBusbarGroup: zeroSelectedBusbarGroup,
+    selectedBusbarSection: zeroSelectedBusbarSection,
+    setZeroBusbarVariant,
     totalWeight: zeroTotalWeight,
     totalPrice: zeroTotalPrice,
     materialCost: zeroMaterialCost,
@@ -127,6 +137,11 @@ export const BusbarSystemContainer = () => {
         <BusbarResults
           title="сборным шинам РУНН"
           matchingConfig={matchingConfig}
+          recommendedConfig={recommendedConfig}
+          availableBusbarOptions={availableBusbarOptions}
+          selectedBusbarGroup={selectedBusbarGroup}
+          selectedBusbarSection={selectedBusbarSection}
+          onBusbarOptionChange={(option) => setBusbarVariant(option.group, option.section)}
           totalWeight={totalWeight}
           totalPrice={totalPrice}
           materialCost={materialCost}
@@ -143,6 +158,11 @@ export const BusbarSystemContainer = () => {
         <BusbarResults
           title="сборным шинам N"
           matchingConfig={zeroMatchingConfig}
+          recommendedConfig={zeroRecommendedConfig}
+          availableBusbarOptions={zeroAvailableBusbarOptions}
+          selectedBusbarGroup={zeroSelectedBusbarGroup}
+          selectedBusbarSection={zeroSelectedBusbarSection}
+          onBusbarOptionChange={(option) => setZeroBusbarVariant(option.group, option.section)}
           totalWeight={zeroTotalWeight}
           totalPrice={zeroTotalPrice}
           materialCost={zeroMaterialCost}

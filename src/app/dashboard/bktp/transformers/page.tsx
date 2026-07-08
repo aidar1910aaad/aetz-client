@@ -15,6 +15,10 @@ import { getCalculationsByGroup, Calculation } from '@/api/calculations';
 import { useAuth } from '@/hooks/useAuth';
 import { BusbarConfiguration } from '@/components/Transformers/BusbarConfiguration';
 import { useRealtimeCalculationStore } from '@/store/useRealtimeCalculationStore';
+import {
+  findUst04Calculation,
+  findUstCalculationByVoltage,
+} from '@/utils/busbarUstCost';
 
 export default function TransformerConfigurator() {
   const router = useRouter();
@@ -24,7 +28,6 @@ export default function TransformerConfigurator() {
   const [transformers, setTransformers] = useState<Transformer[]>([]);
   const [loading, setLoading] = useState(true);
   const [calculations, setCalculations] = useState<Calculation[]>([]);
-  const [selectedUstCalculations, setSelectedUstCalculations] = useState<Calculation[]>([]);
   const [busbarUstData, setBusbarUstData] = useState<{
     mainUstWeight: number;
     zeroUstWeight: number;
@@ -159,32 +162,6 @@ export default function TransformerConfigurator() {
     }));
   };
 
-  // Автоматический выбор калькуляции УСТ на основе выбранного напряжения
-  useEffect(() => {
-    if (selected.voltage && calculations.length > 0) {
-      let voltageKey = null;
-      
-      // Определяем ключ напряжения для поиска УСТ
-      if (selected.voltage === '10') {
-        voltageKey = '10кВ';
-      } else if (selected.voltage === '20') {
-        voltageKey = '20кВ';
-      }
-      
-      if (voltageKey) {
-        const matchingCalculation = calculations.find(calc => 
-          calc.name.includes(voltageKey) || calc.name.includes(`УСТ-${voltageKey}`)
-        );
-        if (matchingCalculation) {
-          setSelectedUstCalculations([matchingCalculation]);
-          console.log(`✅ Автоматически выбрана калькуляция УСТ для ${voltageKey}:`, matchingCalculation.name);
-        }
-      }
-    } else {
-      setSelectedUstCalculations([]);
-    }
-  }, [selected.voltage, calculations]);
-
   const isComplete = Object.values(selected).every((v) => v !== null);
 
   const matched = transformers.find(
@@ -194,6 +171,24 @@ export default function TransformerConfigurator() {
       t.power === selected.power &&
       t.manufacturer === selected.manufacturer
   );
+
+  // УСТ ВН + УСТ-0.4кВ в одном мемо — без гонки двух useEffect
+  const selectedUstCalculations = useMemo(() => {
+    if (!selected.voltage || calculations.length === 0) return [] as Calculation[];
+
+    const result: Calculation[] = [];
+    const hv = findUstCalculationByVoltage(calculations, selected.voltage) as Calculation | undefined;
+    if (hv) result.push(hv);
+
+    if (isComplete && matched) {
+      const lv = findUst04Calculation(calculations) as Calculation | undefined;
+      if (lv && !result.some((c) => c.id === lv.id)) {
+        result.push(lv);
+      }
+    }
+
+    return result;
+  }, [selected.voltage, calculations, isComplete, matched]);
 
   // Синхронизируем выбранный трансформатор в store в реальном времени,
   // чтобы backend realtime calculation видел актуальные данные страницы до submit.
@@ -234,52 +229,6 @@ export default function TransformerConfigurator() {
     setTransformer,
     skipTransformer,
   ]);
-
-  // Автоматическое подтягивание УСТ-0.4кВ когда все параметры выбраны
-  useEffect(() => {
-    console.log('🔍 Проверка подтягивания УСТ-0.4кВ:', {
-      isComplete,
-      matched: !!matched,
-      calculationsCount: calculations.length,
-      selectedUstCalculationsCount: selectedUstCalculations.length
-    });
-
-    if (isComplete && matched && calculations.length > 0) {
-      const ust04Calculation = calculations.find(calc => 
-        calc.name.includes('0.4кВ') || calc.name.includes('УСТ-0.4кВ')
-      );
-      
-      console.log('🔍 Поиск УСТ-0.4кВ:', {
-        found: !!ust04Calculation,
-        calculation: ust04Calculation ? {
-          id: ust04Calculation.id,
-          name: ust04Calculation.name,
-          hasData: !!ust04Calculation.data
-        } : null
-      });
-      
-      if (ust04Calculation) {
-        // Добавляем УСТ-0.4кВ к существующим УСТ калькуляциям
-        setSelectedUstCalculations(prev => {
-          const hasUst04 = prev.some(calc => 
-            calc.name.includes('0.4кВ') || calc.name.includes('УСТ-0.4кВ')
-          );
-          console.log('🔍 Проверка существования УСТ-0.4кВ:', {
-            hasUst04,
-            prevCount: prev.length,
-            willAdd: !hasUst04
-          });
-          if (!hasUst04) {
-            console.log('✅ Автоматически подтянута калькуляция УСТ-0.4кВ:', ust04Calculation.name);
-            return [...prev, ust04Calculation];
-          }
-          return prev;
-        });
-      } else {
-        console.log('❌ УСТ-0.4кВ не найдена в доступных калькуляциях');
-      }
-    }
-  }, [isComplete, matched, calculations]);
 
   const handleSubmit = () => {
     if (skip === null) {

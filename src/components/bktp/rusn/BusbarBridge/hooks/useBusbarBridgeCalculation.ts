@@ -84,11 +84,11 @@ export const useBusbarBridgeCalculation = () => {
 
   // Находим расход для "Шинный мост"
   const bridgeCell = matchingConfig?.cells?.find((cell) => cell.name === 'Шинный мост');
-  const weightPerMeter = bridgeCell?.quantity || 0;
+  const weightPerPiece = bridgeCell?.quantity || 0;
 
   // Рассчитываем общую массу и стоимость для всех мостов
   const totalWeight = bridges.reduce((sum, bridge) => {
-    return sum + weightPerMeter * bridge.length * bridge.quantity;
+    return sum + weightPerPiece * bridge.quantity;
   }, 0);
 
   const pricePerKg = getPricePerKg(busBridge.material);
@@ -135,12 +135,12 @@ export const useBusbarBridgeCalculation = () => {
         busBridge.material === 'АД' || busBridge.material === 'АД2' ? 'Алюминий' : 'Медь';
 
       // Создаем отдельный summary для каждого моста
-      const validBridges = bridges.filter((bridge) => bridge.length > 0);
+      const validBridges = bridges.filter((bridge) => bridge.quantity > 0);
 
       if (validBridges.length > 0) {
         // Создаем массив summary для каждого моста
         const bridgeSummaries = validBridges.map((bridge, index) => {
-          const bridgeWeight = weightPerMeter * bridge.length;
+          const bridgeWeight = weightPerPiece;
           const bridgePrice = bridgeWeight * pricePerKg;
 
           // Рассчитываем стоимость дополнительных материалов
@@ -170,9 +170,7 @@ export const useBusbarBridgeCalculation = () => {
           );
 
           return {
-            name: `№${index + 1} Шинный мост ${materialName} ${matchingConfig.busbar} (длина: ${
-              bridge.length
-            }м)`,
+            name: `№${index + 1} Шинный мост ${materialName} ${matchingConfig.busbar}`,
             quantity: bridge.quantity,
             pricePerUnit: calculationResult.finalPrice,
             totalPrice: calculationResult.finalPrice * bridge.quantity,
@@ -202,7 +200,7 @@ export const useBusbarBridgeCalculation = () => {
     busBridge.material,
     bridges,
     busbarBridgeCalculationResult?.finalPrice,
-    weightPerMeter,
+    weightPerPiece,
     pricePerKg,
   ]);
 
@@ -229,7 +227,8 @@ export const useBusbarBridgeCalculation = () => {
     selectedBreaker,
     matchingConfig,
     bridgeCell,
-    weightPerMeter,
+    weightPerMeter: weightPerPiece,
+    weightPerPiece,
     totalWeight,
     totalPrice,
     busbarBridgeCalculationResult,

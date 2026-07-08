@@ -1,41 +1,42 @@
 import React from 'react';
 import { normalizeBusbarSection } from '@/utils/busbarSectionUtils';
+import { BusbarOption } from './hooks/useBusbarCalculation';
 
 interface BusbarSectionSelectorProps {
-  availableSections: string[];
-  selectedSection: string | null;
-  recommendedSection?: string | null;
-  onSectionChange: (section: string) => void;
+  availableOptions: BusbarOption[];
+  selectedOption: BusbarOption | null;
+  recommendedOption?: BusbarOption | null;
+  onOptionChange: (option: BusbarOption) => void;
 }
 
 export const BusbarSectionSelector: React.FC<BusbarSectionSelectorProps> = ({
-  availableSections,
-  selectedSection,
-  recommendedSection,
-  onSectionChange,
+  availableOptions,
+  selectedOption,
+  recommendedOption,
+  onOptionChange,
 }) => {
-  const normalizedSelected = selectedSection
-    ? normalizeBusbarSection(selectedSection)
+  const normalizedSelected = selectedOption
+    ? `${selectedOption.group}:${normalizeBusbarSection(selectedOption.section)}`
     : null;
 
-  const normalizedRecommended = recommendedSection
-    ? normalizeBusbarSection(recommendedSection)
+  const normalizedRecommended = recommendedOption
+    ? `${recommendedOption.group}:${normalizeBusbarSection(recommendedOption.section)}`
     : null;
 
   return (
     <div className="space-y-3">
       <span className="text-sm font-medium text-gray-700">Сечение шины</span>
       <div className="flex flex-wrap gap-2">
-        {availableSections.map((section) => {
-          const normalized = normalizeBusbarSection(section);
+        {availableOptions.map((option) => {
+          const normalized = `${option.group}:${normalizeBusbarSection(option.section)}`;
           const selected = normalizedSelected === normalized;
           const recommended = normalizedRecommended === normalized;
 
           return (
             <button
-              key={section}
+              key={`${option.group}:${option.section}`}
               type="button"
-              onClick={() => onSectionChange(section)}
+              onClick={() => onOptionChange(option)}
               className={`relative rounded-xl border-2 px-4 py-2.5 text-sm font-medium transition-all ${
                 selected
                   ? 'border-[#8eba1e] bg-[#8eba1e]/5 text-gray-900 shadow-sm'
@@ -45,7 +46,7 @@ export const BusbarSectionSelector: React.FC<BusbarSectionSelectorProps> = ({
               }`}
             >
               <span className="flex items-center gap-1.5">
-                {section} мм
+                {option.group} {option.section} мм
                 {recommended && (
                   <span
                     className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${

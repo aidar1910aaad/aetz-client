@@ -31,13 +31,13 @@ export const SingleBusbarBridgeCalculation: React.FC<SingleBusbarBridgeCalculati
 }) => {
   const [showCalculation, setShowCalculation] = useState(false);
 
-  const formatNumber = (num: number) => {
-    return num.toLocaleString('ru-RU');
+  const formatNumber = (num: number | null | undefined) => {
+    return Number(num ?? 0).toLocaleString('ru-RU');
   };
 
   // Рассчитываем стоимость для этого моста
   const calculateBridgePrice = () => {
-    const weight = weightPerMeter * bridge.length;
+    const weight = weightPerMeter;
     return weight * pricePerKg;
   };
 
@@ -69,7 +69,7 @@ export const SingleBusbarBridgeCalculation: React.FC<SingleBusbarBridgeCalculati
     ndsPercentage: 12,
   });
 
-  if (bridge.length === 0) return null;
+  if (bridge.quantity <= 0) return null;
 
   return (
     <div className="mt-4 bg-white border border-gray-200 rounded-md p-4">
@@ -142,13 +142,13 @@ export const SingleBusbarBridgeCalculation: React.FC<SingleBusbarBridgeCalculati
                       {busBridgeMaterial === 'АД' || busBridgeMaterial === 'АД2'
                         ? 'Алюминий'
                         : 'Медь'}{' '}
-                      {matchingConfig.busbar} {matchingConfig.breaker} (длина: {bridge.length}м)
+                      {matchingConfig.busbar} {matchingConfig.breaker}
                     </td>
                     <td className="px-4 py-2 text-sm text-gray-500">компл.</td>
                     <td className="px-4 py-2 text-sm text-gray-900 text-right">
                       {formatNumber(bridgePrice)} ₸
                     </td>
-                    <td className="px-4 py-2 text-sm text-gray-900 text-right">1</td>
+                    <td className="px-4 py-2 text-sm text-gray-900 text-right">1 шт.</td>
                     <td className="px-4 py-2 text-sm text-gray-900 text-right">
                       {formatNumber(bridgePrice)} ₸
                     </td>

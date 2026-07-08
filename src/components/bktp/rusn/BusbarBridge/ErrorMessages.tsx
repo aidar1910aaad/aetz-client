@@ -28,8 +28,8 @@ export const ErrorMessages: React.FC<ErrorMessagesProps> = ({
       )}
 
       {selectedMaterial && hasMatchingConfig && length <= 0 && (
-        <BusAlert variant="info" title="Укажите длину моста">
-          Добавьте шинный мост и задайте длину больше 0 для расчёта стоимости.
+        <BusAlert variant="info" title="Укажите количество мостов">
+          Добавьте шинный мост и задайте количество больше 0 для расчёта стоимости.
         </BusAlert>
       )}
     </>

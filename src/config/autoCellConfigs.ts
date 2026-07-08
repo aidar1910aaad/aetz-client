@@ -67,7 +67,8 @@ export const autoCellConfigs: Record<string, AutoCellConfig> = {
       meterFallback: ['234 ART 2', '234 ARTM 2', 'CA4У-Э712', 'Меркурий', 'Сайман'],
       tt: ['ТОЛ-10 200/5', '200/5']
     },
-    count: 1,
+    // КСО А12-10 / А17-20 / КМ1-АФ: по умолчанию 2 (как вводная)
+    count: 2,
     useGlobalMeter: true,
     useGlobalBreaker: true,
     useGlobalRza: true

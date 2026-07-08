@@ -4,10 +4,26 @@ import React, { useMemo } from 'react';
 import { useRusnStore } from '@/store/useRusnStore';
 import { resolveSummaryToCellId } from '@/domain/rusn/cellSummary';
 import { useDebugPanelsEnabled } from '@/components/common/DebugToggle';
+import { getCellTypesForGroup } from '@/config/cellTypeConfigs';
+import { RUSN_CELL_PURPOSE } from '@/domain/rusn/rusnConstants';
 
 interface RusnMaterialsSummaryProps {
   title?: string;
   showClearButton?: boolean;
+}
+
+/**
+ * Порядок ячеек в сводке = как секции на странице РУСН:
+ * типы из getCellTypesForGroup, но «Отходящая» после остальных
+ * (как в RusnCellTable), внутри типа — порядок cellConfigs.
+ * Затем сборные шины, затем шинный мост.
+ */
+function getRusnPageCellPurposeOrder(bodyType: string): string[] {
+  const cellTypes = getCellTypesForGroup(bodyType || 'Камера КСО А12-10');
+  const staticTypes = cellTypes.filter((type) => type !== RUSN_CELL_PURPOSE.OUTGOING);
+  return cellTypes.includes(RUSN_CELL_PURPOSE.OUTGOING)
+    ? [...staticTypes, RUSN_CELL_PURPOSE.OUTGOING]
+    : staticTypes;
 }
 
 export default function RusnMaterialsSummary({
@@ -16,6 +32,7 @@ export default function RusnMaterialsSummary({
 }: RusnMaterialsSummaryProps) {
   const cellSummaries = useRusnStore((s) => s.cellSummaries);
   const cellConfigs = useRusnStore((s) => s.cellConfigs);
+  const bodyType = useRusnStore((s) => s.global.bodyType);
   const busbarSummary = useRusnStore((s) => s.busbarSummary);
   const busBridgeSummaries = useRusnStore((s) => s.busBridgeSummaries);
   const removeCellSummary = useRusnStore((s) => s.removeCellSummary);
@@ -27,15 +44,37 @@ export default function RusnMaterialsSummary({
   const validCellIds = useMemo(() => new Set(cellConfigs.map((cell) => cell.id)), [cellConfigs]);
 
   const filteredSummaries = useMemo(() => {
-    return cellSummaries.filter((cellSummary) => {
-      const isOldKso366Entry = cellSummary.name.includes(
-        'Ячейка Секционный разьединитель Камера КСО 366'
-      );
-      if (isOldKso366Entry) return false;
+    const purposeOrder = getRusnPageCellPurposeOrder(bodyType);
+    const purposeRank = new Map(purposeOrder.map((purpose, index) => [purpose, index]));
+    const cellIndexById = new Map(cellConfigs.map((cell, index) => [cell.id, index]));
+    const cellById = new Map(cellConfigs.map((cell) => [cell.id, cell]));
 
-      return validCellIds.has(resolveSummaryToCellId(cellSummary.cellId));
-    });
-  }, [cellSummaries, validCellIds]);
+    return cellSummaries
+      .filter((cellSummary) => {
+        const isOldKso366Entry = cellSummary.name.includes(
+          'Ячейка Секционный разьединитель Камера КСО 366'
+        );
+        if (isOldKso366Entry) return false;
+
+        return validCellIds.has(resolveSummaryToCellId(cellSummary.cellId));
+      })
+      .sort((a, b) => {
+        const aCellId = resolveSummaryToCellId(a.cellId);
+        const bCellId = resolveSummaryToCellId(b.cellId);
+        const aCell = cellById.get(aCellId);
+        const bCell = cellById.get(bCellId);
+
+        const aPurposeRank = purposeRank.get(aCell?.purpose || '') ?? Number.MAX_SAFE_INTEGER;
+        const bPurposeRank = purposeRank.get(bCell?.purpose || '') ?? Number.MAX_SAFE_INTEGER;
+        if (aPurposeRank !== bPurposeRank) return aPurposeRank - bPurposeRank;
+
+        const aCellIndex = cellIndexById.get(aCellId) ?? Number.MAX_SAFE_INTEGER;
+        const bCellIndex = cellIndexById.get(bCellId) ?? Number.MAX_SAFE_INTEGER;
+        if (aCellIndex !== bCellIndex) return aCellIndex - bCellIndex;
+
+        return a.cellId.localeCompare(b.cellId);
+      });
+  }, [cellSummaries, cellConfigs, validCellIds, bodyType]);
 
   const busbarSummaries = [];
 

@@ -11,14 +11,23 @@ import RusnMaterialsSummary from '@/components/bktp/rusn/RusnMaterialsSummary';
 import CellSectionToggler from '@/components/bktp/shared/CellSectionToggler';
 import { createCellByConfig } from '@/utils/autoCellUtils';
 import { autoCellConfigs } from '@/config/autoCellConfigs';
-import { RUSN_CAMERA, RUSN_CELL_PURPOSE, isVoltageTransformerCellPurpose } from '@/domain/rusn/rusnConstants';
+import { RUSN_CAMERA, isVoltageTransformerCellPurpose } from '@/domain/rusn/rusnConstants';
 
 const OUTGOING_CELL_PURPOSE = 'Отходящая';
-const isA17ZsshCell = (type: string, bodyType: string) =>
-  type === RUSN_CELL_PURPOSE.VOLTAGE_TRANSFORMER_ZSSH && bodyType === RUSN_CAMERA.KSO_A17_20;
 
 export default function RusnCellTable() {
-  const cellManager = useCellManager();
+  const [deletedCells, setDeletedCells] = useState<Set<string>>(() => {
+    if (typeof window !== 'undefined') {
+      const bodyType = useRusnStore.getState().global.bodyType;
+      if (bodyType) {
+        const saved = localStorage.getItem(`hiddenCells_${bodyType}`);
+        return saved ? new Set(JSON.parse(saved) as string[]) : new Set();
+      }
+    }
+    return new Set();
+  });
+
+  const cellManager = useCellManager({ hiddenCellPurposes: deletedCells });
   const { cellConfigs, addCell, updateCell, materials, global } = cellManager;
   const pruneCellSummaries = useRusnStore((s) => s.pruneCellSummaries);
   useMaterialUpdaterWithManager(cellManager); // Автоматически обновляет материалы
@@ -29,14 +38,18 @@ export default function RusnCellTable() {
   
   const [openCellMap, setOpenCellMap] = useState<Record<string, string>>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(`openCells_${global.bodyType}`);
+      const saved = localStorage.getItem(`openCells_${useRusnStore.getState().global.bodyType}`);
       return saved ? JSON.parse(saved) : {};
     }
     return {};
   });
-  const [deletedCells, setDeletedCells] = useState<Set<string>>(new Set());
   const [pendingCellType, setPendingCellType] = useState<string | null>(null);
   const { removeCellSummary, removeCell } = useRusnStore();
+
+  const persistHiddenCells = (hidden: Set<string>, bodyType = global.bodyType) => {
+    if (typeof window === 'undefined' || !bodyType) return;
+    localStorage.setItem(`hiddenCells_${bodyType}`, JSON.stringify([...hidden]));
+  };
   
   // Получаем правильные параметры для калькуляций
   const [selectedGroupSlug, setSelectedGroupSlug] = useState<string>(() => {
@@ -74,10 +87,11 @@ export default function RusnCellTable() {
       const newName = localStorage.getItem('selectedGroupName') || '';
       setSelectedGroupSlug(newSlug);
       setSelectedGroupName(newName);
-      
-      // При смене типа камеры очищаем состояние открытых ячеек
+
+      // При смене типа камеры восстанавливаем/очищаем состояние открытых ячеек
       setOpenCellMap({});
-      setDeletedCells(new Set());
+      const savedHidden = localStorage.getItem(`hiddenCells_${global.bodyType}`);
+      setDeletedCells(savedHidden ? new Set(JSON.parse(savedHidden) as string[]) : new Set());
     }
   }, [global.bodyType]);
 
@@ -117,17 +131,24 @@ export default function RusnCellTable() {
       global.rza
     ) {
       const newOpenCellMap: Record<string, string> = {};
-      
+
       // Проверяем, какие ячейки существуют и автоматически открываем их
-      cellConfigs.forEach(cell => {
+      cellConfigs.forEach((cell) => {
+        // Скрытые пользователем ячейки не поднимаем обратно
+        if (deletedCells.has(cell.purpose)) {
+          return;
+        }
+
         // Все ячейки КСО А12-10 раскрываются при наличии breaker и rza
-        if (cell.purpose === 'Секционный выключатель' || 
-            cell.purpose === 'Секционный разьединитель' ||
-            cell.purpose === 'Ввод' || 
-            cell.purpose === 'Трансформаторная' ||
-            cell.purpose === OUTGOING_CELL_PURPOSE ||
-            isVoltageTransformerCellPurpose(cell.purpose) ||
-            cell.purpose === 'Трансформатор собственных нужд') {
+        if (
+          cell.purpose === 'Секционный выключатель' ||
+          cell.purpose === 'Секционный разьединитель' ||
+          cell.purpose === 'Ввод' ||
+          cell.purpose === 'Трансформаторная' ||
+          cell.purpose === OUTGOING_CELL_PURPOSE ||
+          isVoltageTransformerCellPurpose(cell.purpose) ||
+          cell.purpose === 'Трансформатор собственных нужд'
+        ) {
           if (cell.purpose === OUTGOING_CELL_PURPOSE) {
             newOpenCellMap[OUTGOING_CELL_PURPOSE] = 'open';
           } else {
@@ -135,7 +156,7 @@ export default function RusnCellTable() {
           }
         }
       });
-      
+
       if (Object.keys(newOpenCellMap).length > 0) {
         setOpenCellMap((prev) => {
           const merged = { ...prev, ...newOpenCellMap };
@@ -146,7 +167,7 @@ export default function RusnCellTable() {
         });
       }
     }
-  }, [global.bodyType, global.breaker, global.rza, global.meterType, cellConfigs]);
+  }, [global.bodyType, global.breaker, global.rza, global.meterType, cellConfigs, deletedCells]);
 
   // Автоматически открываем ячейки для КСО 366
   useEffect(() => {
@@ -180,6 +201,7 @@ export default function RusnCellTable() {
         setDeletedCells(prev => {
           const newSet = new Set(prev);
           newSet.delete(pendingCellType);
+          persistHiddenCells(newSet);
           return newSet;
         });
         setPendingCellType(null);
@@ -257,17 +279,15 @@ export default function RusnCellTable() {
     setDeletedCells((prev) => {
       const next = new Set(prev);
       next.delete(OUTGOING_CELL_PURPOSE);
+      persistHiddenCells(next);
       return next;
     });
   };
 
   const handleToggle = (type: string) => {
-    if (isA17ZsshCell(type, global.bodyType || '')) {
-      return;
-    }
-
     if (type === OUTGOING_CELL_PURPOSE) {
-      const isOpen = !!openCellMap[OUTGOING_CELL_PURPOSE];
+      const isOpen =
+        !!openCellMap[OUTGOING_CELL_PURPOSE] && !deletedCells.has(OUTGOING_CELL_PURPOSE);
 
       if (isOpen) {
         outgoingCells.forEach((cell) => {
@@ -279,7 +299,11 @@ export default function RusnCellTable() {
           delete newMap[OUTGOING_CELL_PURPOSE];
           return newMap;
         });
-        setDeletedCells((prev) => new Set([...prev, OUTGOING_CELL_PURPOSE]));
+        setDeletedCells((prev) => {
+          const next = new Set([...prev, OUTGOING_CELL_PURPOSE]);
+          persistHiddenCells(next);
+          return next;
+        });
         return;
       }
 
@@ -290,77 +314,76 @@ export default function RusnCellTable() {
       return;
     }
 
-    const isOpen = !!openCellMap[type];
-    const existingCell = cellConfigs.find(cell => cell.purpose === type);
-    
+    const existingCell = cellConfigs.find((cell) => cell.purpose === type);
+    const isOpen = !!openCellMap[type] && !deletedCells.has(type) && !!existingCell;
+
     if (isOpen) {
       // Закрываем ячейку и удаляем из стора
-      if (existingCell) {
-        // Удаляем ячейку из стора
-        removeCellSummary(existingCell.id);
-        removeCell(existingCell.id);
-        // Удаляем из openCellMap
-        setOpenCellMap(prev => {
-          const newMap = { ...prev };
-          delete newMap[type];
-          return newMap;
-        });
-        setDeletedCells(prev => new Set([...prev, type]));
-      }
-    } else {
-      // Создаем ячейку, если ее нет, или открываем существующую
-      if (!existingCell) {
-        const autoConfig = autoCellConfigs[type];
-        if (autoConfig) {
-          createCellByConfig(type, autoConfig, materials, global, addCell);
-          const createdCell = useRusnStore
-            .getState()
-            .cellConfigs.find((cell) => cell.purpose === type);
-          if (createdCell) {
-            setOpenCellMap((prev) => ({ ...prev, [type]: createdCell.id }));
-            setDeletedCells((prev) => {
-              const next = new Set(prev);
-              next.delete(type);
-              return next;
-            });
-          } else {
-            setPendingCellType(type);
-          }
-          return;
-        }
+      removeCellSummary(existingCell.id);
+      removeCell(existingCell.id);
+      setOpenCellMap((prev) => {
+        const newMap = { ...prev };
+        delete newMap[type];
+        return newMap;
+      });
+      setDeletedCells((prev) => {
+        const next = new Set([...prev, type]);
+        persistHiddenCells(next);
+        return next;
+      });
+      return;
+    }
 
-        // Для КСО 366 и "Секционный разъединитель" создаем ячейку с выбором типа
-        if (global.bodyType === 'Камера КСО 366' && type === 'Секционный разьединитель') {
-          const newCell = {
-            purpose: 'Секционный разьединитель',
-            cellType: '', // Пустой тип, чтобы не вызывать расчеты
-            count: 1,
-            totalPrice: 0,
-          };
-          addCell(newCell);
+    // Создаем ячейку, если ее нет, или открываем существующую
+    setDeletedCells((prev) => {
+      const next = new Set(prev);
+      next.delete(type);
+      persistHiddenCells(next);
+      return next;
+    });
+
+    if (!existingCell) {
+      const autoConfig = autoCellConfigs[type];
+      if (autoConfig) {
+        createCellByConfig(type, autoConfig, materials, global, addCell);
+        const createdCell = useRusnStore
+          .getState()
+          .cellConfigs.find((cell) => cell.purpose === type);
+        if (createdCell) {
+          setOpenCellMap((prev) => ({ ...prev, [type]: createdCell.id }));
+        } else {
           setPendingCellType(type);
-          return;
         }
-        
-        // Создаем новую ячейку
+        return;
+      }
+
+      // Для КСО 366 и "Секционный разъединитель" создаем ячейку с выбором типа
+      if (global.bodyType === 'Камера КСО 366' && type === 'Секционный разьединитель') {
         const newCell = {
-          purpose: type,
-          cellType: global.bodyType || '',
+          purpose: 'Секционный разьединитель',
+          cellType: '', // Пустой тип, чтобы не вызывать расчеты
           count: 1,
           totalPrice: 0,
         };
         addCell(newCell);
         setPendingCellType(type);
-      } else {
-        // Открываем существующую ячейку
-        setOpenCellMap(prev => ({ ...prev, [type]: existingCell.id }));
-        setDeletedCells(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(type);
-          return newSet;
-        });
+        return;
       }
+
+      // Создаем новую ячейку
+      const newCell = {
+        purpose: type,
+        cellType: global.bodyType || '',
+        count: 1,
+        totalPrice: 0,
+      };
+      addCell(newCell);
+      setPendingCellType(type);
+      return;
     }
+
+    // Открываем существующую ячейку
+    setOpenCellMap((prev) => ({ ...prev, [type]: existingCell.id }));
   };
 
   const handleAddOutgoing = () => {
@@ -418,8 +441,7 @@ export default function RusnCellTable() {
 
       {staticCellTypes.map((cellType) => {
         const existingCell = cellConfigs.find(cell => cell.purpose === cellType);
-        const isPermanentA17Zssh = isA17ZsshCell(cellType, global.bodyType || '');
-        const isOpen = isPermanentA17Zssh || !!openCellMap[cellType];
+        const isOpen = !!openCellMap[cellType];
         const isDeleted = deletedCells.has(cellType);
 
         // Отладочная информация для 8DJH
@@ -437,9 +459,7 @@ export default function RusnCellTable() {
             key={cellType}
             label={`Ячейка: ${cellType}`}
             toggled={isOpen && !isDeleted}
-            onToggle={isPermanentA17Zssh ? undefined : () => handleToggle(cellType)}
-            hideToggle={isPermanentA17Zssh}
-            defaultEnabled={isPermanentA17Zssh}
+            onToggle={() => handleToggle(cellType)}
           >
             {existingCell && (
               <RusnCell

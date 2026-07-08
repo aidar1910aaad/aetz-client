@@ -228,6 +228,8 @@ export default function RusnCell({
     cell.purpose,
     cell.breaker?.id,
     cell.breaker?.name,
+    cell.sr?.id,
+    cell.sr?.name,
     cell.rza?.id,
     cell.rza?.name,
     cell.transformerCurrent?.id,

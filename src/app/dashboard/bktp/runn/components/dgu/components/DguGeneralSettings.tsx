@@ -1,15 +1,21 @@
 import { useDguStore } from '@/store/useDguStore';
 import TogglerWithInput from '../../../TogglerWithInput';
-import {
-  calculateNominalCurrentForDgu,
-} from '../../../utils/runnDguMaterialFinder';
+import { formatAmount } from '@/utils/formatAmount';
 
 interface DguGeneralSettingsProps {
   nominalCurrent: number;
 }
 
+function parsePriceInput(value: string): number {
+  const digits = value.replace(/[^\d]/g, '');
+  if (!digits) return 0;
+  return Number(digits) || 0;
+}
+
 export default function DguGeneralSettings({ nominalCurrent }: DguGeneralSettingsProps) {
   const dgu = useDguStore();
+  const priceDisplay =
+    dgu.settings.price && dgu.settings.price > 0 ? formatAmount(dgu.settings.price) : '';
 
   return (
     <TogglerWithInput label="Общие настройки" defaultEnabled>
@@ -80,15 +86,13 @@ export default function DguGeneralSettings({ nominalCurrent }: DguGeneralSetting
             />
           </div>
 
-          <div className="flex flex-col gap-1 min-w-[120px]">
+          <div className="flex flex-col gap-1 min-w-[140px]">
             <span className="text-xs font-medium text-[#3A55DF]">Цена (₸)</span>
             <input
-              type="number"
-              min={0}
-              value={dgu.settings.price || ''}
-              onChange={(e) =>
-                dgu.setSettings({ price: Number(e.target.value) || 0 })
-              }
+              type="text"
+              inputMode="numeric"
+              value={priceDisplay}
+              onChange={(e) => dgu.setSettings({ price: parsePriceInput(e.target.value) })}
               className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#3A55DF]"
               placeholder="0"
             />

@@ -73,9 +73,9 @@ export default function BreakerCalculation({
       : 0;
     selectedMaterialsTotal = puMaterialTotal;
   } else if (isDisconnectorCell) {
-    // Для разъединителя показываем только разъединитель
-    const disconnectorMaterialTotal = cell.breaker
-      ? Number(materials.sr.find((m) => m.id.toString() === cell.breaker?.id)?.price || 0)
+    // Для разъединителя показываем только разъединитель (выбор хранится в cell.sr)
+    const disconnectorMaterialTotal = cell.sr
+      ? Number(materials.sr.find((m) => m.id.toString() === cell.sr?.id)?.price || 0)
       : 0;
     selectedMaterialsTotal = disconnectorMaterialTotal;
   } else if (isTsnCell) {

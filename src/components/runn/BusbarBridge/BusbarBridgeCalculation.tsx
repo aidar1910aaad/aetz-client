@@ -12,7 +12,7 @@ import { api } from '@/api/baseUrl';
 interface BusbarBridge {
   id: string;
   name: string;
-  length: number; // в метрах
+  length: number;
   quantity: number; // количество мостов
   width: number; // ширина
   pairedId?: string; // ID связанного моста (для связи 0.4 с N)
@@ -32,13 +32,13 @@ export const BusbarBridgeCalculation: React.FC = () => {
   }>({ aluminum: 2800, copper: 5600 }); // Значения по умолчанию
   const [busbarCalculationFromApi, setBusbarCalculationFromApi] = useState<any>(null);
 
-  // Получаем weight multiplier из конфигурации для обычных мостов
+  // Получаем расход в кг/шт из конфигурации для обычных мостов
   const bridgeCell = matchingConfig?.cells?.find(cell => cell.name === 'Шинный мост');
-  const bridgeWeightMultiplier = bridgeCell?.quantity || 1; // Из API, например 3.4
+  const bridgeWeightPerPiece = bridgeCell?.quantity || 0;
   
-  // Получаем weight multiplier для нулевых мостов
+  // Получаем расход в кг/шт для нулевых мостов
   const zeroBridgeCell = zeroMatchingConfig?.cells?.find(cell => cell.name === 'Шинный мост');
-  const zeroBridgeWeightMultiplier = zeroBridgeCell?.quantity || 1; // Из API
+  const zeroBridgeWeightPerPiece = zeroBridgeCell?.quantity || 0;
   
   // Получаем цену за кг из API материалов
   // Определяем материал на основе конфигурации, а не трансформатора
@@ -187,104 +187,8 @@ export const BusbarBridgeCalculation: React.FC = () => {
 
   // Убираем автоматическую синхронизацию - будем обновлять store только при изменении мостов
 
-  // Функция для получения множителя из группы для обычных мостов
-  const getGroupMultiplier = () => {
-    const group = matchingConfig?.group || '';
-    const match = group.match(/(АД|МТ)(\d)/);
-    if (match) {
-      return parseInt(match[2]);
-    }
-    // Fallback: если группа без числа, возвращаем 1
-    return 1;
-  };
-
-  // Функция для получения множителя из группы для нулевых мостов
-  const getZeroGroupMultiplier = () => {
-    const group = zeroMatchingConfig?.group || '';
-    const match = group.match(/(АД|МТ)(\d)/);
-    if (match) {
-      return parseInt(match[2]);
-    }
-    // Fallback: если группа без числа, возвращаем 1
-    return 1;
-  };
-
-  // Функция для получения расчетной длины
-  const getCalculatedLength = (bridge: BusbarBridge) => {
-    if (bridge.name.includes('Шинный мост N')) {
-      // Для мостов N (нулевых шин): (длина + 5) × множитель группы из zeroMatchingConfig × quantity
-      const baseResult = bridge.length + 5;
-      const groupMultiplier = getZeroGroupMultiplier(); // Используем множитель из zeroMatchingConfig
-      // Умножаем на множитель группы (из АД1/АД2/МТ1/МТ2) и на quantity
-      return baseResult * groupMultiplier * zeroBridgeWeightMultiplier;
-    }
-    // Для обычных мостов: сначала применяем формулу ((длина + 2) × 1.3) × 3
-    const formulaResult = ((bridge.length + 2) * 1.3) * 3;
-    // Затем умножаем на множитель из группы
-    const groupMultiplier = getGroupMultiplier();
-    // И на вес multiplier из API
-    return formulaResult * groupMultiplier * bridgeWeightMultiplier;
-  };
-
-  // Функция для получения базовой формулы (без множителей)
-  const getBaseFormula = (bridge: BusbarBridge) => {
-    // Для всех мостов применяем формулу ((длина + 2) × 1.3) × 3
-    // Это промежуточный результат для обычных мостов
-    return ((bridge.length + 2) * 1.3) * 3;
-  };
-
-  // Функция для получения базовой формулы мостов N
-  const getBaseFormulaN = (bridge: BusbarBridge) => {
-    if (bridge.name.includes('Шинный мост N')) {
-      // Для мостов N (нулевых шин): длина + 5
-      return bridge.length + 5;
-    }
-    return 0;
-  };
-
-  // Функция для получения group multiplier части
-  const getGroupMultipliedLength = (bridge: BusbarBridge) => {
-    if (bridge.name.includes('Шинный мост N')) {
-      // Для мостов N: (длина + 5) × множитель группы из zeroMatchingConfig
-      const baseResult = bridge.length + 5;
-      const groupMultiplier = getZeroGroupMultiplier();
-      return baseResult * groupMultiplier;
-    }
-    const baseFormula = getBaseFormula(bridge);
-    const groupMultiplier = getGroupMultiplier();
-    return baseFormula * groupMultiplier;
-  };
-
-  // Функция для получения текущего weight multiplier
-  const getCurrentWeightMultiplier = (bridge: BusbarBridge) => {
-    if (bridge.name.includes('Шинный мост N')) {
-      return zeroBridgeWeightMultiplier;
-    }
-    return bridgeWeightMultiplier;
-  };
-
-  // Функция для получения веса на метр в зависимости от типа моста
-  const getBridgeWeightPerMeter = (bridgeName: string) => {
-    if (bridgeName.includes('Шинный мост N')) {
-      // Если конфигурации еще не загружены, возвращаем fallback значение
-      if (switchgearConfigs.length === 0) {
-        return 4;
-      }
-      
-      // Для мостов типа N ищем конфигурацию "Панель ЩО-70N"
-      const nConfig = switchgearConfigs.find(config => 
-        config.type === 'Панель ЩО-70N' && 
-        config.group === (selectedTransformer?.busbars === 'Медь' ? 'МТ' : 'АД')
-      );
-      
-      if (nConfig) {
-        // Для мостов N используем фиксированный вес 4 кг/м
-        return 4;
-      }
-      return 4; // Fallback значение
-    }
-    return 8; // Фиксированный вес для мостов 0.4
-  };
+  const getWeightPerPiece = (bridge: BusbarBridge) =>
+    bridge.name.includes('Шинный мост N') ? zeroBridgeWeightPerPiece : bridgeWeightPerPiece;
 
   // Добавить новый шинный мост
   const addBridge = () => {
@@ -295,7 +199,7 @@ export const BusbarBridgeCalculation: React.FC = () => {
     const newBridge04: BusbarBridge = {
       id: `bridge-${timestamp}`,
       name: `Шинный мост 0.4 #${bridgePairNumber}`,
-      length: 1.0,
+      length: 0,
       quantity: 1,
       width: 0,
       pairedId: `bridge-n-${timestamp}` // Связываем с мостом N
@@ -304,7 +208,7 @@ export const BusbarBridgeCalculation: React.FC = () => {
     const newBridgeN: BusbarBridge = {
       id: `bridge-n-${timestamp}`,
       name: `Шинный мост N #${bridgePairNumber}`,
-      length: 1.0,
+      length: 0,
       quantity: 1,
       width: 0,
       pairedId: `bridge-${timestamp}` // Связываем с мостом 0.4
@@ -321,7 +225,7 @@ export const BusbarBridgeCalculation: React.FC = () => {
     const newBridge: BusbarBridge = {
       id: `bridge-n-${Date.now()}`,
       name: `Шинный мост N #${bridgePairNumber}`,
-      length: 1.0,
+      length: 0,
       quantity: 1,
       width: 0
     };
@@ -370,26 +274,6 @@ export const BusbarBridgeCalculation: React.FC = () => {
     runn.setBusBridges(renumberedBridges);
   };
 
-  // Обновить длину моста
-  const updateBridgeLength = (id: string, length: number) => {
-    const bridge = bridges.find(b => b.id === id);
-    
-    const updatedBridges = bridges.map(b => {
-      // Обновляем текущий мост
-      if (b.id === id) {
-        return { ...b, length };
-      }
-      // Если у моста есть связанный мост, синхронизируем длину
-      if (bridge?.pairedId && b.id === bridge.pairedId) {
-        return { ...b, length };
-      }
-      return b;
-    });
-    
-    setBridges(updatedBridges);
-    runn.setBusBridges(updatedBridges);
-  };
-
   // Обновить количество мостов
   const updateBridgeQuantity = (id: string, quantity: number) => {
     const bridge = bridges.find(b => b.id === id);
@@ -420,9 +304,7 @@ export const BusbarBridgeCalculation: React.FC = () => {
   // Рассчитать общий вес и стоимость
   const calculateTotalWeight = () => {
     return bridges.reduce((total, bridge) => {
-      const calculatedLength = getCalculatedLength(bridge);
-      // Расчетная длина уже в килограммах, умножаем только на количество
-      return total + (calculatedLength * bridge.quantity);
+      return total + getWeightPerPiece(bridge) * bridge.quantity;
     }, 0);
   };
 
@@ -449,9 +331,8 @@ export const BusbarBridgeCalculation: React.FC = () => {
     );
 
     // Рассчитываем стоимость конкретного моста
-    const calculatedLength = getCalculatedLength(bridge);
-    // Расчетная длина уже в килограммах
-    const bridgeMaterialCost = calculatedLength * bridge.quantity * pricePerKg;
+    const calculatedWeight = getWeightPerPiece(bridge);
+    const bridgeMaterialCost = calculatedWeight * bridge.quantity * pricePerKg;
 
     // Общая стоимость материалов = стоимость моста + дополнительные материалы
     const totalMaterialsCost = bridgeMaterialCost + (additionalMaterialsCost * bridge.quantity);
@@ -486,17 +367,17 @@ export const BusbarBridgeCalculation: React.FC = () => {
   // Рассчитываем данные для пары мостов как одной калькуляции
   const calculateBridgePairPrice = (primaryBridge, pairedBridge) => {
     if (!busbarCalculationFromApi) {
-      const primaryLength = getCalculatedLength(primaryBridge);
-      const pairedLength = getCalculatedLength(pairedBridge);
-      const totalCost = (primaryLength + pairedLength) * pricePerKg;
+      const primaryWeight = getWeightPerPiece(primaryBridge);
+      const pairedWeight = getWeightPerPiece(pairedBridge);
+      const totalCost = (primaryWeight + pairedWeight) * pricePerKg;
       return { totalWithNds: totalCost };
     }
 
     const calculationData = busbarCalculationFromApi.data.calculation;
     if (!calculationData) {
-      const primaryLength = getCalculatedLength(primaryBridge);
-      const pairedLength = getCalculatedLength(pairedBridge);
-      const totalCost = (primaryLength + pairedLength) * pricePerKg;
+      const primaryWeight = getWeightPerPiece(primaryBridge);
+      const pairedWeight = getWeightPerPiece(pairedBridge);
+      const totalCost = (primaryWeight + pairedWeight) * pricePerKg;
       return { totalWithNds: totalCost };
     }
 
@@ -512,10 +393,10 @@ export const BusbarBridgeCalculation: React.FC = () => {
     );
 
     // Материалы для обоих мостов
-    const primaryLength = getCalculatedLength(primaryBridge);
-    const pairedLength = getCalculatedLength(pairedBridge);
-    const primaryMaterialCost = primaryLength * primaryBridge.quantity * pricePerKg;
-    const pairedMaterialCost = pairedLength * pairedBridge.quantity * pricePerKg;
+    const primaryWeight = getWeightPerPiece(primaryBridge);
+    const pairedWeight = getWeightPerPiece(pairedBridge);
+    const primaryMaterialCost = primaryWeight * primaryBridge.quantity * pricePerKg;
+    const pairedMaterialCost = pairedWeight * pairedBridge.quantity * pricePerKg;
     const totalBridgeMaterialCost = primaryMaterialCost + pairedMaterialCost;
 
     // Общая стоимость материалов (мосты + дополнительные материалы только один раз)
@@ -535,8 +416,8 @@ export const BusbarBridgeCalculation: React.FC = () => {
     return {
       primaryMaterialsTotal: primaryMaterialCost,
       pairedMaterialsTotal: pairedMaterialCost,
-      primaryWeight: primaryLength,
-      pairedWeight: pairedLength,
+      primaryWeight,
+      pairedWeight,
       additionalMaterialsCost,
       totalMaterialsCost,
       salary: totalSalary,
@@ -583,7 +464,7 @@ export const BusbarBridgeCalculation: React.FC = () => {
           </div>
           <div>
             <h3 className="text-base font-semibold text-gray-900">Шинные мосты</h3>
-            <p className="text-sm text-gray-500">Пары 0,4 кВ + N, расчёт по длине</p>
+            <p className="text-sm text-gray-500">Пары 0,4 кВ + N, расчёт по количеству и кг/шт</p>
           </div>
           {matchingConfig && (
             <span className="hidden rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 sm:inline">
@@ -637,7 +518,7 @@ export const BusbarBridgeCalculation: React.FC = () => {
           ) : (
             <div className="space-y-3">
               <div className="rounded-xl border border-gray-200 bg-white p-3">
-                <h5 className="mb-2 text-sm font-medium text-gray-800">Множитель группы</h5>
+                <h5 className="mb-2 text-sm font-medium text-gray-800">Расход из таблицы</h5>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                   <div>
                     <span className="text-gray-600">Группа:</span>
@@ -645,11 +526,9 @@ export const BusbarBridgeCalculation: React.FC = () => {
                     <div className="text-xs text-gray-500">Из конфигурации {matchingConfig?.type}</div>
                   </div>
                   <div>
-                    <span className="text-gray-600">Множитель:</span>
-                    <div className="font-semibold text-gray-900">×{getGroupMultiplier()}</div>
-                    <div className="text-xs text-gray-500">
-                      Формула: ((длина + 2) × 1.3) × 3 × множитель группы
-                    </div>
+                    <span className="text-gray-600">Шинный мост 0,4 кВ:</span>
+                    <div className="font-semibold text-gray-900">{bridgeWeightPerPiece} кг/шт</div>
+                    <div className="text-xs text-gray-500">Берётся напрямую из таблицы конфигурации</div>
                   </div>
                 </div>
               </div>
@@ -658,8 +537,8 @@ export const BusbarBridgeCalculation: React.FC = () => {
                 <h5 className="mb-2 text-sm font-medium text-gray-800">Шинные мосты 0,4 кВ</h5>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                   <div>
-                    <span className="text-gray-600">Коэффициент веса (quantity):</span>
-                    <div className="font-semibold text-gray-900">{bridgeWeightMultiplier}</div>
+                    <span className="text-gray-600">Расход:</span>
+                    <div className="font-semibold text-gray-900">{bridgeWeightPerPiece} кг/шт</div>
                     <div className="text-xs text-gray-500">Из конфигурации API</div>
                   </div>
                   <div>
@@ -676,9 +555,9 @@ export const BusbarBridgeCalculation: React.FC = () => {
                 <h5 className="mb-2 text-sm font-medium text-gray-800">Шинные мосты N</h5>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                   <div>
-                    <span className="text-gray-600">Вес на метр:</span>
-                    <div className="font-semibold text-gray-900">4 кг/м</div>
-                    <div className="text-xs text-gray-500">Фиксированное значение</div>
+                    <span className="text-gray-600">Расход:</span>
+                    <div className="font-semibold text-gray-900">{zeroBridgeWeightPerPiece} кг/шт</div>
+                    <div className="text-xs text-gray-500">Из конфигурации API</div>
                   </div>
                   <div>
                     <span className="text-gray-600">Цена за кг:</span>
@@ -760,19 +639,13 @@ export const BusbarBridgeCalculation: React.FC = () => {
                     )}
                   </div>
                   
-                  {/* Параметры (длина и количество - одинаковые для обеих) */}
+                  {/* Параметры количества */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Длина (м)</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0.1"
-                        value={primary.length}
-                        onChange={(e) => updateBridgeLength(primary.id, parseFloat(e.target.value) || 0.1)}
-                        disabled={!isEditing}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-[#8eba1e] focus:ring-2 focus:ring-[#8eba1e]/20 disabled:bg-gray-100"
-                      />
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Расход из таблицы</label>
+                      <div className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-gray-900">
+                        0,4 кВ: {getWeightPerPiece(primary)} кг/шт{paired ? `, N: ${getWeightPerPiece(paired)} кг/шт` : ''}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Количество</label>
@@ -794,24 +667,18 @@ export const BusbarBridgeCalculation: React.FC = () => {
                       <h6 className="mb-2 text-sm font-semibold text-gray-900">Мост 0,4 кВ</h6>
                       <div className="text-sm text-gray-600 space-y-1">
                         <div className="flex justify-between">
-                          <span>Введенная длина:</span>
-                          <span className="font-medium">{primary.length} м</span>
+                            <span>Расход:</span>
+                            <span className="font-medium">{getWeightPerPiece(primary).toFixed(2)} кг/шт</span>
                         </div>
                         <div className="flex justify-between">
-                          <span>Базовая формула:</span>
-                          <span className="font-medium">{getBaseFormula(primary).toFixed(2)} кг</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>× Коэфф. группы:</span>
-                          <span className="font-medium">×{getGroupMultiplier()} = {getGroupMultipliedLength(primary).toFixed(2)} кг</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>× Коэфф. веса:</span>
-                          <span className="font-medium">×{getCurrentWeightMultiplier(primary)} = {getCalculatedLength(primary).toFixed(2)} кг</span>
+                            <span>Количество:</span>
+                            <span className="font-medium">{primary.quantity} шт</span>
                         </div>
                         <div className="flex justify-between border-t border-gray-100 pt-1">
-                          <span>Итого (кг):</span>
-                          <span className="font-bold text-[#8eba1e]">{getCalculatedLength(primary).toFixed(2)} кг</span>
+                            <span>Итого (кг):</span>
+                            <span className="font-bold text-[#8eba1e]">
+                              {(getWeightPerPiece(primary) * primary.quantity).toFixed(2)} кг
+                            </span>
                         </div>
                       </div>
                     </div>
@@ -822,24 +689,18 @@ export const BusbarBridgeCalculation: React.FC = () => {
                         <h6 className="mb-2 text-sm font-semibold text-gray-900">Мост N</h6>
                         <div className="text-sm text-gray-600 space-y-1">
                           <div className="flex justify-between">
-                            <span>Введенная длина:</span>
-                            <span className="font-medium">{paired.length} м</span>
+                            <span>Расход:</span>
+                            <span className="font-medium">{getWeightPerPiece(paired).toFixed(2)} кг/шт</span>
                           </div>
                           <div className="flex justify-between">
-                            <span>Базовая формула:</span>
-                            <span className="font-medium">{paired.length} + 5 = {getBaseFormulaN(paired).toFixed(2)} м</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>× Коэфф. группы:</span>
-                            <span className="font-medium">×{getZeroGroupMultiplier()} = {getGroupMultipliedLength(paired).toFixed(2)} кг</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>× Коэфф. веса:</span>
-                            <span className="font-medium">×{zeroBridgeWeightMultiplier} = {getCalculatedLength(paired).toFixed(2)} кг</span>
+                            <span>Количество:</span>
+                            <span className="font-medium">{paired.quantity} шт</span>
                           </div>
                           <div className="flex justify-between border-t border-gray-100 pt-1">
                             <span>Итого (кг):</span>
-                            <span className="font-bold text-[#8eba1e]">{getCalculatedLength(paired).toFixed(2)} кг</span>
+                            <span className="font-bold text-[#8eba1e]">
+                              {(getWeightPerPiece(paired) * paired.quantity).toFixed(2)} кг
+                            </span>
                           </div>
                         </div>
                       </div>

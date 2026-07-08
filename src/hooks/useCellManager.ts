@@ -6,8 +6,14 @@ import { createCellByConfig } from '@/utils/autoCellUtils';
 import { autoCellConfigs } from '@/config/autoCellConfigs';
 import { RUSN_CAMERA, RUSN_CELL_PURPOSE } from '@/domain/rusn/rusnConstants';
 
+type UseCellManagerOptions = {
+  /** Cell purposes the user intentionally hid — do not auto-create them again */
+  hiddenCellPurposes?: Set<string>;
+};
+
 // Единый хук для управления ячейками
-export const useCellManager = () => {
+export const useCellManager = (options: UseCellManagerOptions = {}) => {
+  const { hiddenCellPurposes } = options;
   const { cellConfigs, addCell, updateCell, clearAllCells, global } = useRusnStore();
   const { materials, loading: materialsLoading } = useRusnMaterials();
   const prevBodyTypeRef = useRef<string | null>(null);
@@ -153,6 +159,10 @@ export const useCellManager = () => {
             return;
           }
 
+          if (hiddenCellPurposes?.has(cellType)) {
+            return;
+          }
+
           const existingCell = cellConfigs.find(cell => cell.purpose === cellType);
           
           if (!existingCell) {
@@ -180,7 +190,7 @@ export const useCellManager = () => {
       }
       // Для КСО 366 ячейки НЕ создаются автоматически - только по кнопке "Добавить"
     }
-  }, [materialsLoading, global.breaker, global.rza, global.meterType, global.bodyType, materials, cellConfigs, addCell]);
+  }, [materialsLoading, global.breaker, global.rza, global.meterType, global.bodyType, materials, cellConfigs, addCell, hiddenCellPurposes]);
 
   // Очистка материалов для КСО 366
   useEffect(() => {

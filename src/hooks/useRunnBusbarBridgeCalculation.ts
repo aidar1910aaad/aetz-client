@@ -81,55 +81,6 @@ export const useRunnBusbarBridgeCalculation = () => {
     }
   };
 
-  // Функция для получения веса на метр
-  const getBridgeWeightPerMeter = (bridgeName: string, switchgearConfigs: Switchgear[]) => {
-    
-    if (bridgeName.includes('Шинный мост N')) {
-      // Для мостов типа N ищем конфигурацию "Панель ЩО-70N"
-      const nConfig = switchgearConfigs.find(config =>
-        config.type === 'Панель ЩО-70N' &&
-        config.group === (selectedTransformer?.busbars === 'Медь' ? 'МТ' : 'АД')
-      );
-      
-      if (nConfig) {
-        const nBridgeCell = nConfig.cells?.find(cell => cell.name === 'Шинный мост');
-        const weight = nBridgeCell?.quantity || 4;
-        return weight;
-      }
-      return 4;
-    } else {
-      // Для обычных мостов ищем конфигурацию "Панель ЩО-70" по мощности трансформатора
-      const transformerPower = selectedTransformer?.power;
-      const config = transformerPower
-        ? switchgearConfigs.find((config) => {
-            const possibleGroups = selectedTransformer?.busbars === 'Медь' ? ['МТ', 'МТ2'] : ['АД', 'АД2'];
-            return (
-              config.type === 'Панель ЩО-70' &&
-              config.breaker === transformerPower.toString() &&
-              possibleGroups.includes(config.group)
-            );
-          })
-        : null;
-
-      if (config) {
-        const bridgeCell = config.cells?.find(cell => cell.name === 'Шинный мост');
-        const weight = bridgeCell?.quantity || 8; // Fallback для мостов 0.4
-        return weight;
-      }
-      return 8; // Fallback для мостов 0.4
-    }
-  };
-
-  // Функция для получения множителя из группы
-  const getGroupMultiplier = (matchingConfig: any) => {
-    const group = matchingConfig?.group || '';
-    const match = group.match(/(АД|МТ)(\d)/);
-    if (match) {
-      return parseInt(match[2]);
-    }
-    return 1;
-  };
-
   // Функция для расчета стоимости пары мостов как одной калькуляции
   const calculateBridgePairCost = async (primaryBridge: any, pairedBridge: any, materialPrices: any, busbarCalculation: any) => {
     if (!busbarCalculation) return 0;
@@ -138,7 +89,7 @@ export const useRunnBusbarBridgeCalculation = () => {
     const materialType = selectedTransformer?.busbars === 'Медь' ? 'copper' : 'aluminum';
     const pricePerKg = materialPrices[materialType];
 
-    // Получаем matchingConfig для определения группы
+    // Получаем конфигурации, где quantity для "Шинный мост" теперь трактуется как кг/шт
     const switchgearConfigs = await switchgearApi.getAll();
     const transformerPower = selectedTransformer?.power;
     const matchingConfig = transformerPower
@@ -163,41 +114,15 @@ export const useRunnBusbarBridgeCalculation = () => {
       possibleZeroGroups.includes(config.group)
     );
 
-    // Функции для получения множителей
-    const getGroupMultiplier = (matchingConfig: any) => {
-      const group = matchingConfig?.group || '';
-      const match = group.match(/(АД|МТ)(\d)/);
-      if (match) return parseInt(match[2]);
-      return 1;
-    };
-
-    const getZeroGroupMultiplier = (zeroConfig: any) => {
-      const group = zeroConfig?.group || '';
-      const match = group.match(/(АД|МТ)(\d)/);
-      if (match) return parseInt(match[2]);
-      return 1;
-    };
-
     const bridgeCell = matchingConfig?.cells?.find((cell: any) => cell.name === 'Шинный мост');
-    const bridgeWeightMultiplier = bridgeCell?.quantity || 1;
+    const primaryWeightPerPiece = bridgeCell?.quantity || 0;
 
     const zeroBridgeCell = zeroBusbarConfig?.cells?.find((cell: any) => cell.name === 'Шинный мост');
-    const zeroBridgeWeightMultiplier = zeroBridgeCell?.quantity || 1;
-
-    // Рассчитываем длины для обоих мостов
-    // Мост 0.4
-    const formulaResult = ((primaryBridge.length + 2) * 1.3) * 3;
-    const groupMultiplier = getGroupMultiplier(matchingConfig);
-    const primaryCalculatedLength = formulaResult * groupMultiplier * bridgeWeightMultiplier;
-
-    // Мост N
-    const baseResult = pairedBridge.length + 5;
-    const zeroGroupMultiplier = getZeroGroupMultiplier(zeroBusbarConfig);
-    const pairedCalculatedLength = baseResult * zeroGroupMultiplier * zeroBridgeWeightMultiplier;
+    const pairedWeightPerPiece = zeroBridgeCell?.quantity || 0;
 
     // Материалы для обоих мостов
-    const primaryMaterialCost = primaryCalculatedLength * primaryBridge.quantity * pricePerKg;
-    const pairedMaterialCost = pairedCalculatedLength * pairedBridge.quantity * pricePerKg;
+    const primaryMaterialCost = primaryWeightPerPiece * primaryBridge.quantity * pricePerKg;
+    const pairedMaterialCost = pairedWeightPerPiece * pairedBridge.quantity * pricePerKg;
     const totalBridgeMaterialCost = primaryMaterialCost + pairedMaterialCost;
 
     // Дополнительные материалы из калькуляции (только один раз!)
@@ -256,7 +181,7 @@ export const useRunnBusbarBridgeCalculation = () => {
     const materialType = selectedTransformer?.busbars === 'Медь' ? 'copper' : 'aluminum';
     const pricePerKg = materialPrices[materialType];
 
-    // Получаем matchingConfig для определения группы
+    // Получаем конфигурации, где quantity для "Шинный мост" трактуется как кг/шт
     const switchgearConfigs = await switchgearApi.getAll();
     const transformerPower = selectedTransformer?.power;
     const matchingConfig = transformerPower
@@ -281,44 +206,17 @@ export const useRunnBusbarBridgeCalculation = () => {
       possibleZeroGroups.includes(config.group)
     );
 
-    // Функция для получения множителя из группы zero config
-    const getZeroGroupMultiplier = (zeroConfig: any) => {
-      const group = zeroConfig?.group || '';
-      const match = group.match(/(АД|МТ)(\d)/);
-      if (match) {
-        return parseInt(match[2]);
-      }
-      // Если группа без числа (например "АД"), возвращаем 1
-      return 1;
-    };
-
-    // Получаем weight multiplier из конфигурации для обычных мостов
+    // Получаем расход в кг/шт из конфигурации
     const bridgeCell = matchingConfig?.cells?.find((cell: any) => cell.name === 'Шинный мост');
-    const bridgeWeightMultiplier = bridgeCell?.quantity || 1;
+    const primaryWeightPerPiece = bridgeCell?.quantity || 0;
 
-    // Получаем weight multiplier для нулевых мостов из zeroBusbarConfig
     const zeroBridgeCell = zeroBusbarConfig?.cells?.find((cell: any) => cell.name === 'Шинный мост');
-    const zeroBridgeWeightMultiplier = zeroBridgeCell?.quantity || 1;
+    const calculatedWeight = bridge.name.includes('Шинный мост N')
+      ? zeroBridgeCell?.quantity || 0
+      : primaryWeightPerPiece;
 
-    // Рассчитываем длину с учетом множителя группы и weight multiplier
-    let calculatedLength;
-    
-    if (bridge.name.includes('Шинный мост N')) {
-      // Для мостов N (нулевых шин): (длина + 5) × множитель группы из zeroBusbarConfig × quantity
-      const baseResult = bridge.length + 5;
-      const groupMultiplier = getZeroGroupMultiplier(zeroBusbarConfig);
-      calculatedLength = baseResult * groupMultiplier * zeroBridgeWeightMultiplier;
-    } else {
-      // Для обычных мостов применяем формулу ((длина + 2) × 1.3) × 3
-      const formulaResult = ((bridge.length + 2) * 1.3) * 3;
-      // Затем умножаем на множитель из группы
-      const groupMultiplier = getGroupMultiplier(matchingConfig);
-      // И на weight multiplier из API
-      calculatedLength = formulaResult * groupMultiplier * bridgeWeightMultiplier;
-    }
-
-    // Стоимость материалов моста (calculatedLength уже в кг)
-    const bridgeMaterialCost = calculatedLength * bridge.quantity * pricePerKg;
+    // Стоимость материалов моста
+    const bridgeMaterialCost = calculatedWeight * bridge.quantity * pricePerKg;
 
     // Дополнительные материалы из калькуляции
     const additionalMaterialsCost = busbarCalculation.data.categories.reduce(

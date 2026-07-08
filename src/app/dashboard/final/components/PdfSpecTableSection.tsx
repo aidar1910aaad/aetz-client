@@ -127,12 +127,8 @@ export function PdfSpecTableSection({
         <Text style={[styles.tableCellQuantity, styles.totalCell]}>Кол-во</Text>
         {showPrices && (
           <>
-            <Text style={[styles.tableCellPrice, styles.totalCell]}>
-              {'Цена за ед.,\nв тенге, без НДС'}
-            </Text>
-            <Text style={[styles.tableCellTotal, styles.totalCell]}>
-              {'Сумма, в тенге,\nбез НДС'}
-            </Text>
+            <Text style={[styles.tableCellPrice, styles.totalCell]}>Цена</Text>
+            <Text style={[styles.tableCellTotal, styles.totalCell]}>Сумма</Text>
           </>
         )}
       </View>

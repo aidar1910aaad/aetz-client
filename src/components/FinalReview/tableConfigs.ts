@@ -15,6 +15,8 @@ import {
   isUst04CalculationName,
   type BusbarMaterialPrices,
 } from '@/utils/busbarUstCost';
+import { getCellTypesForGroup } from '@/config/cellTypeConfigs';
+import { resolveSummaryToCellId } from '@/domain/rusn/cellSummary';
 
 // Общие колонки для всех таблиц
 // Ширины: Номер (5%) + Наименование (60%) + Ед. изм. (5%) + Кол-во (5%) + Цена (12.5%) + Сумма (12.5%) = 100%
@@ -316,84 +318,109 @@ export const worksTableConfig: TableConfig = {
   showTotal: true,
 };
 
+function getRusnPageCellPurposeOrder(bodyType?: string): string[] {
+  const cellTypes = getCellTypesForGroup(bodyType || 'Камера КСО А12-10');
+  const staticTypes = cellTypes.filter((type) => type !== 'Отходящая');
+  return cellTypes.includes('Отходящая') ? [...staticTypes, 'Отходящая'] : staticTypes;
+}
+
+function sortRusnSummariesByPageOrder(
+  cellSummaries: RusnState['cellSummaries'],
+  cellConfigs: RusnState['cellConfigs'],
+  bodyType?: string
+) {
+  const purposeOrder = getRusnPageCellPurposeOrder(bodyType);
+  const purposeRank = new Map(purposeOrder.map((purpose, index) => [purpose, index]));
+  const cellIndexById = new Map(cellConfigs.map((cell, index) => [cell.id, index]));
+  const cellById = new Map(cellConfigs.map((cell) => [cell.id, cell]));
+
+  return [...cellSummaries].sort((a, b) => {
+    const aCellId = resolveSummaryToCellId(a.cellId);
+    const bCellId = resolveSummaryToCellId(b.cellId);
+    const aCell = cellById.get(aCellId);
+    const bCell = cellById.get(bCellId);
+
+    const aPurposeRank = purposeRank.get(aCell?.purpose || '') ?? Number.MAX_SAFE_INTEGER;
+    const bPurposeRank = purposeRank.get(bCell?.purpose || '') ?? Number.MAX_SAFE_INTEGER;
+    if (aPurposeRank !== bPurposeRank) return aPurposeRank - bPurposeRank;
+
+    const aCellIndex = cellIndexById.get(aCellId) ?? Number.MAX_SAFE_INTEGER;
+    const bCellIndex = cellIndexById.get(bCellId) ?? Number.MAX_SAFE_INTEGER;
+    if (aCellIndex !== bCellIndex) return aCellIndex - bCellIndex;
+
+    return a.cellId.localeCompare(b.cellId);
+  });
+}
+
 // Конфигурация для РУСН
 export const rusnTableConfig: TableConfig = {
   id: 'rusn',
   title: 'РУ-10кВ',
   columns: commonColumns,
   dataMapper: (rusnData: RusnState) => {
-    const { cellConfigs, cellSummaries, busbarSummary, busBridgeSummary, busBridgeSummaries } = rusnData;
+    const {
+      cellConfigs,
+      cellSummaries,
+      busbarSummary,
+      busBridgeSummary,
+      busBridgeSummaries,
+      global,
+    } = rusnData;
     const rows = [];
     let rowNumber = 1;
+    const bodyType = global?.bodyType;
 
-    // Приоритет: cellSummaries, fallback к cellConfigs
+    // Приоритет: cellSummaries, fallback к cellConfigs (порядок как секции на странице РУСН)
     if (cellSummaries && cellSummaries.length > 0) {
-      // Используем готовые summary данные
-      cellSummaries.forEach((cellSummary) => {
-        rows.push({
-          id: `cell-${rowNumber++}`,
-          name: cellSummary.name,
-          unit: 'шт',
-          quantity: cellSummary.quantity,
-          price: cellSummary.pricePerUnit,
-          total: cellSummary.totalPrice,
-        });
-      });
-          } else if (cellConfigs && cellConfigs.length > 0) {
-            // Fallback: используем данные из cellConfigs
-            cellConfigs.forEach((cell: any) => {
-              // Вычисляем totalPrice из компонентов ячейки, если нет готового значения
-              const cellTotalPrice = cell.totalPrice || 
-                ((cell.breakerPrice || 0) + 
-                 (cell.meterPrice || 0) + 
-                 (cell.rzaPrice || 0) + 
-                 (cell.transformerPrice || 0));
-              
-              const cellQuantity = cell.count || cell.quantity || 1;
-              const cellPricePerUnit = cellQuantity > 0 ? cellTotalPrice / cellQuantity : cellTotalPrice;
-              
-              // Формируем название ячейки
-              const cellName = cell.purpose || 
-                cell.selectedCalculationName || 
-                cell.calculationName || 
-                `Ячейка ${rowNumber}`;
+      sortRusnSummariesByPageOrder(cellSummaries, cellConfigs || [], bodyType).forEach(
+        (cellSummary) => {
+          rows.push({
+            id: `cell-${rowNumber++}`,
+            name: cellSummary.name,
+            unit: 'шт',
+            quantity: cellSummary.quantity,
+            price: cellSummary.pricePerUnit,
+            total: cellSummary.totalPrice,
+          });
+        }
+      );
+    } else if (cellConfigs && cellConfigs.length > 0) {
+      const purposeOrder = getRusnPageCellPurposeOrder(bodyType);
+      const purposeRank = new Map(purposeOrder.map((purpose, index) => [purpose, index]));
+      [...cellConfigs]
+        .sort((a, b) => {
+          const aRank = purposeRank.get(a.purpose || '') ?? Number.MAX_SAFE_INTEGER;
+          const bRank = purposeRank.get(b.purpose || '') ?? Number.MAX_SAFE_INTEGER;
+          return aRank - bRank;
+        })
+        .forEach((cell: any) => {
+          const cellTotalPrice =
+            cell.totalPrice ||
+            (cell.breakerPrice || 0) +
+              (cell.meterPrice || 0) +
+              (cell.rzaPrice || 0) +
+              (cell.transformerPrice || 0);
 
-        rows.push({
-          id: `cell-${rowNumber++}`,
-          name: cellName,
-          unit: 'шт',
-          quantity: cellQuantity,
-          price: cellPricePerUnit,
-          total: cellTotalPrice,
+          const cellQuantity = cell.count || cell.quantity || 1;
+          const cellPricePerUnit = cellQuantity > 0 ? cellTotalPrice / cellQuantity : cellTotalPrice;
+          const cellName =
+            cell.purpose ||
+            cell.selectedCalculationName ||
+            cell.calculationName ||
+            `Ячейка ${rowNumber}`;
+
+          rows.push({
+            id: `cell-${rowNumber++}`,
+            name: cellName,
+            unit: 'шт',
+            quantity: cellQuantity,
+            price: cellPricePerUnit,
+            total: cellTotalPrice,
+          });
         });
-      });
     }
 
-    // Добавляем шинные мосты, если есть данные (сначала массив, потом один объект)
-    if (busBridgeSummaries && busBridgeSummaries.length > 0) {
-      busBridgeSummaries.forEach((busBridgeSummary) => {
-        rows.push({
-          id: `busbridge-${rowNumber++}`,
-          name: busBridgeSummary.name || 'Шинный мост',
-          unit: 'шт',
-          quantity: busBridgeSummary.quantity || 1,
-          price: busBridgeSummary.pricePerUnit || 0,
-          total: busBridgeSummary.totalPrice || 0,
-        });
-      });
-    } else if (busBridgeSummary) {
-      // Если нет массива, но есть один объект
-      rows.push({
-        id: `busbridge-${rowNumber++}`,
-        name: busBridgeSummary.name || 'Шинный мост',
-        unit: 'шт',
-        quantity: busBridgeSummary.quantity || 1,
-        price: busBridgeSummary.pricePerUnit || 0,
-        total: busBridgeSummary.totalPrice || 0,
-      });
-    }
-
-    // Добавляем сборные шины, если есть данные
+    // Как на странице РУСН: сначала сборные шины, потом шинный мост
     if (busbarSummary) {
       rows.push({
         id: `busbar-${rowNumber++}`,
@@ -402,6 +429,28 @@ export const rusnTableConfig: TableConfig = {
         quantity: busbarSummary.quantity || 1,
         price: busbarSummary.pricePerUnit || 0,
         total: busbarSummary.totalPrice || 0,
+      });
+    }
+
+    if (busBridgeSummaries && busBridgeSummaries.length > 0) {
+      busBridgeSummaries.forEach((summary) => {
+        rows.push({
+          id: `busbridge-${rowNumber++}`,
+          name: summary.name || 'Шинный мост',
+          unit: 'шт',
+          quantity: summary.quantity || 1,
+          price: summary.pricePerUnit || 0,
+          total: summary.totalPrice || 0,
+        });
+      });
+    } else if (busBridgeSummary) {
+      rows.push({
+        id: `busbridge-${rowNumber++}`,
+        name: busBridgeSummary.name || 'Шинный мост',
+        unit: 'шт',
+        quantity: busBridgeSummary.quantity || 1,
+        price: busBridgeSummary.pricePerUnit || 0,
+        total: busBridgeSummary.totalPrice || 0,
       });
     }
 

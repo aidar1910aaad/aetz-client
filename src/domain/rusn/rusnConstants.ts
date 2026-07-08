@@ -6,7 +6,7 @@ export const RUSN_CAMERA = {
   KSO_A17_20: 'Камера КСО А17-20',
 } as const;
 
-/** Камеры, в ячейках «Ввод» и «Отходящая» которых показывается выбор ПУ. */
+/** Камеры, где в ячейках «Ввод», «Трансформаторная» и «Отходящая» есть выбор ПУ. */
 export const RUSN_CAMERAS_WITH_CELL_METER: readonly string[] = [
   RUSN_CAMERA.KSO_A12_10,
   'КСО А12-10',
@@ -19,6 +19,7 @@ export function supportsCellMeterSelection(cameraName?: string, cellPurpose?: st
 
   if (
     cellPurpose !== RUSN_CELL_PURPOSE.INPUT &&
+    cellPurpose !== RUSN_CELL_PURPOSE.TRANSFORMER &&
     cellPurpose !== RUSN_CELL_PURPOSE.OUTGOING
   ) {
     return false;

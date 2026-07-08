@@ -76,27 +76,28 @@ interface EquipmentSelectorProps {
   voltage?: number; // Добавляем напряжение
 }
 
-// Функция для фильтрации категорий по напряжению (только для выключателя)
-const filterCategoriesByVoltage = (categories: { id: number; name: string }[], voltage: number): { id: number; name: string }[] => {
-  const voltageLabel = voltage === 400 ? '0.4' : voltage.toString();
-  
-  return categories.filter(category => {
-    const name = category.name.toLowerCase();
-    
-    // Проверяем различные варианты написания напряжения
-    const voltagePatterns = [
-      `${voltageLabel}кв`,
-      `${voltageLabel} кв`,
-      `${voltageLabel}кВ`,
-      `${voltageLabel} кВ`,
-      `${voltageLabel}кв`,
-      `${voltageLabel} кв`,
-      `${voltageLabel}кВ`,
-      `${voltageLabel} кВ`,
-    ];
-    
-    return voltagePatterns.some(pattern => name.includes(pattern));
+/** Категории, в названии которых есть напряжение заявки (10кВ / 20кВ / 0.4кВ). */
+const filterCategoriesByVoltage = (
+  categories: { id: number; name: string }[],
+  voltage: number
+): { id: number; name: string }[] => {
+  const voltageLabel = voltage === 400 ? '0.4' : String(voltage);
+  const normalized = (value: string) =>
+    value.toLowerCase().replace(/,/g, '.').replace(/\s+/g, '');
+
+  const patterns = [
+    `${voltageLabel}кв`,
+    `${voltageLabel}кв.`,
+    `${normalized(voltageLabel)}кв`,
+  ];
+
+  const matched = categories.filter((category) => {
+    const name = normalized(category.name);
+    return patterns.some((pattern) => name.includes(pattern));
   });
+
+  // Если в названиях нет «10кВ/20кВ» — не прячем категории совсем
+  return matched.length > 0 ? matched : categories;
 };
 
 export default function EquipmentSelector({
@@ -105,16 +106,16 @@ export default function EquipmentSelector({
   onGlobalChange,
   voltage = 10, // Дефолтное значение
 }: EquipmentSelectorProps) {
-  // Фильтруем категории по напряжению только для выключателя
+  // Выключатель, ТТ и ТСН — только категория под выбранное напряжение (10/20 кВ)
   const filteredSettings = useMemo(
     () => ({
       switch: filterCategoriesByVoltage(rusnSettings.switch, voltage),
       rza: rusnSettings.rza,
       counter: rusnSettings.counter,
       sr: rusnSettings.sr,
-      tsn: rusnSettings.tsn,
+      tsn: filterCategoriesByVoltage(rusnSettings.tsn, voltage),
       tn: rusnSettings.tn,
-      tt: rusnSettings.tt,
+      tt: filterCategoriesByVoltage(rusnSettings.tt, voltage),
     }),
     [rusnSettings, voltage]
   );
@@ -132,12 +133,18 @@ export default function EquipmentSelector({
     { key: 'tsn', label: 'Силовой трансформатор', settings: filteredSettings.tsn },
     { key: 'tn', label: 'Трансформатор напряжения', settings: filteredSettings.tn },
     { key: 'tt', label: 'Трансформатор тока', settings: filteredSettings.tt },
-  ];
+  ] as const;
 
-  // Автоматически выбираем первый доступный вариант для autoSelectEquipment
+  // Автоматически выбираем категорию под напряжение (для ТТ — 10кВ или 20кВ)
   useEffect(() => {
     autoSelectEquipment.forEach(({ key, settings }) => {
-      if (settings.length === 1 && !global[key as keyof typeof global]) {
+      if (settings.length === 0) return;
+
+      const current = global[key as keyof typeof global];
+      const stillValid =
+        current && settings.some((option) => option.id === current.id);
+
+      if (!stillValid) {
         const firstOption = settings[0];
         onGlobalChange(key, { id: firstOption.id, name: firstOption.name });
       }

@@ -31,14 +31,8 @@ export const CalculationResults: React.FC<CalculationResultsProps> = ({
     return num.toLocaleString('ru-RU');
   };
 
-  // Рассчитываем общую длину всех мостов
-  const totalLength = bridges.reduce((sum, bridge) => sum + bridge.length, 0);
-
   // Рассчитываем общее количество всех мостов
   const totalQuantity = bridges.reduce((sum, bridge) => sum + bridge.quantity, 0);
-
-  // Рассчитываем среднюю длину для формулы
-  const averageLength = totalLength / bridges.length;
 
   return (
     <div className="bg-purple-50 border border-purple-200 rounded-md p-5">
@@ -61,8 +55,8 @@ export const CalculationResults: React.FC<CalculationResultsProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div className="bg-white border border-gray-200 rounded-md p-4">
-          <div className="text-sm text-gray-600 mb-1">Масса на 1 м</div>
-          <div className="text-xl font-bold text-gray-900">{formatNumber(weightPerMeter)} кг/м</div>
+          <div className="text-sm text-gray-600 mb-1">Расход на 1 шт.</div>
+          <div className="text-xl font-bold text-gray-900">{formatNumber(weightPerMeter)} кг/шт</div>
         </div>
         <div className="bg-white border border-gray-200 rounded-md p-4">
           <div className="text-sm text-gray-600 mb-1">Цена за кг</div>
@@ -78,8 +72,8 @@ export const CalculationResults: React.FC<CalculationResultsProps> = ({
           <div className="text-2xl font-bold text-gray-900">{formatNumber(totalWeight)} кг</div>
         </div>
         <div className="bg-white border border-gray-200 rounded-md p-4">
-          <div className="text-sm text-gray-600 mb-1">Общая длина</div>
-          <div className="text-2xl font-bold text-purple-600">{formatNumber(totalLength)} м</div>
+          <div className="text-sm text-gray-600 mb-1">Общее количество</div>
+          <div className="text-2xl font-bold text-purple-600">{formatNumber(totalQuantity)} шт</div>
         </div>
         <div className="bg-white border border-gray-200 rounded-md p-4">
           <div className="text-sm text-gray-600 mb-1">Итоговая стоимость</div>
@@ -90,12 +84,12 @@ export const CalculationResults: React.FC<CalculationResultsProps> = ({
       <div className="bg-white border border-gray-200 rounded-md p-4">
         <div className="text-sm text-gray-600 mb-2">Формула расчета:</div>
         <div className="text-sm font-mono text-gray-800">
-          {formatNumber(weightPerMeter)} кг/м × {formatNumber(totalLength)} м ×{' '}
+          {formatNumber(weightPerMeter)} кг/шт × {formatNumber(totalQuantity)} шт ×{' '}
           {formatNumber(getPricePerKg(busBridgeMaterial!))} ₸/кг = {formatNumber(totalPrice)} ₸
         </div>
         <div className="text-sm text-gray-600 mt-2">
           Детализация:{' '}
-          {bridges.map((bridge, index) => `${bridge.length}м × ${bridge.quantity}шт`).join(' + ')}
+          {bridges.map((bridge, index) => `№${index + 1}: ${bridge.quantity} шт`).join(' + ')}
         </div>
       </div>
     </div>

@@ -1,10 +1,17 @@
 import React from 'react';
 import { Switchgear } from '@/api/switchgear';
 import { BusAlert } from '@/components/shared/busUi';
+import { BusbarSectionSelector } from '@/components/bktp/rusn/BusbarSystem/BusbarSectionSelector';
+import { RunnBusbarOption } from '@/utils/runnBusbarOptions';
 
 interface BusbarResultsProps {
   title: string;
   matchingConfig: Switchgear | null;
+  recommendedConfig?: Switchgear | null;
+  availableBusbarOptions?: RunnBusbarOption[];
+  selectedBusbarGroup?: string | null;
+  selectedBusbarSection?: string | null;
+  onBusbarOptionChange?: (option: RunnBusbarOption) => void;
   totalWeight: number;
   totalPrice: number;
   materialCost?: number;
@@ -29,6 +36,11 @@ function StatItem({ label, value, hint }: { label: string; value: string; hint?:
 export const BusbarResults: React.FC<BusbarResultsProps> = ({
   title,
   matchingConfig,
+  recommendedConfig,
+  availableBusbarOptions = [],
+  selectedBusbarGroup,
+  selectedBusbarSection,
+  onBusbarOptionChange,
   totalWeight,
   totalPrice,
   pricePerKg,
@@ -37,20 +49,36 @@ export const BusbarResults: React.FC<BusbarResultsProps> = ({
   selectedTransformer,
 }) => {
   const materialLabel =
-    matchingConfig?.group === 'МТ' || matchingConfig?.group === 'МТ2'
+    matchingConfig?.group === 'МТ' ||
+    matchingConfig?.group === 'МТ2' ||
+    matchingConfig?.group === 'МТ3'
       ? 'Медь'
-      : matchingConfig?.group === 'АД' || matchingConfig?.group === 'АД2'
+      : matchingConfig?.group === 'АД' ||
+          matchingConfig?.group === 'АД2' ||
+          matchingConfig?.group === 'АД3'
         ? 'Алюминий'
         : selectedTransformer?.busbars || 'Не выбран';
 
   if (!hasMatchingConfig) {
     return (
       <BusAlert variant="error" title="Конфигурация не найдена">
-        Для трансформатора {transformerPower ?? '—'} кВА и материала «{selectedTransformer?.busbars ?? '—'}»
-        не найдена подходящая конфигурация. Проверьте ячейки РУНН и настройки трансформатора.
+        Для трансформатора {transformerPower ?? '—'} кВА и материала «
+        {selectedTransformer?.busbars ?? '—'}» не найдена подходящая конфигурация. Проверьте ячейки
+        РУНН и настройки трансформатора.
       </BusAlert>
     );
   }
+
+  const selectedOption =
+    selectedBusbarGroup && selectedBusbarSection
+      ? { group: selectedBusbarGroup, section: selectedBusbarSection }
+      : matchingConfig
+        ? { group: matchingConfig.group, section: matchingConfig.busbar }
+        : null;
+
+  const recommendedOption = recommendedConfig
+    ? { group: recommendedConfig.group, section: recommendedConfig.busbar }
+    : null;
 
   return (
     <div className="space-y-4">
@@ -59,10 +87,20 @@ export const BusbarResults: React.FC<BusbarResultsProps> = ({
         {matchingConfig && (
           <span className="text-gray-500">
             {' '}
-            · из конфигурации «{matchingConfig.type}» (группа {matchingConfig.group})
+            · из конфигурации «{matchingConfig.type}» (группа {matchingConfig.group}
+            {matchingConfig.busbar ? `, ${matchingConfig.busbar}` : ''})
           </span>
         )}
       </div>
+
+      {availableBusbarOptions.length > 0 && onBusbarOptionChange && (
+        <BusbarSectionSelector
+          availableOptions={availableBusbarOptions}
+          selectedOption={selectedOption}
+          recommendedOption={recommendedOption}
+          onOptionChange={onBusbarOptionChange}
+        />
+      )}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatItem label="Конфигурация" value={matchingConfig?.type || '—'} />
@@ -71,7 +109,11 @@ export const BusbarResults: React.FC<BusbarResultsProps> = ({
           label="Цена за кг"
           value={`${pricePerKg.toLocaleString()} тг`}
           hint={
-            matchingConfig?.group === 'МТ' || matchingConfig?.group === 'МТ2' ? 'Медь' : 'Алюминий'
+            matchingConfig?.group === 'МТ' ||
+            matchingConfig?.group === 'МТ2' ||
+            matchingConfig?.group === 'МТ3'
+              ? 'Медь'
+              : 'Алюминий'
           }
         />
         <StatItem

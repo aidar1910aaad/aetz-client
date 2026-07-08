@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { normalizeBusbarSection } from '@/utils/busbarSectionUtils';
 
 export type BusMaterial = 'АД' | 'АД2' | 'МТ' | 'МТ2';
 
@@ -22,6 +23,8 @@ interface RunnGlobalOptions {
   busbar: {
     enabled: boolean;
     material: BusMaterial | null;
+    selectedBusbarGroup: string | null;
+    selectedBusbarSection: string | null;
   };
   busBridge: {
     enabled: boolean;
@@ -34,6 +37,8 @@ interface RunnGlobalOptions {
     configuration: string;
     weight: number;
     pricePerKg: number;
+    selectedBusbarGroup: string | null;
+    selectedBusbarSection: string | null;
   };
 }
 
@@ -91,6 +96,8 @@ interface RunnState {
   updateCell: (id: string, key: keyof RunnCell, value: any) => void;
   removeCell: (id: string) => void;
   setBusMaterial: (material: BusMaterial) => void;
+  setBusbarVariant: (group: string | null, section: string | null) => void;
+  setZeroBusbarVariant: (group: string | null, section: string | null) => void;
   setBusBridgeMaterial: (material: BusMaterial) => void;
   setBusBridges: (bridges: BusbarBridge[]) => void;
   toggleBusbar: (enabled: boolean) => void;
@@ -124,6 +131,8 @@ export const useRunnStore = create<RunnState>()(
         busbar: {
           enabled: false,
           material: null,
+          selectedBusbarGroup: null,
+          selectedBusbarSection: null,
         },
         busBridge: {
           enabled: false,
@@ -136,6 +145,8 @@ export const useRunnStore = create<RunnState>()(
           configuration: '',
           weight: 0,
           pricePerKg: 0,
+          selectedBusbarGroup: null,
+          selectedBusbarSection: null,
         },
       },
       cellConfigs: [],
@@ -173,20 +184,96 @@ export const useRunnStore = create<RunnState>()(
         set((state) => ({
           global: {
             ...state.global,
-            busbar: { 
-              ...(state.global.busbar || { enabled: false, material: null }),
-              material 
+            busbar: {
+              ...(state.global.busbar || {
+                enabled: false,
+                material: null,
+                selectedBusbarGroup: null,
+                selectedBusbarSection: null,
+              }),
+              material,
+              selectedBusbarGroup: null,
+              selectedBusbarSection: null,
             },
           },
         })),
+
+      setBusbarVariant: (group, section) =>
+        set((state) => {
+          const current = state.global.busbar || {
+            enabled: false,
+            material: null,
+            selectedBusbarGroup: null,
+            selectedBusbarSection: null,
+          };
+          const nextGroup = group ?? null;
+          const nextSection = section ?? null;
+          const sameGroup = (current.selectedBusbarGroup ?? null) === nextGroup;
+          const sameSection =
+            (current.selectedBusbarSection ?? null) === nextSection ||
+            (current.selectedBusbarSection &&
+              nextSection &&
+              normalizeBusbarSection(current.selectedBusbarSection) ===
+                normalizeBusbarSection(nextSection));
+
+          if (sameGroup && sameSection) {
+            return state;
+          }
+          return {
+            global: {
+              ...state.global,
+              busbar: {
+                ...current,
+                selectedBusbarGroup: nextGroup,
+                selectedBusbarSection: nextSection,
+              },
+            },
+          };
+        }),
+
+      setZeroBusbarVariant: (group, section) =>
+        set((state) => {
+          const current = state.global.zeroBusbar || {
+            enabled: false,
+            material: null,
+            configuration: '',
+            weight: 0,
+            pricePerKg: 0,
+            selectedBusbarGroup: null,
+            selectedBusbarSection: null,
+          };
+          const nextGroup = group ?? null;
+          const nextSection = section ?? null;
+          const sameGroup = (current.selectedBusbarGroup ?? null) === nextGroup;
+          const sameSection =
+            (current.selectedBusbarSection ?? null) === nextSection ||
+            (current.selectedBusbarSection &&
+              nextSection &&
+              normalizeBusbarSection(current.selectedBusbarSection) ===
+                normalizeBusbarSection(nextSection));
+
+          if (sameGroup && sameSection) {
+            return state;
+          }
+          return {
+            global: {
+              ...state.global,
+              zeroBusbar: {
+                ...current,
+                selectedBusbarGroup: nextGroup,
+                selectedBusbarSection: nextSection,
+              },
+            },
+          };
+        }),
 
       setBusBridgeMaterial: (material) =>
         set((state) => ({
           global: {
             ...state.global,
-            busBridge: { 
+            busBridge: {
               ...(state.global.busBridge || { enabled: false, material: null, bridges: [] }),
-              material 
+              material,
             },
           },
         })),
@@ -250,6 +337,8 @@ export const useRunnStore = create<RunnState>()(
             busbar: {
               enabled: false,
               material: null,
+              selectedBusbarGroup: null,
+              selectedBusbarSection: null,
             },
             busBridge: {
               enabled: false,
@@ -262,6 +351,8 @@ export const useRunnStore = create<RunnState>()(
               configuration: '',
               weight: 0,
               pricePerKg: 0,
+              selectedBusbarGroup: null,
+              selectedBusbarSection: null,
             },
           },
           cellConfigs: [],

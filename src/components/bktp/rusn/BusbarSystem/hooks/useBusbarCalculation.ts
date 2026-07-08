@@ -8,10 +8,15 @@ import { useMaterialPrices } from '@/hooks/useMaterialPrices';
 import { applyApiCalculationRates } from '@/utils/calculationSettings';
 import {
   getBusbarSectionWeightScale,
-  getBusbarSectionsFromConfigs,
+  parseBusbarSectionArea,
   normalizeBusbarSection,
 } from '@/utils/busbarSectionUtils';
 import { isVoltageTransformerCellPurpose } from '@/domain/rusn/rusnConstants';
+
+export interface BusbarOption {
+  group: string;
+  section: string;
+}
 
 function buildEffectiveConfig(
   baseConfig: Switchgear,
@@ -56,7 +61,7 @@ function buildEffectiveConfig(
 
 export const useBusbarCalculation = () => {
   const rusn = useRusnStore();
-  const setBusbarSection = useRusnStore((s) => s.setBusbarSection);
+  const setBusbarVariant = useRusnStore((s) => s.setBusbarVariant);
   const { busBridge } = rusn.global;
   const [switchgearConfigs, setSwitchgearConfigs] = useState<Switchgear[]>([]);
   const { aluminum: aluminumPrice, copper: copperPrice } = useMaterialPrices();
@@ -136,12 +141,28 @@ export const useBusbarCalculation = () => {
     return switchgearConfigs.filter((config) => materialGroups.includes(config.group));
   }, [switchgearConfigs, busBridge.material]);
 
-  const availableBusbarSections = useMemo(
-    () => getBusbarSectionsFromConfigs(tableConfigs),
-    [tableConfigs]
-  );
+  const availableBusbarOptions = useMemo(() => {
+    const unique = new Map<string, BusbarOption>();
+    for (const config of tableConfigs) {
+      if (!config.group || !config.busbar) continue;
+      const key = `${config.group}:${normalizeBusbarSection(config.busbar)}`;
+      if (!unique.has(key)) {
+        unique.set(key, {
+          group: config.group,
+          section: config.busbar,
+        });
+      }
+    }
+
+    return [...unique.values()].sort((a, b) => {
+      const sectionDiff = parseBusbarSectionArea(a.section) - parseBusbarSectionArea(b.section);
+      if (sectionDiff !== 0) return sectionDiff;
+      return a.group.localeCompare(b.group, 'ru');
+    });
+  }, [tableConfigs]);
 
   const selectedBusbarSection = busBridge.selectedBusbarSection;
+  const selectedBusbarGroup = busBridge.selectedBusbarGroup;
 
   const baseMatchingConfig = useMemo(() => {
     if (matchingConfigs.length === 0) return null;
@@ -166,6 +187,25 @@ export const useBusbarCalculation = () => {
     const breakerCurrent = selectedBreaker
       ? getBreakerCurrent(selectedBreaker.name)
       : null;
+    const selectedConfig =
+      (selectedBusbarGroup &&
+        section &&
+        (matchingConfigs.find(
+          (config) =>
+            config.group === selectedBusbarGroup &&
+            normalizeBusbarSection(config.busbar) === normalizeBusbarSection(section)
+        ) ??
+          tableConfigs.find(
+            (config) =>
+              config.group === selectedBusbarGroup &&
+              normalizeBusbarSection(config.busbar) === normalizeBusbarSection(section)
+          ))) ||
+      null;
+
+    if (selectedConfig) {
+      return selectedConfig;
+    }
+
     return buildEffectiveConfig(
       baseMatchingConfig,
       section,
@@ -178,6 +218,7 @@ export const useBusbarCalculation = () => {
     baseMatchingConfig,
     matchingConfigs,
     tableConfigs,
+    selectedBusbarGroup,
     selectedBusbarSection,
     selectedBreaker,
     busBridge.material,
@@ -186,28 +227,35 @@ export const useBusbarCalculation = () => {
   // Устанавливаем сечение по умолчанию из конфигурации
   useEffect(() => {
     if (!baseMatchingConfig) {
-      if (busBridge.selectedBusbarSection) {
-        setBusbarSection(null);
+      if (busBridge.selectedBusbarSection || busBridge.selectedBusbarGroup) {
+        setBusbarVariant(null, null);
       }
       return;
     }
 
-    const available = availableBusbarSections.map(normalizeBusbarSection);
+    const available = availableBusbarOptions.map(
+      (option) => `${option.group}:${normalizeBusbarSection(option.section)}`
+    );
     const selectedNorm = busBridge.selectedBusbarSection
-      ? normalizeBusbarSection(busBridge.selectedBusbarSection)
+      ? `${busBridge.selectedBusbarGroup}:${normalizeBusbarSection(busBridge.selectedBusbarSection)}`
       : null;
 
     if (!selectedNorm || !available.includes(selectedNorm)) {
+      const nextGroup = baseMatchingConfig.group;
       const nextSection = baseMatchingConfig.busbar;
-      if (busBridge.selectedBusbarSection !== nextSection) {
-        setBusbarSection(nextSection);
+      if (
+        busBridge.selectedBusbarGroup !== nextGroup ||
+        busBridge.selectedBusbarSection !== nextSection
+      ) {
+        setBusbarVariant(nextGroup, nextSection);
       }
     }
   }, [
     baseMatchingConfig,
+    busBridge.selectedBusbarGroup,
     busBridge.selectedBusbarSection,
-    availableBusbarSections,
-    setBusbarSection,
+    availableBusbarOptions,
+    setBusbarVariant,
   ]);
 
   // Рассчитываем общий вес и стоимость
@@ -329,6 +377,7 @@ export const useBusbarCalculation = () => {
     busbarCalculation?.id,
     busbarCalculationResult?.finalPrice,
     busBridge.material,
+    selectedBusbarGroup,
     selectedBusbarSection,
   ]);
 
@@ -356,8 +405,9 @@ export const useBusbarCalculation = () => {
     matchingConfig,
     baseMatchingConfig,
     matchingConfigs,
-    availableBusbarSections,
+    availableBusbarOptions,
     selectedBusbarSection,
+    selectedBusbarGroup,
     totalWeight,
     totalPrice,
     busbarCalculationResult,
@@ -367,6 +417,6 @@ export const useBusbarCalculation = () => {
     getBreakerCurrent,
     getPricePerKg,
     getMaterialGroup,
-    setBusbarSection,
+    setBusbarVariant,
   };
 };

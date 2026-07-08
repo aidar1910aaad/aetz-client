@@ -81,8 +81,8 @@ export default function SelectedMaterialsTable({
     }
   }
 
-  if (showDisconnector && cell.breaker && cell.purpose === 'Секционный разьединитель') {
-    const material = getRusnMaterialById(materials, 'sr', cell.breaker.id);
+  if (showDisconnector && cell.sr) {
+    const material = getRusnMaterialById(materials, 'sr', cell.sr.id);
     if (material) {
       selectedMaterialsList.push({
         name: material.name,

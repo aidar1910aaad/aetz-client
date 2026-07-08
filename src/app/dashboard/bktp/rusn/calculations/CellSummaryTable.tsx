@@ -34,7 +34,7 @@ export default function CellSummaryTable({
   onClearCell,
 }: CellSummaryTableProps) {
   // Не показываем ячейки без выбранных материалов
-  const hasSelectedMaterials = cell.breaker || cell.rza || cell.meterType || 
+  const hasSelectedMaterials = cell.breaker || cell.sr || cell.rza || cell.meterType || 
                               cell.transformerCurrent || cell.transformerVoltage || 
                               cell.transformerPower || cell.transformer;
   

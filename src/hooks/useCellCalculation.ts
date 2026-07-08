@@ -769,6 +769,7 @@ export const useCellCalculation = ({
   }, [
     cell.bhaMode,
     cell.breaker,
+    cell.sr,
     cell.rza,
     cell.meterType,
     cell.transformer,

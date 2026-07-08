@@ -87,18 +87,31 @@ export function TransformerSummary({
     return total + calculateUstPrice(calc, additionalCost);
   }, 0);
   const totalPrice = (price * quantity) + (totalUstPrice * quantity);
-  const effectiveRows = Array.isArray(onlineRows) && onlineRows.length > 0
-    ? onlineRows
-    : [
-        { name: model, unit: 'шт', quantity, price, total: price * quantity },
-        ...calculationsToShow.map((calc) => {
-          const shouldAddBusbarCost = isUst04CalculationName(calc.name);
-          const additionalCost = shouldAddBusbarCost ? busbarUstCost : 0;
-          const calcPrice = calculateUstPrice(calc, additionalCost);
-          return { name: calc.name, unit: 'шт', quantity, price: calcPrice, total: calcPrice * quantity };
-        }),
-      ];
-  const effectiveTotal = typeof onlineTotal === 'number' && onlineTotal > 0 ? onlineTotal : totalPrice;
+  const localRows = [
+    { name: model, unit: 'шт', quantity, price, total: price * quantity },
+    ...calculationsToShow.map((calc) => {
+      const shouldAddBusbarCost = isUst04CalculationName(calc.name);
+      const additionalCost = shouldAddBusbarCost ? busbarUstCost : 0;
+      const calcPrice = calculateUstPrice(calc, additionalCost);
+      return { name: calc.name, unit: 'шт', quantity, price: calcPrice, total: calcPrice * quantity };
+    }),
+  ];
+
+  const onlineHasUst =
+    Array.isArray(onlineRows) &&
+    onlineRows.some((row) => /уст/i.test(String(row.name || '')));
+
+  // Пока онлайн без строк УСТ — показываем локальный расчёт (не затираем таблицу пустым ответом)
+  const shouldUseOnline =
+    Array.isArray(onlineRows) &&
+    onlineRows.length > 0 &&
+    (calculationsToShow.length === 0 || onlineHasUst);
+
+  const effectiveRows = shouldUseOnline ? onlineRows! : localRows;
+  const effectiveTotal =
+    shouldUseOnline && typeof onlineTotal === 'number' && onlineTotal > 0
+      ? onlineTotal
+      : totalPrice;
   return (
     <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-lg">
       <div className="flex items-center gap-3 mb-6">
