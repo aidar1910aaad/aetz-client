@@ -4,6 +4,7 @@ import React from 'react';
 import { useBmzStore } from '@/store/useBmzStore';
 import { BmzSettings } from '@/api/bmz';
 import { formatNumber } from '@/utils/formatNumber';
+import { calculateArea, formatAreaQuantity, roundArea } from '@/utils/bmzCalculations';
 import { Settings, Check, X } from 'lucide-react';
 
 interface BmzOptionsProps {
@@ -24,8 +25,7 @@ const BmzOptions = ({
   width,
 }: BmzOptionsProps) => {
   const bmz = useBmzStore();
-  const area = (length / 1000) * (width / 1000);
-  const roundedArea = Math.round(area * 100) / 100;
+  const roundedArea = roundArea(calculateArea(width, length));
   const isDisabled = buildingType === 'none';
 
   if (!bmz.settings) return null;
@@ -55,7 +55,7 @@ const BmzOptions = ({
             unit = 'м²';
           } else if (equipment.priceType === 'perHalfSquareMeter') {
             price = equipment.pricePerSquareMeter || 0;
-            quantity = roundedArea / 2;
+            quantity = roundArea(roundedArea / 2);
             unit = 'м²';
           } else if (equipment.priceType === 'fixed') {
             price = equipment.fixedPrice || 0;
@@ -63,7 +63,7 @@ const BmzOptions = ({
             unit = 'компл.';
           }
 
-          const totalPrice = price * quantity;
+          const totalPrice = Math.round(price * quantity);
           const isSelected = state[stateKey] || false;
 
           return (
@@ -92,11 +92,7 @@ const BmzOptions = ({
                       '1 компл.'
                     ) : (
                       <>
-                        {formatNumber(price)} тг/м² ×{' '}
-                        {equipment.priceType === 'perHalfSquareMeter'
-                          ? `${(roundedArea / 2).toFixed(2)}`
-                          : `${roundedArea}`}{' '}
-                        м²
+                        {formatNumber(price)} тг/м² × {formatAreaQuantity(quantity)} м²
                       </>
                     )}
                   </div>
@@ -139,7 +135,7 @@ const BmzOptions = ({
             unit = 'м²';
           } else if (equipment.priceType === 'perHalfSquareMeter') {
             price = equipment.pricePerSquareMeter || 0;
-            quantity = roundedArea / 2;
+            quantity = roundArea(roundedArea / 2);
             unit = 'м²';
           } else if (equipment.priceType === 'fixed') {
             price = equipment.fixedPrice || 0;
@@ -147,7 +143,7 @@ const BmzOptions = ({
             unit = 'компл.';
           }
 
-          const totalPrice = price * quantity;
+          const totalPrice = Math.round(price * quantity);
           const isSelected = state[stateKey] || false;
 
           return (
@@ -176,11 +172,7 @@ const BmzOptions = ({
                       '1 компл.'
                     ) : (
                       <>
-                        {formatNumber(price)} тг/м² ×{' '}
-                        {equipment.priceType === 'perHalfSquareMeter'
-                          ? `${(roundedArea / 2).toFixed(2)}`
-                          : `${roundedArea}`}{' '}
-                        м²
+                        {formatNumber(price)} тг/м² × {formatAreaQuantity(quantity)} м²
                       </>
                     )}
                   </div>

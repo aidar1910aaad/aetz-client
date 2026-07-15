@@ -5,6 +5,7 @@ import {
   calculateArea,
   calculateBasePrice,
   calculateTotalPrice,
+  roundArea,
   BmzData,
 } from '@/utils/bmzCalculations';
 import BmzTable from './BmzTable';
@@ -21,7 +22,7 @@ const COLORS = {
 export default function BmzSection({ bmz }: Props) {
   // Мемоизированные вычисления
   const area = useMemo(() => calculateArea(bmz.width, bmz.length), [bmz.width, bmz.length]);
-  const roundedArea = useMemo(() => Math.round(area * 10) / 10, [area]);
+  const roundedArea = useMemo(() => roundArea(area), [area]);
   const unitPrice = useMemo(
     () =>
       bmz.buildingType === 'bmz'

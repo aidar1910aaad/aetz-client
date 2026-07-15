@@ -1,6 +1,12 @@
 import type { TableConfig } from './UniversalTable';
 import type { BmzData } from '@/utils/bmzCalculations';
-import { calculateBasePrice, getActiveEquipment } from '@/utils/bmzCalculations';
+import {
+  calculateArea,
+  calculateBasePrice,
+  formatAreaQuantity,
+  getActiveEquipment,
+  roundArea,
+} from '@/utils/bmzCalculations';
 import type { Transformer } from '@/api/transformers';
 import type { RusnState } from '@/store/useRusnStore';
 import type { AdditionalEquipmentState, AdditionalEquipmentItem } from '@/store/useAdditionalEquipmentStore';
@@ -66,17 +72,27 @@ const commonColumns = [
 export const bmzTableConfig: TableConfig = {
   id: 'bmz',
   title: 'Блочно модульное здание',
-  columns: commonColumns,
+  columns: [
+    ...commonColumns.slice(0, 2),
+    {
+      key: 'quantity',
+      title: 'Кол-во',
+      width: '5%',
+      align: 'center' as const,
+      formatter: (value: any, row: any) => {
+        if (typeof value !== 'number') return value ?? '';
+        return row?.unit === 'м²' ? formatAreaQuantity(value) : String(value);
+      },
+    },
+    ...commonColumns.slice(3),
+  ],
   dataMapper: (bmzData: BmzData) => {
     if (!bmzData.buildingType || bmzData.buildingType === 'none') {
       return [];
     }
     
-    const area = (bmzData.length / 1000) * (bmzData.width / 1000);
-    // Округляем площадь до целого числа
-    const roundedArea = Math.round(area);
-    
-    // Используем импортированные функции для расчетов
+    const area = calculateArea(bmzData.width, bmzData.length);
+    const roundedArea = roundArea(area);
     
     const unitPrice = bmzData.buildingType === 'bmz' 
       ? calculateBasePrice(bmzData.settings, bmzData.thickness, area, bmzData.height)
@@ -94,7 +110,7 @@ export const bmzTableConfig: TableConfig = {
         unit: 'м²',
         quantity: roundedArea,
         price: unitPrice,
-        total: unitPrice * roundedArea,
+        total: Math.round(unitPrice * roundedArea),
       });
     } else if (bmzData.buildingType === 'tp') {
       rows.push({
@@ -107,16 +123,14 @@ export const bmzTableConfig: TableConfig = {
       });
     }
     
-    // Активное оборудование - округляем количество до целого числа
     activeEquipment.forEach((equipment, index) => {
-      const roundedQuantity = Math.round(equipment.quantity);
       rows.push({
         id: `equipment-${index}`,
         name: equipment.name,
         unit: equipment.unit,
-        quantity: roundedQuantity,
+        quantity: equipment.quantity,
         price: equipment.price,
-        total: equipment.price * roundedQuantity,
+        total: equipment.totalPrice,
       });
     });
     

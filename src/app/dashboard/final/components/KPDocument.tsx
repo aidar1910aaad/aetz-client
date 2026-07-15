@@ -6,7 +6,9 @@ import {
   calculateArea,
   calculateBasePrice,
   calculateTotalPrice,
+  formatAreaQuantity,
   getActiveEquipment,
+  roundArea,
   BmzData,
 } from '@/utils/bmzCalculations';
 import type { Transformer } from '@/api/transformers';
@@ -232,11 +234,11 @@ export const KPDocument = ({
 
   // БМЗ данные
   const area = calculateArea(bmzStore.length || 0, bmzStore.width || 0);
-  const roundedArea = Math.round(area);
+  const roundedArea = roundArea(area);
   const unitPrice = bmzStore.buildingType === 'bmz' 
     ? calculateBasePrice(bmzStore.settings, bmzStore.thickness || 0, area, bmzStore.height || 0)
     : 0;
-  const buildingTotal = unitPrice * roundedArea;
+  const buildingTotal = Math.round(unitPrice * roundedArea);
   const activeEquipment = getActiveEquipment(bmzStore);
 
   // Трансформатор данные
@@ -346,7 +348,7 @@ export const KPDocument = ({
                   {bmzStore.thickness} мм, {bmzStore.blockCount} блоков)
                 </Text>
                 <Text style={styles.tableCellUnit}>м²</Text>
-                <Text style={styles.tableCellQuantity}>{roundedArea}</Text>
+                <Text style={styles.tableCellQuantity}>{formatAreaQuantity(roundedArea)}</Text>
               </View>
 
               {/* Оборудование */}
@@ -355,7 +357,9 @@ export const KPDocument = ({
                   <Text style={styles.tableCellNumber}>{idx + 2}</Text>
                   <Text style={styles.tableCellName}>{eq.name}</Text>
                   <Text style={styles.tableCellUnit}>{eq.unit}</Text>
-                  <Text style={styles.tableCellQuantity}>{eq.quantity}</Text>
+                  <Text style={styles.tableCellQuantity}>
+                    {eq.unit === 'м²' ? formatAreaQuantity(eq.quantity) : eq.quantity}
+                  </Text>
                 </View>
               ))}
 

@@ -28,6 +28,20 @@ export const calculateArea = (width: number, length: number): number => {
 };
 
 /**
+ * Округляет площадь до 2 знаков (мм × мм → м² без грубого округления)
+ */
+export const roundArea = (area: number): number => {
+  return Math.round(area * 100) / 100;
+};
+
+/**
+ * Форматирует количество площади для таблиц расчёта
+ */
+export const formatAreaQuantity = (quantity: number): string => {
+  return quantity.toFixed(2);
+};
+
+/**
  * Рассчитывает базовую цену за квадратный метр
  */
 export const calculateBasePrice = (
@@ -54,14 +68,15 @@ export const calculateEquipmentPrice = (equipment: any, area: number): Equipment
   let price = 0;
   let quantity = 0;
   let unit = '';
+  const roundedArea = roundArea(area);
 
   if (equipment.priceType === 'perSquareMeter') {
     price = equipment.pricePerSquareMeter || 0;
-    quantity = Math.round(area);
+    quantity = roundedArea;
     unit = 'м²';
   } else if (equipment.priceType === 'perHalfSquareMeter') {
     price = equipment.pricePerSquareMeter || 0;
-    quantity = Math.round(area / 2);
+    quantity = roundArea(roundedArea / 2);
     unit = 'м²';
   } else if (equipment.priceType === 'fixed') {
     price = equipment.fixedPrice || 0;
@@ -74,7 +89,7 @@ export const calculateEquipmentPrice = (equipment: any, area: number): Equipment
     price,
     quantity,
     unit,
-    totalPrice: price * quantity,
+    totalPrice: Math.round(price * quantity),
   };
 };
 
@@ -84,7 +99,7 @@ export const calculateEquipmentPrice = (equipment: any, area: number): Equipment
 export const calculateTotalPrice = (bmzData: BmzData): number => {
   if (!bmzData.settings || bmzData.buildingType === 'none') return 0;
 
-  const area = calculateArea(bmzData.width, bmzData.length);
+  const area = roundArea(calculateArea(bmzData.width, bmzData.length));
   let total = 0;
 
   if (bmzData.buildingType === 'bmz') {
@@ -94,7 +109,7 @@ export const calculateTotalPrice = (bmzData: BmzData): number => {
       area,
       bmzData.height,
     );
-    total += basePrice * area;
+    total += Math.round(basePrice * area);
   }
 
   bmzData.settings.equipment.forEach((equipment) => {

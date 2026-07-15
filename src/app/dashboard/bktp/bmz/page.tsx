@@ -12,6 +12,12 @@ import { useEffect } from 'react';
 import { bmzApi } from '@/api/bmz';
 import { useRealtimeCalculationStore } from '@/store/useRealtimeCalculationStore';
 import { findMatchingAreaPriceRange } from '@/utils/bmzAreaPriceRange';
+import {
+  calculateArea,
+  formatAreaQuantity,
+  formatPrice,
+  roundArea,
+} from '@/utils/bmzCalculations';
 
 export default function BmzConfigPage() {
   const router = useRouter();
@@ -122,7 +128,7 @@ export default function BmzConfigPage() {
     height: number,
   ): number => {
     if (!bmz.settings) return 0;
-    const area = (width / 1000) * (length / 1000);
+    const area = calculateArea(width, length);
     const priceRange = findMatchingAreaPriceRange(bmz.settings.areaPriceRanges, {
       area,
       thickness,
@@ -134,13 +140,13 @@ export default function BmzConfigPage() {
   const calculateTotalPrice = () => {
     if (!isFormValid() || bmz.buildingType === 'none' || !bmz.settings) return 0;
 
-    const area = (bmz.width / 1000) * (bmz.length / 1000);
+    const area = roundArea(calculateArea(bmz.width, bmz.length));
     let total = 0;
 
     // Считаем стоимость здания только для БМЗ
     if (bmz.buildingType === 'bmz') {
       const basePrice = calculateBasePrice(bmz.width, bmz.length, bmz.thickness, bmz.height);
-      total += basePrice * area;
+      total += Math.round(basePrice * area);
     }
 
     // Считаем дополнительное оборудование
@@ -148,9 +154,9 @@ export default function BmzConfigPage() {
       const stateKey = equipment.name.toLowerCase().replace(/\s+/g, '');
       if (bmz.equipmentState[stateKey]) {
         if (equipment.priceType === 'perSquareMeter') {
-          total += area * (equipment.pricePerSquareMeter || 0);
+          total += Math.round(area * (equipment.pricePerSquareMeter || 0));
         } else if (equipment.priceType === 'perHalfSquareMeter') {
-          total += (area / 2) * (equipment.pricePerSquareMeter || 0);
+          total += Math.round(roundArea(area / 2) * (equipment.pricePerSquareMeter || 0));
         } else if (equipment.priceType === 'fixed') {
           total += equipment.fixedPrice || 0;
         }
@@ -160,8 +166,7 @@ export default function BmzConfigPage() {
     return Math.round(total);
   };
 
-  const area = (bmz.width / 1000) * (bmz.length / 1000);
-  const roundedArea = Math.round(area * 10) / 10;
+  const roundedArea = roundArea(calculateArea(bmz.width, bmz.length));
   const unitPrice =
     bmz.buildingType === 'bmz'
       ? calculateBasePrice(bmz.width, bmz.length, bmz.thickness, bmz.height)
@@ -269,9 +274,9 @@ export default function BmzConfigPage() {
                               {bmz.thickness} мм, {bmz.blockCount} блоков)
                             </td>
                             <td className="p-4 text-center text-gray-600">м²</td>
-                            <td className="p-4 text-center font-semibold">{roundedArea}</td>
-                            <td className="p-4 text-right text-[#8eba1e] font-semibold">{unitPrice.toLocaleString()} тг</td>
-                            <td className="p-4 text-right text-[#8eba1e] font-bold">{(unitPrice * roundedArea).toLocaleString()} тг</td>
+                            <td className="p-4 text-center font-semibold">{formatAreaQuantity(roundedArea)}</td>
+                            <td className="p-4 text-right text-[#8eba1e] font-semibold">{formatPrice(unitPrice)}</td>
+                            <td className="p-4 text-right text-[#8eba1e] font-bold">{formatPrice(Math.round(unitPrice * roundedArea))}</td>
                           </tr>
                         )}
                         {bmz.buildingType === 'tp' && (
@@ -280,7 +285,7 @@ export default function BmzConfigPage() {
                               Здание ТП ({bmz.length}×{bmz.width}×{bmz.height} мм)
                             </td>
                             <td className="p-4 text-center text-gray-600">м²</td>
-                            <td className="p-4 text-center font-semibold">{roundedArea}</td>
+                            <td className="p-4 text-center font-semibold">{formatAreaQuantity(roundedArea)}</td>
                             <td className="p-4 text-right text-gray-400">—</td>
                             <td className="p-4 text-right text-gray-400">—</td>
                           </tr>
@@ -300,7 +305,7 @@ export default function BmzConfigPage() {
                             unit = 'м²';
                           } else if (equipment.priceType === 'perHalfSquareMeter') {
                             price = equipment.pricePerSquareMeter || 0;
-                            quantity = roundedArea / 2;
+                            quantity = roundArea(roundedArea / 2);
                             unit = 'м²';
                           } else if (equipment.priceType === 'fixed') {
                             price = equipment.fixedPrice || 0;
@@ -308,15 +313,17 @@ export default function BmzConfigPage() {
                             unit = 'компл.';
                           }
 
-                          const totalPrice = price * quantity;
+                          const rowTotal = Math.round(price * quantity);
+                          const quantityLabel =
+                            unit === 'м²' ? formatAreaQuantity(quantity) : String(quantity);
 
                           return (
                             <tr key={equipment.name} className="border-b border-gray-100 hover:bg-gray-50">
                               <td className="p-4 text-left font-medium">{equipment.name}</td>
                               <td className="p-4 text-center text-gray-600">{unit}</td>
-                              <td className="p-4 text-center font-semibold">{quantity.toFixed(2)}</td>
-                              <td className="p-4 text-right text-[#8eba1e] font-semibold">{price.toLocaleString()} тг</td>
-                              <td className="p-4 text-right text-[#8eba1e] font-bold">{totalPrice.toLocaleString()} тг</td>
+                              <td className="p-4 text-center font-semibold">{quantityLabel}</td>
+                              <td className="p-4 text-right text-[#8eba1e] font-semibold">{formatPrice(price)}</td>
+                              <td className="p-4 text-right text-[#8eba1e] font-bold">{formatPrice(rowTotal)}</td>
                             </tr>
                           );
                         })}
@@ -325,7 +332,7 @@ export default function BmzConfigPage() {
                           <td colSpan={4} className="text-right pr-2 p-4 text-lg">
                             ВСЕГО:
                           </td>
-                          <td className="text-right pl-2 p-4 text-lg text-[#8eba1e]">{displayedBmzTotal.toLocaleString()} тг</td>
+                          <td className="text-right pl-2 p-4 text-lg text-[#8eba1e]">{formatPrice(displayedBmzTotal)}</td>
                         </tr>
                       </tbody>
                     </table>

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { getActiveEquipment } from '@/utils/bmzCalculations';
+import { formatAreaQuantity, getActiveEquipment } from '@/utils/bmzCalculations';
 import { BmzData } from '@/utils/bmzCalculations';
 
 interface BmzTableProps {
@@ -42,9 +42,9 @@ export default function BmzTable({ bmzData, roundedArea, unitPrice, totalPrice }
                 {bmzData.thickness} мм, {bmzData.blockCount} блоков)
               </td>
               <td className="p-2">м²</td>
-              <td className="p-2">{roundedArea}</td>
-              <td className="p-2">{unitPrice.toLocaleString()} тг</td>
-              <td className="p-2">{(unitPrice * roundedArea).toLocaleString()} тг</td>
+              <td className="p-2">{formatAreaQuantity(roundedArea)}</td>
+              <td className="p-2">{unitPrice.toLocaleString('ru-RU')} тг</td>
+              <td className="p-2">{Math.round(unitPrice * roundedArea).toLocaleString('ru-RU')} тг</td>
             </tr>
           )}
           {bmzData.buildingType === 'tp' && (
@@ -54,7 +54,7 @@ export default function BmzTable({ bmzData, roundedArea, unitPrice, totalPrice }
                 Здание ТП ({bmzData.length}×{bmzData.width}×{bmzData.height} мм)
               </td>
               <td className="p-2">м²</td>
-              <td className="p-2">{roundedArea}</td>
+              <td className="p-2">{formatAreaQuantity(roundedArea)}</td>
               <td className="p-2">—</td>
               <td className="p-2">—</td>
             </tr>
@@ -65,9 +65,13 @@ export default function BmzTable({ bmzData, roundedArea, unitPrice, totalPrice }
               <td className="p-2">{index + 2}</td>
               <td className="p-2 text-left break-words">{equipment.name}</td>
               <td className="p-2">{equipment.unit}</td>
-              <td className="p-2">{equipment.quantity.toFixed(2)}</td>
-              <td className="p-2">{equipment.price.toLocaleString()} тг</td>
-              <td className="p-2">{equipment.totalPrice.toLocaleString()} тг</td>
+              <td className="p-2">
+                {equipment.unit === 'м²'
+                  ? formatAreaQuantity(equipment.quantity)
+                  : equipment.quantity}
+              </td>
+              <td className="p-2">{equipment.price.toLocaleString('ru-RU')} тг</td>
+              <td className="p-2">{equipment.totalPrice.toLocaleString('ru-RU')} тг</td>
             </tr>
           ))}
 

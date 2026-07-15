@@ -6,7 +6,9 @@ import {
   calculateArea,
   calculateBasePrice,
   calculateTotalPrice,
+  formatAreaQuantity,
   getActiveEquipment,
+  roundArea,
   BmzData,
 } from '@/utils/bmzCalculations';
 import type { Transformer } from '@/api/transformers';
@@ -257,14 +259,14 @@ export const PDFDocument = ({
 
   // Данные для отображения таблиц (только для рендеринга, не для расчета сумм)
   const bmzArea = calculateArea(bmzStore.width || 0, bmzStore.length || 0);
-  const roundedArea = Math.round(bmzArea * 10) / 10;
+  const roundedArea = roundArea(bmzArea);
   const unitPrice = calculateBasePrice(
     bmzStore.settings,
     bmzStore.thickness,
     bmzArea,
     bmzStore.height,
   );
-  const buildingTotal = unitPrice * roundedArea;
+  const buildingTotal = Math.round(unitPrice * roundedArea);
   const activeEquipment = getActiveEquipment(bmzStore);
 
   // Функция для расчета цены УСТ (только для отображения в таблице)
@@ -364,7 +366,7 @@ export const PDFDocument = ({
                   {bmzStore.thickness} мм, {bmzStore.blockCount} блоков)
                 </Text>
                 <Text style={styles.tableCellUnit}>м²</Text>
-                <Text style={styles.tableCellQuantity}>{roundedArea}</Text>
+                <Text style={styles.tableCellQuantity}>{formatAreaQuantity(roundedArea)}</Text>
                 <Text style={styles.tableCellPrice}>{formatNumber(unitPrice)} тг</Text>
                 <Text style={styles.tableCellTotal}>{formatNumber(buildingTotal)} тг</Text>
               </View>
@@ -375,7 +377,9 @@ export const PDFDocument = ({
                   <Text style={styles.tableCellNumber}>{idx + 2}</Text>
                   <Text style={styles.tableCellName}>{eq.name}</Text>
                   <Text style={styles.tableCellUnit}>{eq.unit}</Text>
-                  <Text style={styles.tableCellQuantity}>{eq.quantity}</Text>
+                  <Text style={styles.tableCellQuantity}>
+                    {eq.unit === 'м²' ? formatAreaQuantity(eq.quantity) : eq.quantity}
+                  </Text>
                   <Text style={styles.tableCellPrice}>{formatNumber(eq.price)} тг</Text>
                   <Text style={styles.tableCellTotal}>{formatNumber(eq.totalPrice)} тг</Text>
                 </View>
