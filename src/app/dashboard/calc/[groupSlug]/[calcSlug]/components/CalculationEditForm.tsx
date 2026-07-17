@@ -8,6 +8,7 @@ import { getBhaPreset, isBhaCellType, isKsoA12CalculationGroup } from '@/domain/
 import { isKsoA17CalculationGroup, isKsoA17CellType } from '@/domain/calculation/ksoA17Presets';
 import { normalizeCellType } from '@/domain/calculation/cellTypes';
 import { generateCalculationSlug } from '@/utils/calculationSlug';
+import { isCustomPercentagesGroup } from '@/domain/calculation/customPercentagesGroups';
 
 interface CalculationMaterial {
   id?: number;
@@ -137,6 +138,7 @@ export function CalculationEditForm({
   const isKsoA12Group = isKsoA12CalculationGroup(groupSlug);
   const isKsoA17Group = isKsoA17CalculationGroup(groupSlug);
   const isBhaConfig = isKsoA12Group && isBhaCellType(cellConfig?.type);
+  const editablePercentages = isCustomPercentagesGroup(groupSlug);
 
   const handleCellConfigChange = (newConfig: CellConfiguration) => {
     if (isKsoA12Group && isBhaCellType(newConfig.type)) {
@@ -257,6 +259,7 @@ export function CalculationEditForm({
         totalMaterialsCost={calculateTotalMaterialsCost()}
         onValuesChange={(values) => setCalculationValues(values)}
         initialValues={calculationValues}
+        editablePercentages={editablePercentages}
       />
 
       {/* Кнопки действий */}

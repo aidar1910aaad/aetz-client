@@ -7,10 +7,20 @@ import SwitchingDeviceLogic from '../switching-devices/SwitchingDeviceLogic';
 import { useRunnOutgoingCalculation, useRunnMoldedCaseCalculation, useRunnAirCalculation, useRunnMeterCalculation } from '@/hooks/useRunnInputCalculation';
 import { useOutgoingCalculations } from '@/hooks/useOutgoingCalculations';
 import OutgoingCalculation from '../calculations/OutgoingCalculation';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { calculateCost } from '@/utils/calculationUtils';
 import { useTransformerStore } from '@/store/useTransformerStore';
 import { Select } from '@/components/ui/select';
+
+/** Схема 4 = Панель ЩО 70-04 — единственная, где доступен РПС 630А */
+function isOutgoingScheme4(calculation: { name?: string } | null | undefined): boolean {
+  if (!calculation?.name) return false;
+  return /70-0?4\b/i.test(calculation.name);
+}
+
+function padRubilnikiSlots(names: string[], slots = 4): string[] {
+  return Array.from({ length: slots }, (_, index) => names[index] || '');
+}
 
 interface CellItemProps {
   cell: RunnCell;
@@ -67,7 +77,9 @@ export default function CellItem({
   
   // Состояние для выбранной калькуляции отходящей ячейки
   const [selectedOutgoingCalculation, setSelectedOutgoingCalculation] = useState<any>(null);
-  const [previousCalculationId, setPreviousCalculationId] = useState<string | null>(null);
+  // Применяем пресет схемы только при смене калькуляции — дальше пользователь свободно правит 4 РПС
+  const appliedOutgoingCalculationIdRef = useRef<string | number | null>(null);
+  const allowRps630 = isOutgoingScheme4(selectedOutgoingCalculation);
   
   // Материалы из дополнительной калькуляции для литого корпуса (вычисляем на лету)
   const additionalMoldedCaseMaterials = useMemo(() => {
@@ -100,203 +112,72 @@ export default function CellItem({
     }));
   }, [selectedOutgoingCalculation]);
 
-  // Эффект для автоматического выбора коммутационного аппарата при выборе дополнительной калькуляции
+  // Пресет схемы применяем только при смене калькуляции — дальше 4 РПС можно менять свободно
   useEffect(() => {
     if (!selectedOutgoingCalculation?.data?.cellConfig?.materials) {
       return;
     }
-    
+
+    const currentCalculationId = selectedOutgoingCalculation.id ?? selectedOutgoingCalculation.name;
+    if (appliedOutgoingCalculationIdRef.current === currentCalculationId) {
+      return;
+    }
+    appliedOutgoingCalculationIdRef.current = currentCalculationId;
+
     const materials = selectedOutgoingCalculation.data.cellConfig.materials;
-    
-    // Проверяем наличие РПС
+
     if (materials.rps && Array.isArray(materials.rps) && materials.rps.length > 0) {
-      // Если есть РПС, автоматически выбираем "РПС" как коммутационный аппарат
-      if (cell.switchingDevice !== 'РПС') {
-        updateCell(cell.id, 'switchingDevice', 'РПС');
+      updateCell(cell.id, 'switchingDevice', 'РПС');
+      // Всегда 4 слота: пресет схемы + пустые позиции, которые пользователь может заполнить
+      const rpsNames = materials.rps.map((rps: { name: string }) => rps.name);
+      updateCell(cell.id, 'rubilniki', padRubilnikiSlots(rpsNames, 4));
+      return;
+    }
+
+    if (materials.molded_case_breaker && materials.rubilnik) {
+      updateCell(cell.id, 'switchingDevice', 'Литой корпус + Рубильник');
+      const moldedCaseBreakers = materials.molded_case_breaker;
+      if (Array.isArray(moldedCaseBreakers) && moldedCaseBreakers.length > 0) {
+        updateCell(
+          cell.id,
+          'rubilniki',
+          moldedCaseBreakers.map((breaker: { name: string }) => breaker.name)
+        );
       }
-      
-      // Проставляем все РПС в ячейку
-      const rpsNames = materials.rps.map((rps: any) => rps.name);
-      
-      // Проверяем, нужно ли обновлять rubilniki
-      const currentRubilniki = cell.rubilniki || [];
-      
-      // Проверяем, изменилась ли калькуляция
-      const currentCalculationId = selectedOutgoingCalculation?.id;
-      const calculationChanged = currentCalculationId !== previousCalculationId;
-      
-      // Обновляем рубильники если:
-      // 1. Массив пустой
-      // 2. Все значения пустые (пользователь выбрал "—" для всех)
-      // 3. Значения точно совпадают с исходными из калькуляции
-      // 4. Текущие рубильники не являются РПС (при смене типа коммутационного аппарата)
-      // 5. Калькуляция изменилась (при смене калькуляции)
-      const isEmpty = currentRubilniki.length === 0;
-      const allEmpty = currentRubilniki.every(rubilnik => !rubilnik || rubilnik.trim() === '');
-      const isUnchanged = JSON.stringify([...currentRubilniki].sort()) === JSON.stringify([...rpsNames].sort());
-      const isNotRpsRubilniki = currentRubilniki.some(rubilnik => 
-        rubilnik && rubilnik.trim() !== '' && !rubilnik.includes('РПС')
-      );
-      
-      
-      if (isEmpty || allEmpty || isUnchanged || isNotRpsRubilniki || calculationChanged) {
-        // Проверяем, что новые значения действительно отличаются от текущих
-        const currentNames = currentRubilniki.map(r => r?.trim()).filter(r => r);
-        const newNames = rpsNames.map(r => r?.trim()).filter(r => r);
-        
-        
-        // Обновляем только если калькуляция изменилась или это первичная настройка
-        if ((calculationChanged || isEmpty || allEmpty || isNotRpsRubilniki) && 
-            JSON.stringify([...currentNames].sort()) !== JSON.stringify([...newNames].sort())) {
-          updateCell(cell.id, 'rubilniki', rpsNames);
+      return;
+    }
+
+    if (materials.molded_case_breaker && !materials.rubilnik) {
+      updateCell(cell.id, 'switchingDevice', 'Литой корпус');
+      const moldedCaseBreakers = materials.molded_case_breaker;
+      if (Array.isArray(moldedCaseBreakers)) {
+        updateCell(
+          cell.id,
+          'rubilniki',
+          moldedCaseBreakers.map((breaker: { name: string }) => breaker.name)
+        );
+      }
+      return;
+    }
+
+    if (
+      materials.withdrawable_breaker &&
+      !materials.molded_case_breaker &&
+      !materials.rubilnik &&
+      !materials.rps
+    ) {
+      updateCell(cell.id, 'switchingDevice', 'Воздушный');
+      const withdrawableBreaker = materials.withdrawable_breaker;
+      if (Array.isArray(withdrawableBreaker) && withdrawableBreaker.length > 0) {
+        const availableBreaker = withdrawableBreaker.find((breaker: { name: string }) =>
+          breakerOptions.includes(breaker.name)
+        );
+        if (availableBreaker) {
+          updateCell(cell.id, 'breaker', availableBreaker.name);
         }
-      }
-      
-      // Обновляем previousCalculationId после обработки
-      if (calculationChanged) {
-        setPreviousCalculationId(currentCalculationId);
       }
     }
-    // Проверяем наличие литого корпуса и рубильника
-    else if (materials.molded_case_breaker && materials.rubilnik) {
-        // Если есть и molded_case_breaker, и rubilnik, выбираем "Литой корпус + Рубильник"
-        if (cell.switchingDevice !== 'Литой корпус + Рубильник') {
-          updateCell(cell.id, 'switchingDevice', 'Литой корпус + Рубильник');
-        }
-        
-        // Проставляем автоматы в ячейку
-        const moldedCaseBreakers = materials.molded_case_breaker;
-        if (Array.isArray(moldedCaseBreakers) && moldedCaseBreakers.length > 0) {
-          const breakerNames = moldedCaseBreakers.map((breaker: any) => breaker.name);
-          
-          // Проверяем, нужно ли обновлять rubilniki
-          const currentRubilniki = cell.rubilniki || [];
-          
-          // Проверяем, изменилась ли калькуляция
-          const currentCalculationId = selectedOutgoingCalculation?.id;
-          const calculationChanged = currentCalculationId !== previousCalculationId;
-          
-          // Обновляем рубильники если:
-          // 1. Массив пустой
-          // 2. Все значения пустые (пользователь выбрал "—" для всех)
-          // 3. Значения точно совпадают с исходными из калькуляции
-          // 4. Текущие рубильники не являются автоматами (при смене типа коммутационного аппарата)
-          // 5. Калькуляция изменилась (при смене калькуляции)
-          const isEmpty = currentRubilniki.length === 0;
-          const allEmpty = currentRubilniki.every(rubilnik => !rubilnik || rubilnik.trim() === '');
-          const isUnchanged = JSON.stringify([...currentRubilniki].sort()) === JSON.stringify([...breakerNames].sort());
-          const isNotMoldedCaseBreakers = currentRubilniki.some(rubilnik => 
-            rubilnik && rubilnik.trim() !== '' && !rubilnik.includes('Автомат')
-          );
-          
-          if (isEmpty || allEmpty || isUnchanged || isNotMoldedCaseBreakers || calculationChanged) {
-            // Проверяем, что новые значения действительно отличаются от текущих
-            const currentNames = currentRubilniki.map(r => r?.trim()).filter(r => r);
-            const newNames = breakerNames.map(r => r?.trim()).filter(r => r);
-            
-            // Обновляем только если калькуляция изменилась или это первичная настройка
-            if ((calculationChanged || isEmpty || allEmpty || isNotMoldedCaseBreakers) && 
-                JSON.stringify([...currentNames].sort()) !== JSON.stringify([...newNames].sort())) {
-              updateCell(cell.id, 'rubilniki', breakerNames);
-            }
-          }
-          
-          // Обновляем previousCalculationId после обработки
-          if (calculationChanged) {
-            setPreviousCalculationId(currentCalculationId);
-          }
-        }
-    }
-    // Проверяем наличие только литого корпуса (без рубильника)
-    else if (materials.molded_case_breaker && !materials.rubilnik) {
-        // Если есть только molded_case_breaker, выбираем "Литой корпус"
-        if (cell.switchingDevice !== 'Литой корпус') {
-          updateCell(cell.id, 'switchingDevice', 'Литой корпус');
-        }
-        
-        // Проставляем автоматы в ячейку
-        const moldedCaseBreakers = materials.molded_case_breaker;
-        if (Array.isArray(moldedCaseBreakers)) {
-          const breakerNames = moldedCaseBreakers.map((breaker: any) => breaker.name);
-          
-          // Проверяем, нужно ли обновлять rubilniki
-          const currentRubilniki = cell.rubilniki || [];
-          
-          // Проверяем, изменилась ли калькуляция
-          const currentCalculationId = selectedOutgoingCalculation?.id;
-          const calculationChanged = currentCalculationId !== previousCalculationId;
-          
-          // Обновляем автоматы если:
-          // 1. Массив пустой
-          // 2. Все значения пустые (пользователь выбрал "—" для всех)
-          // 3. Значения точно совпадают с исходными из калькуляции
-          // 4. Текущие автоматы не являются автоматами литого корпуса (при смене типа коммутационного аппарата)
-          // 5. Калькуляция изменилась (при смене калькуляции)
-          const isEmpty = currentRubilniki.length === 0;
-          const allEmpty = currentRubilniki.every(automaton => !automaton || automaton.trim() === '');
-          const isUnchanged = JSON.stringify([...currentRubilniki].sort()) === JSON.stringify([...breakerNames].sort());
-          const isNotMoldedCaseBreakers = currentRubilniki.some(automaton => 
-            automaton && automaton.trim() !== '' && !automaton.includes('ВА-57')
-          );
-          
-          if (isEmpty || allEmpty || isUnchanged || isNotMoldedCaseBreakers || calculationChanged) {
-            // Проверяем, что новые значения действительно отличаются от текущих
-            const currentNames = currentRubilniki.map(r => r?.trim()).filter(r => r);
-            const newNames = breakerNames.map(r => r?.trim()).filter(r => r);
-            
-            // Обновляем только если калькуляция изменилась или это первичная настройка
-            if ((calculationChanged || isEmpty || allEmpty || isNotMoldedCaseBreakers) && 
-                JSON.stringify([...currentNames].sort()) !== JSON.stringify([...newNames].sort())) {
-              updateCell(cell.id, 'rubilniki', breakerNames);
-            }
-          }
-          
-          // Обновляем previousCalculationId после обработки
-          if (calculationChanged) {
-            setPreviousCalculationId(currentCalculationId);
-          }
-        }
-    }
-    // Проверяем наличие только воздушного выключателя
-    else if (materials.withdrawable_breaker && !materials.molded_case_breaker && !materials.rubilnik && !materials.rps) {
-        // Если есть только withdrawable_breaker, выбираем "Воздушный"
-        if (cell.switchingDevice !== 'Воздушный') {
-          updateCell(cell.id, 'switchingDevice', 'Воздушный');
-        }
-        
-        // Проставляем воздушный выключатель в ячейку
-        const withdrawableBreaker = materials.withdrawable_breaker;
-        if (Array.isArray(withdrawableBreaker) && withdrawableBreaker.length > 0) {
-          // Ищем первый выключатель, который есть в доступных опциях
-          const availableBreaker = withdrawableBreaker.find(breaker => 
-            breakerOptions.includes(breaker.name)
-          );
-          
-          if (availableBreaker) {
-            const breakerName = availableBreaker.name;
-            
-            // Проверяем, изменилась ли калькуляция
-            const currentCalculationId = selectedOutgoingCalculation?.id;
-            const calculationChanged = currentCalculationId !== previousCalculationId;
-            
-            // Обновляем выключатель только если:
-            // 1. Текущий выключатель не установлен
-            // 2. Текущий выключатель не является воздушным (при смене типа коммутационного аппарата)
-            // 3. Калькуляция изменилась (при смене калькуляции)
-            const isNotAirBreaker = !cell.breaker || !breakerOptions.includes(cell.breaker);
-            
-            if ((!cell.breaker || isNotAirBreaker || calculationChanged) && cell.breaker !== breakerName) {
-              updateCell(cell.id, 'breaker', breakerName);
-            }
-            
-            // Обновляем previousCalculationId после обработки
-            if (calculationChanged) {
-              setPreviousCalculationId(currentCalculationId);
-            }
-          }
-        }
-      }
-  }, [selectedOutgoingCalculation, cell.id, updateCell, breakerOptions, previousCalculationId]);
+  }, [selectedOutgoingCalculation, cell.id, updateCell, breakerOptions]);
 
 
   // Используем выбранную калькуляцию из выпадающего списка вместо автоматического поиска
@@ -460,6 +341,7 @@ export default function CellItem({
           additionalRpsMaterials={additionalRpsMaterials}
           avtomatLityMaterials={avtomatLityMaterials}
           additionalMoldedCaseMaterials={additionalMoldedCaseMaterials}
+          allowRps630={allowRps630}
         />
       </div>
 

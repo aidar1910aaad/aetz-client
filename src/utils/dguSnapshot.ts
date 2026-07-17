@@ -12,6 +12,24 @@ export interface DguSnapshot {
   total: number;
 }
 
+type DguContentSource = Pick<
+  DguSnapshot,
+  'enabled' | 'settings' | 'cellSummaries' | 'busbarSummary' | 'busBridgeSummaries'
+> | null | undefined;
+
+/** Есть ли что показать в спецификации по ДГУ */
+export function hasDguSnapshotData(dgu: DguContentSource): boolean {
+  if (!dgu?.enabled) return false;
+
+  const settingsPrice = Number(dgu.settings?.price) || 0;
+  return (
+    (dgu.cellSummaries?.length ?? 0) > 0 ||
+    !!dgu.busbarSummary ||
+    (dgu.busBridgeSummaries?.length ?? 0) > 0 ||
+    settingsPrice > 0
+  );
+}
+
 export function buildDguSnapshotFromStore(): DguSnapshot {
   const state = useDguStore.getState();
   return {
@@ -25,12 +43,7 @@ export function buildDguSnapshotFromStore(): DguSnapshot {
   };
 }
 
-export function calculateDguTotalFromSnapshot(
-  dgu: Pick<
-    DguSnapshot,
-    'enabled' | 'cellSummaries' | 'busbarSummary' | 'busBridgeSummaries'
-  > | null | undefined
-): number {
+export function calculateDguTotalFromSnapshot(dgu: DguContentSource): number {
   if (!dgu?.enabled) return 0;
 
   const cellsTotal = (dgu.cellSummaries || []).reduce(
@@ -42,21 +55,19 @@ export function calculateDguTotalFromSnapshot(
     (sum, b) => sum + (b.totalPrice || 0),
     0
   );
+  const generatorTotal = Number(dgu.settings?.price) || 0;
 
-  return cellsTotal + busbarTotal + bridgesTotal;
+  return cellsTotal + busbarTotal + bridgesTotal + generatorTotal;
 }
 
-/** Строки ДГУ для таблицы РУ-0.4кВ: заголовок без цены + позиции с расчётом */
+/** Строки ДГУ для таблицы РУ-0.4кВ: заголовок + ячейки + шины/мосты + генератор */
 export function mapDguRowsForRunnTable(
-  dgu: Pick<
-    DguSnapshot,
-    'enabled' | 'settings' | 'cellSummaries' | 'busbarSummary' | 'busBridgeSummaries'
-  > | null | undefined,
+  dgu: DguContentSource,
   startOrder = 0
 ): TableRow[] {
-  if (!dgu?.enabled) return [];
+  if (!hasDguSnapshotData(dgu)) return [];
 
-  const cellItems = (dgu.cellSummaries || []).map((summary, index) => ({
+  const cellItems = (dgu!.cellSummaries || []).map((summary, index) => ({
     id: `dgu-cell-${summary.cellId}`,
     name: summary.name,
     unit: 'шт.',
@@ -66,8 +77,8 @@ export function mapDguRowsForRunnTable(
     order: startOrder + index + 2,
   }));
 
-  const busBridgeSummaries = dgu.busBridgeSummaries || [];
-  const busbarSummary = dgu.busbarSummary;
+  const busBridgeSummaries = dgu!.busBridgeSummaries || [];
+  const busbarSummary = dgu!.busbarSummary;
   let orderOffset = startOrder + cellItems.length + 2;
 
   const busBridgeItems = busBridgeSummaries.map((bbs, i) => ({
@@ -96,6 +107,24 @@ export function mapDguRowsForRunnTable(
       ]
     : [];
 
+  orderOffset += busbarItems.length;
+
+  const settingsPrice = Number(dgu!.settings?.price) || 0;
+  const generatorItems =
+    settingsPrice > 0
+      ? [
+          {
+            id: 'dgu-generator',
+            name: `ДГУ (${dgu!.settings?.nominalPowerKva || 0} кВА)`,
+            unit: 'шт.',
+            quantity: 1,
+            price: settingsPrice,
+            total: settingsPrice,
+            order: orderOffset,
+          },
+        ]
+      : [];
+
   const headerRow: TableRow = {
     id: 'dgu-header',
     name: 'ДГУ',
@@ -103,7 +132,31 @@ export function mapDguRowsForRunnTable(
     order: startOrder + 1,
   };
 
-  return [headerRow, ...cellItems, ...busBridgeItems, ...busbarItems];
+  return [headerRow, ...cellItems, ...busBridgeItems, ...busbarItems, ...generatorItems];
+}
+
+/** Выбирает снимок ДГУ с реальными данными (live стор важнее пустого вложенного) */
+export function resolveDguSnapshot(
+  fromRunn: DguContentSource,
+  live?: DguContentSource
+): DguContentSource {
+  const liveSource =
+    live ??
+    (() => {
+      const state = useDguStore.getState();
+      return {
+        enabled: state.enabled,
+        settings: state.settings,
+        cellSummaries: state.cellSummaries,
+        busbarSummary: state.busbarSummary,
+        busBridgeSummaries: state.busBridgeSummaries,
+      };
+    })();
+
+  if (hasDguSnapshotData(fromRunn)) return fromRunn;
+  if (hasDguSnapshotData(liveSource)) return liveSource;
+  if (fromRunn?.enabled) return fromRunn;
+  return liveSource;
 }
 
 export function applyDguSnapshot(snapshot: Partial<DguSnapshot> | null | undefined): void {

@@ -3,6 +3,8 @@ import type { TableRow } from '@/components/FinalReview/UniversalTable';
 import { useDguStore } from '@/store/useDguStore';
 import {
   buildDguSnapshotFromStore,
+  hasDguSnapshotData,
+  resolveDguSnapshot,
   type DguSnapshot,
 } from '@/utils/dguSnapshot';
 
@@ -12,27 +14,48 @@ export function mergeRunnWithDgu(
   dgu?: Partial<DguSnapshot> | null
 ): Record<string, unknown> {
   const runn = runnStore || {};
-
-  if ((runn as { dgu?: DguSnapshot }).dgu) {
-    return runn;
-  }
-
-  if (dgu) {
-    return { ...runn, dgu };
-  }
+  const nestedDgu = (runn as { dgu?: DguSnapshot }).dgu;
 
   const live = useDguStore.getState();
-  const hasLiveDgu =
-    live.enabled ||
-    (live.cellSummaries?.length ?? 0) > 0 ||
-    !!live.busbarSummary ||
-    (live.busBridgeSummaries?.length ?? 0) > 0;
+  const liveSnapshot = {
+    enabled: live.enabled,
+    settings: live.settings,
+    cellSummaries: live.cellSummaries,
+    busbarSummary: live.busbarSummary,
+    busBridgeSummaries: live.busBridgeSummaries,
+  };
 
-  if (!hasLiveDgu) {
-    return runn;
+  const explicit =
+    dgu &&
+    ({
+      enabled: dgu.enabled ?? false,
+      settings: dgu.settings ?? live.settings,
+      cellSummaries: dgu.cellSummaries ?? [],
+      busbarSummary: dgu.busbarSummary ?? null,
+      busBridgeSummaries: dgu.busBridgeSummaries ?? [],
+    } as DguSnapshot);
+
+  const resolved = resolveDguSnapshot(
+    explicit ?? nestedDgu,
+    hasDguSnapshotData(liveSnapshot) || live.enabled ? liveSnapshot : null
+  );
+
+  if (!resolved || (!hasDguSnapshotData(resolved) && !resolved.enabled)) {
+    const { dgu: _omit, ...rest } = runn as { dgu?: unknown };
+    return rest;
   }
 
-  return { ...runn, dgu: buildDguSnapshotFromStore() };
+  return {
+    ...runn,
+    dgu: {
+      ...resolved,
+      cells: (explicit as DguSnapshot | undefined)?.cells ?? nestedDgu?.cells ?? live.cells ?? [],
+      total:
+        (explicit as DguSnapshot | undefined)?.total ??
+        nestedDgu?.total ??
+        buildDguSnapshotFromStore().total,
+    },
+  };
 }
 
 export function getRunnTableRows(

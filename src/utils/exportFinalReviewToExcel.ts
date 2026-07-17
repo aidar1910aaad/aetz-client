@@ -15,7 +15,10 @@ import {
 } from '@/components/FinalReview/tableConfigs';
 import { getRunnTableRows } from '@/utils/runnExportRows';
 import type { TableRow } from '@/components/FinalReview/UniversalTable';
-import type { BusbarMaterialPrices } from '@/utils/busbarUstCost';
+import {
+  getTransformerUstRows,
+  type BusbarMaterialPrices,
+} from '@/utils/busbarUstCost';
 import type { PdfHeaderMeta } from '@/app/dashboard/final/components/PdfCommercialHeader';
 
 type ExtendedTransformer = Transformer & {
@@ -399,9 +402,7 @@ export async function exportFinalReviewToExcel(params: ExportFinalReviewToExcelP
   );
 
   if (selectedTransformer) {
-    const transformerRows = transformerTableConfig.dataMapper(selectedTransformer, {
-      busbarMaterialPrices,
-    });
+    const transformerRows = transformerTableConfig.dataMapper(selectedTransformer);
     builder.addSectionTable(
       transformerTableConfig.title,
       transformerRows,
@@ -412,7 +413,10 @@ export async function exportFinalReviewToExcel(params: ExportFinalReviewToExcelP
 
   builder.addSectionTable(
     rusnTableConfig.title,
-    rusnTableConfig.dataMapper(rusnStore),
+    [
+      ...rusnTableConfig.dataMapper(rusnStore),
+      ...getTransformerUstRows(selectedTransformer, 'rusn', busbarMaterialPrices),
+    ],
     customRowsByTable[rusnTableConfig.id] || [],
     totals.rusnTotal,
     formatRusnCellName,
@@ -420,7 +424,10 @@ export async function exportFinalReviewToExcel(params: ExportFinalReviewToExcelP
 
   builder.addSectionTable(
     runnTableConfig.title,
-    getRunnTableRows(runnStore),
+    [
+      ...getRunnTableRows(runnStore),
+      ...getTransformerUstRows(selectedTransformer, 'runn', busbarMaterialPrices),
+    ],
     customRowsByTable[runnTableConfig.id] || [],
     totals.runnTotal,
   );

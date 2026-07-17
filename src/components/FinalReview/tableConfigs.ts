@@ -14,11 +14,10 @@ import type { WorkItem } from '@/store/useWorksStore';
 import { useRunnStore } from '@/store/useRunnStore';
 import { useDguStore } from '@/store/useDguStore';
 import { formatAmount } from '@/utils/formatAmount';
-import { mapDguRowsForRunnTable } from '@/utils/dguSnapshot';
+import { mapDguRowsForRunnTable, resolveDguSnapshot } from '@/utils/dguSnapshot';
 import type { DguSnapshot } from '@/utils/dguSnapshot';
 import {
-  calculateBusbarUstCost,
-  isUst04CalculationName,
+  getTransformerUstRows,
   type BusbarMaterialPrices,
 } from '@/utils/busbarUstCost';
 import { getCellTypesForGroup } from '@/config/cellTypeConfigs';
@@ -145,12 +144,12 @@ export const transformerTableConfig: TableConfig = {
   id: 'transformer',
   title: 'Трансформатор',
   columns: commonColumns,
-  dataMapper: (transformer: any, additionalData?: { busbarMaterialPrices?: BusbarMaterialPrices }) => {
+  dataMapper: (transformer: any) => {
     if (!transformer) {
       return [];
     }
     
-    const rows = [
+    return [
       {
         id: 'transformer-1',
         name: transformer.model,
@@ -160,98 +159,6 @@ export const transformerTableConfig: TableConfig = {
         total: transformer.price * (transformer.quantity || 2),
       },
     ];
-
-    // Добавляем все УСТ калькуляции, если они есть
-    if (transformer.ustCalculations && transformer.ustCalculations.length > 0) {
-      const calculateUstPrice = (calc: any, additionalUstCost: number = 0) => {
-        if (!calc.data?.categories) return 0;
-        
-        let materialsTotal = 0;
-        calc.data.categories.forEach((category: any) => {
-          category.items.forEach((item: any) => {
-            materialsTotal += item.price * item.quantity;
-          });
-        });
-
-        // Добавляем стоимость УСТ из конфигурации шин
-        const totalMaterialsWithUst = materialsTotal + additionalUstCost;
-
-        const calculation = calc.data.calculation;
-        if (!calculation) return totalMaterialsWithUst;
-
-        const manufacturingCost = (calculation.manufacturingHours || 0) * (calculation.hourlyRate || 0);
-        const overheadCost = totalMaterialsWithUst * ((calculation.overheadPercentage || 0) / 100);
-        const productionCost = totalMaterialsWithUst + manufacturingCost + overheadCost;
-        const adminCost = totalMaterialsWithUst * ((calculation.adminPercentage || 0) / 100);
-        const fullCost = productionCost + adminCost;
-        const profitCost = fullCost * ((calculation.plannedProfitPercentage || 0) / 100);
-        const wholesalePrice = fullCost + profitCost;
-        const vatCost = wholesalePrice * ((calculation.ndsPercentage || 0) / 100);
-        const finalPrice = wholesalePrice + vatCost;
-
-        return finalPrice;
-      };
-
-      const busbarMaterialPrices = additionalData?.busbarMaterialPrices;
-      const busbarUstData = transformer.busbarUstData;
-
-      transformer.ustCalculations.forEach((calc: any, index: number) => {
-        const shouldAddBusbarCost = isUst04CalculationName(calc.name);
-        const additionalCost = shouldAddBusbarCost
-          ? calculateBusbarUstCost(busbarUstData, busbarMaterialPrices)
-          : 0;
-        const ustPrice = calculateUstPrice(calc, additionalCost);
-        
-        rows.push({
-          id: `ust-${index + 1}`,
-          name: calc.name,
-          unit: 'шт',
-          quantity: transformer.quantity || 2,
-          price: ustPrice,
-          total: ustPrice * (transformer.quantity || 2),
-        });
-      });
-    } else if (transformer.ustCalculation) {
-      // Fallback для старой логики
-      const calculateUstPrice = (calc: any) => {
-        if (!calc.data?.categories) return 0;
-        
-        let materialsTotal = 0;
-        calc.data.categories.forEach((category: any) => {
-          category.items.forEach((item: any) => {
-            materialsTotal += item.price * item.quantity;
-          });
-        });
-
-        const calculation = calc.data.calculation;
-        if (!calculation) return materialsTotal;
-
-        const manufacturingCost = (calculation.manufacturingHours || 0) * (calculation.hourlyRate || 0);
-        const overheadCost = materialsTotal * ((calculation.overheadPercentage || 0) / 100);
-        const productionCost = materialsTotal + manufacturingCost + overheadCost;
-        const adminCost = materialsTotal * ((calculation.adminPercentage || 0) / 100);
-        const fullCost = productionCost + adminCost;
-        const profitCost = fullCost * ((calculation.plannedProfitPercentage || 0) / 100);
-        const wholesalePrice = fullCost + profitCost;
-        const vatCost = wholesalePrice * ((calculation.ndsPercentage || 0) / 100);
-        const finalPrice = wholesalePrice + vatCost;
-
-        return finalPrice;
-      };
-
-      const ustPrice = calculateUstPrice(transformer.ustCalculation);
-      
-      rows.push({
-        id: 'ust-1',
-        name: transformer.ustCalculation.name,
-        unit: 'шт',
-        quantity: transformer.quantity || 2,
-        price: ustPrice,
-        total: ustPrice * (transformer.quantity || 2),
-      });
-    }
-    
-    return rows;
   },
   emptyMessage: 'Трансформатор не выбран',
   showTotal: true,
@@ -371,7 +278,10 @@ export const rusnTableConfig: TableConfig = {
   id: 'rusn',
   title: 'РУ-10кВ',
   columns: commonColumns,
-  dataMapper: (rusnData: RusnState) => {
+  dataMapper: (
+    rusnData: RusnState,
+    additionalData?: { transformer?: any; busbarMaterialPrices?: BusbarMaterialPrices },
+  ) => {
     const {
       cellConfigs,
       cellSummaries,
@@ -468,7 +378,14 @@ export const rusnTableConfig: TableConfig = {
       });
     }
 
-    return rows;
+    return [
+      ...rows,
+      ...getTransformerUstRows(
+        additionalData?.transformer,
+        'rusn',
+        additionalData?.busbarMaterialPrices,
+      ),
+    ];
   },
   emptyMessage: 'РУСН-10кВ не предусмотрено',
   showTotal: true,
@@ -532,7 +449,10 @@ export const runnTableConfig: TableConfig = {
       },
     },
   ],
-  dataMapper: (data?: ReturnType<typeof useRunnStore.getState> & { dgu?: DguSnapshot | null }) => {
+  dataMapper: (
+    data?: ReturnType<typeof useRunnStore.getState> & { dgu?: DguSnapshot | null },
+    additionalData?: { transformer?: any; busbarMaterialPrices?: BusbarMaterialPrices },
+  ) => {
     // Приоритет: использовать переданные данные (реактивно), иначе текущее состояние стора
     const runnStoreState = (data as any) || useRunnStore.getState();
     
@@ -608,17 +528,25 @@ export const runnTableConfig: TableConfig = {
 
     const dguFromApi = (runnStoreState as { dgu?: DguSnapshot | null }).dgu;
     const dguLive = useDguStore.getState();
-    const dguSource = dguFromApi ?? {
+    const dguSource = resolveDguSnapshot(dguFromApi, {
       enabled: dguLive.enabled,
       settings: dguLive.settings,
       cellSummaries: dguLive.cellSummaries,
       busbarSummary: dguLive.busbarSummary,
       busBridgeSummaries: dguLive.busBridgeSummaries,
-    };
+    });
 
     const dguItems = mapDguRowsForRunnTable(dguSource, allItems.length);
 
-    return [...allItems, ...dguItems];
+    return [
+      ...allItems,
+      ...dguItems,
+      ...getTransformerUstRows(
+        additionalData?.transformer,
+        'runn',
+        additionalData?.busbarMaterialPrices,
+      ),
+    ];
   },
   emptyMessage: 'Нет данных РУНН',
   showTotal: true,

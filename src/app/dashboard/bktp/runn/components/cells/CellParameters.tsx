@@ -15,6 +15,8 @@ interface CellParametersProps {
   additionalRpsMaterials?: Material[];
   avtomatLityMaterials?: Material[];
   additionalMoldedCaseMaterials?: Material[];
+  /** РПС 630А доступен только на схеме 4 (Панель ЩО 70-04) */
+  allowRps630?: boolean;
 }
 
 export default function CellParameters({ 
@@ -26,7 +28,8 @@ export default function CellParameters({
   rpsLeftMaterials = [],
   additionalRpsMaterials = [],
   avtomatLityMaterials = [],
-  additionalMoldedCaseMaterials = []
+  additionalMoldedCaseMaterials = [],
+  allowRps630 = false
 }: CellParametersProps) {
   // Функция для извлечения тока из названия материала
   const extractCurrentFromName = (name: string): number | null => {
@@ -212,7 +215,12 @@ export default function CellParameters({
 
         {/* Показываем селектор рубильников только если выбран РПС */}
         {cell.switchingDevice === 'РПС' && (
-          <RpsRubilnikSelector cell={cell} rpsLeftMaterials={rpsLeftMaterials} additionalRpsMaterials={additionalRpsMaterials} />
+          <RpsRubilnikSelector
+            cell={cell}
+            rpsLeftMaterials={rpsLeftMaterials}
+            additionalRpsMaterials={additionalRpsMaterials}
+            allowRps630={allowRps630}
+          />
         )}
 
         {/* Показываем селектор рубильников для "Литой корпус" и "Литой корпус + Рубильник" */}

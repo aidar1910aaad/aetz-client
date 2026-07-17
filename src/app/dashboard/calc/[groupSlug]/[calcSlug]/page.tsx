@@ -13,6 +13,7 @@ import { CalculationSummary } from './components/CalculationSummary';
 import RoleGuard from '@/components/common/RoleGuard';
 import { UserRole } from '@/types/user';
 import { API_FALLBACK_CALCULATION_RATES } from '@/utils/calculationSettings';
+import { isCustomPercentagesGroup } from '@/domain/calculation/customPercentagesGroups';
 import { CellType } from '@/types/calculation';
 import type { RzaCellTarget } from '@/domain/calculation/rzaCellTargets';
 
@@ -137,9 +138,15 @@ const MATERIAL_CONFIG = [
   { key: 'rubilnik', label: 'Рубильник' },
 ] as const;
 
+const toSavedNumber = (value: unknown, fallback: number): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
 
 export default function CalculationDetailPage() {
   const { groupSlug, calcSlug } = useParams() as { groupSlug: string; calcSlug: string };
+  const decodedGroupSlug = decodeURIComponent(groupSlug);
+  const editablePercentages = isCustomPercentagesGroup(decodedGroupSlug);
   const { fetchCalculation, selectedCalculation } = useCalculations();
   const [isEditing, setIsEditing] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -196,22 +203,30 @@ export default function CalculationDetailPage() {
               })),
             })),
           calculation: {
-            manufacturingHours: Number(updatedCalculation.data.calculation.manufacturingHours) || 1,
-            hourlyRate:
-              Number(updatedCalculation.data.calculation.hourlyRate) ||
-              API_FALLBACK_CALCULATION_RATES.hourlyRate,
-            overheadPercentage:
-              Number(updatedCalculation.data.calculation.overheadPercentage) ||
-              API_FALLBACK_CALCULATION_RATES.overheadPercentage,
-            adminPercentage:
-              Number(updatedCalculation.data.calculation.adminPercentage) ||
-              API_FALLBACK_CALCULATION_RATES.adminPercentage,
-            plannedProfitPercentage:
-              Number(updatedCalculation.data.calculation.plannedProfitPercentage) ||
-              API_FALLBACK_CALCULATION_RATES.plannedProfitPercentage,
-            ndsPercentage:
-              Number(updatedCalculation.data.calculation.ndsPercentage) ||
-              API_FALLBACK_CALCULATION_RATES.ndsPercentage,
+            manufacturingHours: toSavedNumber(
+              updatedCalculation.data.calculation.manufacturingHours,
+              API_FALLBACK_CALCULATION_RATES.manufacturingHours ?? 1
+            ),
+            hourlyRate: toSavedNumber(
+              updatedCalculation.data.calculation.hourlyRate,
+              API_FALLBACK_CALCULATION_RATES.hourlyRate
+            ),
+            overheadPercentage: toSavedNumber(
+              updatedCalculation.data.calculation.overheadPercentage,
+              API_FALLBACK_CALCULATION_RATES.overheadPercentage
+            ),
+            adminPercentage: toSavedNumber(
+              updatedCalculation.data.calculation.adminPercentage,
+              API_FALLBACK_CALCULATION_RATES.adminPercentage
+            ),
+            plannedProfitPercentage: toSavedNumber(
+              updatedCalculation.data.calculation.plannedProfitPercentage,
+              API_FALLBACK_CALCULATION_RATES.plannedProfitPercentage
+            ),
+            ndsPercentage: toSavedNumber(
+              updatedCalculation.data.calculation.ndsPercentage,
+              API_FALLBACK_CALCULATION_RATES.ndsPercentage
+            ),
           },
           cellConfig: {
             ...updatedCalculation.data.cellConfig,
@@ -310,7 +325,15 @@ export default function CalculationDetailPage() {
                     })),
                   })),
                   calculation: {
-                    manufacturingHours: selectedCalculation.data.calculation?.manufacturingHours || 1,
+                    manufacturingHours:
+                      selectedCalculation.data.calculation?.manufacturingHours || 1,
+                    hourlyRate: selectedCalculation.data.calculation?.hourlyRate,
+                    overheadPercentage:
+                      selectedCalculation.data.calculation?.overheadPercentage,
+                    adminPercentage: selectedCalculation.data.calculation?.adminPercentage,
+                    plannedProfitPercentage:
+                      selectedCalculation.data.calculation?.plannedProfitPercentage,
+                    ndsPercentage: selectedCalculation.data.calculation?.ndsPercentage,
                   },
                   cellConfig: selectedCalculation.data.cellConfig ? {
                     type: (selectedCalculation.data.cellConfig.type as CellType) || '10kv',
@@ -469,8 +492,17 @@ export default function CalculationDetailPage() {
                 totalMaterialsCost={calculateTotalMaterialsCost()}
                 onValuesChange={() => {}}
                 isReadOnly={true}
+                editablePercentages={editablePercentages}
                 initialValues={{
-                  manufacturingHours: selectedCalculation.data?.calculation?.manufacturingHours || 1,
+                  manufacturingHours:
+                    selectedCalculation.data?.calculation?.manufacturingHours || 1,
+                  hourlyRate: selectedCalculation.data?.calculation?.hourlyRate,
+                  overheadPercentage:
+                    selectedCalculation.data?.calculation?.overheadPercentage,
+                  adminPercentage: selectedCalculation.data?.calculation?.adminPercentage,
+                  plannedProfitPercentage:
+                    selectedCalculation.data?.calculation?.plannedProfitPercentage,
+                  ndsPercentage: selectedCalculation.data?.calculation?.ndsPercentage,
                 }}
               />
             </div>

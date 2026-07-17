@@ -31,7 +31,7 @@ import { rusnTableConfig } from '@/components/FinalReview/tableConfigs';
 import { getRunnTableRows } from '@/utils/runnExportRows';
 import { PdfSpecTableSection } from './PdfSpecTableSection';
 import { useMaterialPrices } from '@/hooks/useMaterialPrices';
-import { calculateBusbarUstCost, isUst04CalculationName } from '@/utils/busbarUstCost';
+import { getTransformerUstRows } from '@/utils/busbarUstCost';
 import { PdfCommercialHeader, type PdfHeaderMeta } from './PdfCommercialHeader';
 import { registerPdfFonts, PDF_FONT_REGULAR, PDF_FONT_BOLD } from '@/lib/pdfFonts';
 
@@ -269,42 +269,13 @@ export const PDFDocument = ({
   const buildingTotal = Math.round(unitPrice * roundedArea);
   const activeEquipment = getActiveEquipment(bmzStore);
 
-  // Функция для расчета цены УСТ (только для отображения в таблице)
-  const calculateUstPrice = (calc: any, additionalUstCost: number = 0) => {
-    if (!calc?.data?.categories) return 0;
-    
-    let materialsTotal = 0;
-    calc.data.categories.forEach((category: any) => {
-      category.items.forEach((item: any) => {
-        materialsTotal += (item.price || 0) * (item.quantity || 0);
-      });
-    });
-
-    const totalMaterialsWithUst = materialsTotal + additionalUstCost;
-    const calculation = calc.data.calculation;
-    if (!calculation) return totalMaterialsWithUst;
-
-    const manufacturingCost = (calculation.manufacturingHours || 0) * (calculation.hourlyRate || 0);
-    const overheadCost = totalMaterialsWithUst * ((calculation.overheadPercentage || 0) / 100);
-    const productionCost = totalMaterialsWithUst + manufacturingCost + overheadCost;
-    const adminCost = totalMaterialsWithUst * ((calculation.adminPercentage || 0) / 100);
-    const fullCost = productionCost + adminCost;
-    const profitCost = fullCost * ((calculation.plannedProfitPercentage || 0) / 100);
-    const wholesalePrice = fullCost + profitCost;
-    const vatCost = wholesalePrice * ((calculation.ndsPercentage || 0) / 100);
-    const finalPrice = wholesalePrice + vatCost;
-
-    return finalPrice;
-  };
-
   // Данные для отображения трансформатора (только для таблицы)
   const transformerQuantity = selectedTransformer?.quantity || 2;
   const transformerBasePrice = selectedTransformer?.price || 0;
   const transformerBaseTotal = transformerBasePrice * transformerQuantity;
-  const busbarUstData = selectedTransformer?.busbarUstData;
-  const busbarUstCost = calculateBusbarUstCost(busbarUstData, busbarMaterialPrices);
-
-  const runnTableRows = getRunnTableRows(runnStore);
+  const rusnUstRows = getTransformerUstRows(selectedTransformer, 'rusn', busbarMaterialPrices);
+  const runnUstRows = getTransformerUstRows(selectedTransformer, 'runn', busbarMaterialPrices);
+  const runnTableRows = [...getRunnTableRows(runnStore), ...runnUstRows];
 
   // Данные для отображения дополнительного оборудования (только для таблицы)
   const additionalEquipmentItems = Object.entries(selectedEquipment || {})
@@ -456,57 +427,9 @@ export const PDFDocument = ({
                 </Text>
               </View>
 
-              {/* УСТ калькуляции */}
-              {selectedTransformer.ustCalculations && selectedTransformer.ustCalculations.length > 0 ? (
-                selectedTransformer.ustCalculations.map((calc: any, index: number) => {
-                  const shouldAddBusbarCost = isUst04CalculationName(calc.name || '');
-                  const additionalCost = shouldAddBusbarCost ? busbarUstCost : 0;
-                  const ustPrice = calculateUstPrice(calc, additionalCost);
-                  const ustTotal = ustPrice * transformerQuantity;
-                  
-                  return (
-                    <View key={`ust-${index}`} style={styles.tableRow}>
-                      <Text style={styles.tableCellNumber}>{index + 2}</Text>
-                      <Text style={styles.tableCellName}>{calc.name || 'УСТ'}</Text>
-                      <Text style={styles.tableCellUnit}>шт</Text>
-                      <Text style={styles.tableCellQuantity}>{transformerQuantity}</Text>
-                      <Text style={styles.tableCellPrice}>
-                        {formatNumber(ustPrice)} тг
-                      </Text>
-                      <Text style={styles.tableCellTotal}>
-                        {formatNumber(ustTotal)} тг
-                      </Text>
-                    </View>
-                  );
-                })
-              ) : selectedTransformer.ustCalculation ? (
-                (() => {
-                  const ustPrice = calculateUstPrice(selectedTransformer.ustCalculation);
-                  const ustTotal = ustPrice * transformerQuantity;
-                  
-                  return (
-                    <View style={styles.tableRow}>
-                      <Text style={styles.tableCellNumber}>2</Text>
-                      <Text style={styles.tableCellName}>
-                        {selectedTransformer.ustCalculation.name || 'УСТ'}
-                      </Text>
-                      <Text style={styles.tableCellUnit}>шт</Text>
-                      <Text style={styles.tableCellQuantity}>{transformerQuantity}</Text>
-                      <Text style={styles.tableCellPrice}>
-                        {formatNumber(ustPrice)} тг
-                      </Text>
-                      <Text style={styles.tableCellTotal}>
-                        {formatNumber(ustTotal)} тг
-                      </Text>
-                    </View>
-                  );
-                })()
-              ) : null}
-
               {/* Пользовательские строки для трансформатора */}
               {(customRowsByTable?.transformer || []).map((row: any, idx: number) => {
-                const baseRowCount = 1 + (selectedTransformer.ustCalculations?.length || (selectedTransformer.ustCalculation ? 1 : 0));
-                const rowNumber = baseRowCount + 1 + idx;
+                const rowNumber = 2 + idx;
                 const indentLevel = row.indent || 0;
                 const indentPadding = indentLevel * 8;
                 return (
@@ -541,7 +464,7 @@ export const PDFDocument = ({
 
         <PdfSpecTableSection
           title="РУСН-10кВ"
-          rows={rusnTableConfig.dataMapper(rusnStore)}
+          rows={[...rusnTableConfig.dataMapper(rusnStore), ...rusnUstRows]}
           total={rusnTotal}
           customRows={customRowsByTable?.rusn || []}
           totalLabel="ВСЕГО:"

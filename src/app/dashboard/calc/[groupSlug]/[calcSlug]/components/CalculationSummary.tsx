@@ -16,6 +16,7 @@ interface CalculationSummaryProps {
   totalMaterialsCost: number;
   onValuesChange: (values: CalculationValues) => void;
   isReadOnly?: boolean;
+  editablePercentages?: boolean;
   initialValues?: Partial<CalculationValues>;
 }
 
@@ -23,6 +24,7 @@ export function CalculationSummary({
   totalMaterialsCost,
   onValuesChange,
   isReadOnly = false,
+  editablePercentages = false,
   initialValues,
 }: CalculationSummaryProps) {
   const [manufacturingHours, setManufacturingHours] = useState(initialValues?.manufacturingHours ?? 0);
@@ -33,16 +35,43 @@ export function CalculationSummary({
     initialValues?.plannedProfitPercentage ?? 10
   );
   const [ndsPercentage, setNdsPercentage] = useState(initialValues?.ndsPercentage ?? 12);
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(editablePercentages);
 
-  // Синхронизация с родителем (например, после импорта Excel)
   useEffect(() => {
+    if (!editablePercentages || !initialValues) return;
+
+    if (initialValues.manufacturingHours !== undefined) {
+      setManufacturingHours(initialValues.manufacturingHours);
+    }
+    if (initialValues.hourlyRate !== undefined) {
+      setHourlyRate(initialValues.hourlyRate);
+    }
+    if (initialValues.overheadPercentage !== undefined) {
+      setOverheadPercentage(initialValues.overheadPercentage);
+    }
+    if (initialValues.adminPercentage !== undefined) {
+      setAdminPercentage(initialValues.adminPercentage);
+    }
+    if (initialValues.plannedProfitPercentage !== undefined) {
+      setPlannedProfitPercentage(initialValues.plannedProfitPercentage);
+    }
+    if (initialValues.ndsPercentage !== undefined) {
+      setNdsPercentage(initialValues.ndsPercentage);
+    }
+    setSettingsLoaded(true);
+  }, [editablePercentages, initialValues]);
+
+  useEffect(() => {
+    if (editablePercentages) return;
+
     if (initialValues?.manufacturingHours !== undefined) {
       setManufacturingHours(initialValues.manufacturingHours);
     }
-  }, [initialValues?.manufacturingHours]);
+  }, [editablePercentages, initialValues?.manufacturingHours]);
 
   useEffect(() => {
+    if (editablePercentages) return;
+
     const loadSettings = async () => {
       try {
         const settings = await currencyApi.getSettings();
@@ -62,7 +91,7 @@ export function CalculationSummary({
       }
     };
     loadSettings();
-  }, []);
+  }, [editablePercentages]);
 
   useEffect(() => {
     if (!settingsLoaded) return;
@@ -143,12 +172,54 @@ export function CalculationSummary({
     </div>
   );
 
+  const EditablePercentRow = ({
+    label,
+    value,
+    onChange,
+    resultLabel,
+    resultValue,
+    separator = false,
+    suffix = '%',
+  }: {
+    label: string;
+    value: number;
+    onChange: (value: number) => void;
+    resultLabel: string;
+    resultValue: string;
+    separator?: boolean;
+    suffix?: string;
+  }) => (
+    <div className={`space-y-1 ${separator ? 'mt-1 pt-2 border-t border-gray-100' : ''}`}>
+      <div className="grid grid-cols-[1fr_auto] items-center gap-3">
+        <span className="text-xs font-semibold text-gray-700 leading-tight">{label}</span>
+        <div className="flex items-center gap-1">
+          <input
+            type="number"
+            value={value}
+            onChange={(e) => onChange(Number(e.target.value))}
+            className="w-16 px-2 py-1 text-xs text-right border border-gray-200 rounded focus:ring-1 focus:ring-[#8eba1e]/40 focus:border-[#8eba1e] transition-colors"
+          />
+          <span className="text-[10px] text-gray-400">{suffix}</span>
+        </div>
+      </div>
+      <div className="flex justify-between items-center">
+        <span className="text-xs text-gray-500">{resultLabel}</span>
+        <span className="text-xs font-semibold tabular-nums text-gray-700">{resultValue}</span>
+      </div>
+    </div>
+  );
+
   return (
     <div className="bg-white rounded-xl border border-[#8eba1e]/20 overflow-hidden">
       <div className="px-4 py-3 border-b border-[#8eba1e]/20 bg-[#8eba1e]/5">
         <h3 className="text-sm font-semibold text-gray-900 border-l-4 border-[#8eba1e] pl-2">
           Расчет стоимости
         </h3>
+        {editablePercentages && !isReadOnly && (
+          <p className="mt-1 text-[10px] text-gray-500 pl-2">
+            Проценты и ставка сохраняются в калькуляции и не зависят от глобальных настроек
+          </p>
+        )}
       </div>
 
       <div className="px-4 py-3 space-y-0.5">
@@ -178,11 +249,23 @@ export function CalculationSummary({
                   />
                 </div>
                 <span className="text-[10px] text-gray-300">×</span>
-                <div className="flex items-center gap-1">
-                  <span className="text-xs font-medium text-gray-700 tabular-nums">{fmt(hourlyRate)}</span>
-                  <span className="text-[10px] text-gray-400">₸</span>
-                  <span className="text-[9px] text-gray-400 bg-gray-100 px-1 py-0.5 rounded">из настроек</span>
-                </div>
+                {editablePercentages ? (
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      value={hourlyRate}
+                      onChange={(e) => setHourlyRate(Number(e.target.value))}
+                      className="w-20 px-2 py-1 text-xs text-right border border-gray-200 rounded focus:ring-1 focus:ring-[#8eba1e]/40 focus:border-[#8eba1e] transition-colors"
+                    />
+                    <span className="text-[10px] text-gray-400">₸</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-medium text-gray-700 tabular-nums">{fmt(hourlyRate)}</span>
+                    <span className="text-[10px] text-gray-400">₸</span>
+                    <span className="text-[9px] text-gray-400 bg-gray-100 px-1 py-0.5 rounded">из настроек</span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex justify-between items-center">
@@ -195,6 +278,14 @@ export function CalculationSummary({
         {/* Общепроизводственные */}
         {isReadOnly ? (
           <Row label={`Общепроизв. расходы (${overheadPercentage}%)`} value={`${fmt(overheadCost)} ₸`} />
+        ) : editablePercentages ? (
+          <EditablePercentRow
+            label="Общепроизв. расходы"
+            value={overheadPercentage}
+            onChange={setOverheadPercentage}
+            resultLabel="Сумма"
+            resultValue={`${fmt(overheadCost)} ₸`}
+          />
         ) : (
           <GlobalSettingRow
             label="Общепроизв. расходы"
@@ -209,6 +300,14 @@ export function CalculationSummary({
         {/* Административные */}
         {isReadOnly ? (
           <Row label={`Адм. расходы (${adminPercentage}%)`} value={`${fmt(adminCost)} ₸`} />
+        ) : editablePercentages ? (
+          <EditablePercentRow
+            label="Адм. расходы"
+            value={adminPercentage}
+            onChange={setAdminPercentage}
+            resultLabel="Сумма"
+            resultValue={`${fmt(adminCost)} ₸`}
+          />
         ) : (
           <GlobalSettingRow
             label="Адм. расходы"
@@ -223,6 +322,14 @@ export function CalculationSummary({
         {/* Плановые накопления */}
         {isReadOnly ? (
           <Row label={`Плановые накопления (${plannedProfitPercentage}%)`} value={`${fmt(plannedProfit)} ₸`} />
+        ) : editablePercentages ? (
+          <EditablePercentRow
+            label="Плановые накопл."
+            value={plannedProfitPercentage}
+            onChange={setPlannedProfitPercentage}
+            resultLabel="Сумма"
+            resultValue={`${fmt(plannedProfit)} ₸`}
+          />
         ) : (
           <GlobalSettingRow
             label="Плановые накопл."
@@ -237,6 +344,14 @@ export function CalculationSummary({
         {/* НДС */}
         {isReadOnly ? (
           <Row label={`НДС (${ndsPercentage}%)`} value={`${fmt(ndsAmount)} ₸`} />
+        ) : editablePercentages ? (
+          <EditablePercentRow
+            label="НДС"
+            value={ndsPercentage}
+            onChange={setNdsPercentage}
+            resultLabel="Сумма НДС"
+            resultValue={`${fmt(ndsAmount)} ₸`}
+          />
         ) : (
           <GlobalSettingRow
             label="НДС"

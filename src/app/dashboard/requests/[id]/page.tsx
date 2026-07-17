@@ -12,7 +12,7 @@ import { useUserStore } from '@/store/useUserStore';
 import { showToast } from '@/shared/modals/ToastProvider';
 import PageLoader from '@/shared/loader/PageLoader';
 import { useMaterialPrices } from '@/hooks/useMaterialPrices';
-import { calculateBusbarUstCost, isUst04CalculationName } from '@/utils/busbarUstCost';
+import { getTransformerUstRows } from '@/utils/busbarUstCost';
 
 export default function RequestDetailPage() {
   const isServerRepriceEnabled = process.env.NEXT_PUBLIC_ENABLE_SERVER_REPRICE !== 'false';
@@ -115,34 +115,6 @@ export default function RequestDetailPage() {
   const selectedWorks = requestData?.data?.works?.selected || {};
   const worksList = requestData?.data?.works?.worksList || [];
 
-  // Функция для расчета цены УСТ
-  const calculateUstPrice = React.useCallback((calc: any, additionalUstCost: number = 0) => {
-    if (!calc?.data?.categories) return 0;
-    
-    let materialsTotal = 0;
-    calc.data.categories.forEach((category: any) => {
-      category.items.forEach((item: any) => {
-        materialsTotal += (item.price || 0) * (item.quantity || 0);
-      });
-    });
-
-    const totalMaterialsWithUst = materialsTotal + additionalUstCost;
-    const calculation = calc.data.calculation;
-    if (!calculation) return totalMaterialsWithUst;
-
-    const manufacturingCost = (calculation.manufacturingHours || 0) * (calculation.hourlyRate || 0);
-    const overheadCost = totalMaterialsWithUst * ((calculation.overheadPercentage || 0) / 100);
-    const productionCost = totalMaterialsWithUst + manufacturingCost + overheadCost;
-    const adminCost = totalMaterialsWithUst * ((calculation.adminPercentage || 0) / 100);
-    const fullCost = productionCost + adminCost;
-    const profitCost = fullCost * ((calculation.plannedProfitPercentage || 0) / 100);
-    const wholesalePrice = fullCost + profitCost;
-    const vatCost = wholesalePrice * ((calculation.ndsPercentage || 0) / 100);
-    const finalPrice = wholesalePrice + vatCost;
-
-    return finalPrice;
-  }, []);
-
   // === Расчет итоговых сумм (единый источник истины) ===
   // БМЗ: считаем сумму из тех же строк, что в таблице БМЗ
   const bmzRows = React.useMemo(() => {
@@ -151,43 +123,26 @@ export default function RequestDetailPage() {
   }, [bmzStore, requestData]);
   const bmzTotal = bmzRows.reduce((sum, row: any) => sum + (row.total || 0), 0);
 
-  // Трансформатор: учитываем УСТ калькуляции
+  // УСТ относятся к РУСН/РУНН, в секции трансформатора остаётся сам трансформатор.
   const transformerQuantity = selectedTransformer?.quantity || 2;
   const transformerBasePrice = selectedTransformer?.price || 0;
   const transformerBaseTotal = transformerBasePrice * transformerQuantity;
   
-  // Рассчитываем стоимость УСТ
-  const ustTotal = React.useMemo(() => {
-    if (!selectedTransformer) return 0;
-    const busbarUstData = selectedTransformer.busbarUstData;
-
-    let total = 0;
-    if (selectedTransformer.ustCalculations && selectedTransformer.ustCalculations.length > 0) {
-      selectedTransformer.ustCalculations.forEach((calc: any) => {
-        const shouldAddBusbarCost = isUst04CalculationName(calc.name || '');
-        const additionalCost = shouldAddBusbarCost
-          ? calculateBusbarUstCost(busbarUstData, busbarMaterialPrices)
-          : 0;
-        const ustPrice = calculateUstPrice(calc, additionalCost);
-        total += ustPrice * transformerQuantity;
-      });
-    } else if (selectedTransformer.ustCalculation) {
-      const ustPrice = calculateUstPrice(selectedTransformer.ustCalculation);
-      total = ustPrice * transformerQuantity;
-    }
-    return total;
-  }, [selectedTransformer, calculateUstPrice, transformerQuantity, busbarMaterialPrices]);
-
-  const transformerTotal = transformerBaseTotal + ustTotal;
+  const transformerTotal = transformerBaseTotal;
 
   const rusnTotal = React.useMemo(() => {
     if (!requestData) return 0;
-    return (
+    const baseTotal =
       ((rusnStore as any).cellConfigs || []).reduce((sum: number, cell: any) => sum + (cell.totalPrice || 0), 0) +
       ((rusnStore as any).busBridgeSummary?.totalPrice || 0) +
-      ((rusnStore as any).busbarSummary?.totalPrice || 0)
-    );
-  }, [rusnStore, requestData]);
+      ((rusnStore as any).busbarSummary?.totalPrice || 0);
+    const ustTotal = getTransformerUstRows(
+      selectedTransformer,
+      'rusn',
+      busbarMaterialPrices,
+    ).reduce((sum, row) => sum + row.total, 0);
+    return baseTotal + ustTotal;
+  }, [rusnStore, requestData, selectedTransformer, busbarMaterialPrices]);
 
   // Сумма работ - считаем из тех же строк, что рендерятся в таблице
   const worksRows = React.useMemo(() => {
@@ -199,8 +154,11 @@ export default function RequestDetailPage() {
   // Сумма РУНН — из тех же строк, что рендерятся в таблице RUNN
   const runnRows = React.useMemo(() => {
     if (!requestData) return [];
-    return runnTableConfig.dataMapper(runnStore);
-  }, [runnStore, requestData]);
+    return runnTableConfig.dataMapper(runnStore, {
+      transformer: selectedTransformer,
+      busbarMaterialPrices,
+    });
+  }, [runnStore, requestData, selectedTransformer, busbarMaterialPrices]);
   const runnTotal = runnRows.reduce((sum: number, row: any) => sum + (row.total || 0), 0);
 
   // Сумма дополнительного оборудования - считаем из тех же строк, что рендерятся в таблице

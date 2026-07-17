@@ -21,8 +21,10 @@ import type { WorkItem } from '@/store/useWorksStore';
 import { FinalReviewHeader, FinalReviewContent, FinalReviewTotal } from './components';
 import { bmzTableConfig, transformerTableConfig, rusnTableConfig, worksTableConfig, runnTableConfig, additionalEquipmentTableConfig } from '@/components/FinalReview/tableConfigs';
 import { useMaterialPrices } from '@/hooks/useMaterialPrices';
-import { calculateBusbarUstCost, isUst04CalculationName } from '@/utils/busbarUstCost';
+import { getTransformerUstRows } from '@/utils/busbarUstCost';
 import { useRealtimeCalculationStore } from '@/store/useRealtimeCalculationStore';
+import { buildDguSnapshotFromStore, hasDguSnapshotData } from '@/utils/dguSnapshot';
+import { getRunnTableRows, mergeRunnWithDgu } from '@/utils/runnExportRows';
 
 const toNumber = (value: unknown): number => {
   const parsed = Number(value);
@@ -40,9 +42,21 @@ export default function FinalReview() {
   const rusnStore: RusnState = useRusnStore();
   const runnStore = useRunnStore();
   const dguEnabled = useDguStore((s) => s.enabled);
+  const dguSettings = useDguStore((s) => s.settings);
   const dguCellSummaries = useDguStore((s) => s.cellSummaries);
   const dguBusbarSummary = useDguStore((s) => s.busbarSummary);
   const dguBusBridgeSummaries = useDguStore((s) => s.busBridgeSummaries);
+  const dguSnapshot = React.useMemo(
+    () => ({
+      enabled: dguEnabled,
+      settings: dguSettings,
+      cellSummaries: dguCellSummaries,
+      busbarSummary: dguBusbarSummary,
+      busBridgeSummaries: dguBusBridgeSummaries,
+    }),
+    [dguEnabled, dguSettings, dguCellSummaries, dguBusbarSummary, dguBusBridgeSummaries]
+  );
+  const hasDguInSpec = hasDguSnapshotData(dguSnapshot);
   const filename = buildBktpFilename(taskNumber, client, date);
   const { aluminum: aluminumPrice, copper: copperPrice } = useMaterialPrices();
   const busbarMaterialPrices = React.useMemo(
@@ -88,61 +102,11 @@ export default function FinalReview() {
     return baseTotal + customTotal;
   }, [bmzRows, bmzCustomRows]);
 
-  // РўСЂР°РЅСЃС„РѕСЂРјР°С‚РѕСЂ: СѓС‡РёС‚С‹РІР°РµРј РЈРЎРў РєР°Р»СЊРєСѓР»СЏС†РёРё
+  // Трансформатор без УСТ: УСТ распределяются по секциям РУСН/РУНН.
   const transformerQuantity = selectedTransformer?.quantity || 2;
   const transformerBasePrice = selectedTransformer?.price || 0;
   const transformerBaseTotal = transformerBasePrice * transformerQuantity;
-  
-  // Р¤СѓРЅРєС†РёСЏ РґР»СЏ СЂР°СЃС‡РµС‚Р° С†РµРЅС‹ РЈРЎРў
-  const calculateUstPrice = React.useCallback((calc: any, additionalUstCost: number = 0) => {
-    if (!calc?.data?.categories) return 0;
-    
-    let materialsTotal = 0;
-    calc.data.categories.forEach((category: any) => {
-      category.items.forEach((item: any) => {
-        materialsTotal += (item.price || 0) * (item.quantity || 0);
-      });
-    });
-
-    const totalMaterialsWithUst = materialsTotal + additionalUstCost;
-    const calculation = calc.data.calculation;
-    if (!calculation) return totalMaterialsWithUst;
-
-    const manufacturingCost = (calculation.manufacturingHours || 0) * (calculation.hourlyRate || 0);
-    const overheadCost = totalMaterialsWithUst * ((calculation.overheadPercentage || 0) / 100);
-    const productionCost = totalMaterialsWithUst + manufacturingCost + overheadCost;
-    const adminCost = totalMaterialsWithUst * ((calculation.adminPercentage || 0) / 100);
-    const fullCost = productionCost + adminCost;
-    const profitCost = fullCost * ((calculation.plannedProfitPercentage || 0) / 100);
-    const wholesalePrice = fullCost + profitCost;
-    const vatCost = wholesalePrice * ((calculation.ndsPercentage || 0) / 100);
-    const finalPrice = wholesalePrice + vatCost;
-
-    return finalPrice;
-  }, []);
-
-  // Р Р°СЃСЃС‡РёС‚С‹РІР°РµРј СЃС‚РѕРёРјРѕСЃС‚СЊ РЈРЎРў
-  const ustTotal = React.useMemo(() => {
-    const busbarUstData = selectedTransformer?.busbarUstData;
-
-    let total = 0;
-    if (selectedTransformer?.ustCalculations && selectedTransformer.ustCalculations.length > 0) {
-      selectedTransformer.ustCalculations.forEach((calc: any) => {
-        const shouldAddBusbarCost = isUst04CalculationName(calc.name || '');
-        const additionalCost = shouldAddBusbarCost
-          ? calculateBusbarUstCost(busbarUstData, busbarMaterialPrices)
-          : 0;
-        const ustPrice = calculateUstPrice(calc, additionalCost);
-        total += ustPrice * transformerQuantity;
-      });
-    } else if (selectedTransformer?.ustCalculation) {
-      const ustPrice = calculateUstPrice(selectedTransformer.ustCalculation);
-      total = ustPrice * transformerQuantity;
-    }
-    return total;
-  }, [selectedTransformer, calculateUstPrice, transformerQuantity, busbarMaterialPrices]);
-
-  const transformerTotal = transformerBaseTotal + ustTotal;
+  const transformerTotal = transformerBaseTotal;
   const transformerCustomRows = React.useMemo(() => customRowsByTable[transformerTableConfig.id] || [], [customRowsByTable]);
   const transformerTotalWithCustom = React.useMemo(() => {
     const customTotal = transformerCustomRows.reduce((sum: number, row: any) => sum + (row.total || 0), 0);
@@ -156,8 +120,13 @@ export default function FinalReview() {
   const rusnCustomRows = React.useMemo(() => customRowsByTable[rusnTableConfig.id] || [], [customRowsByTable]);
   const rusnTotal = React.useMemo(() => {
     const customTotal = rusnCustomRows.reduce((sum: number, row: any) => sum + (row.total || 0), 0);
-    return rusnBaseTotal + customTotal;
-  }, [rusnBaseTotal, rusnCustomRows]);
+    const ustTotal = getTransformerUstRows(
+      selectedTransformer,
+      'rusn',
+      busbarMaterialPrices,
+    ).reduce((sum, row) => sum + row.total, 0);
+    return rusnBaseTotal + ustTotal + customTotal;
+  }, [rusnBaseTotal, rusnCustomRows, selectedTransformer, busbarMaterialPrices]);
 
   // РЎСѓРјРјР° СЂР°Р±РѕС‚ - СЃС‡РёС‚Р°РµРј РёР· С‚РµС… Р¶Рµ СЃС‚СЂРѕРє, С‡С‚Рѕ СЂРµРЅРґРµСЂСЏС‚СЃСЏ РІ С‚Р°Р±Р»РёС†Рµ, РїР»СЋСЃ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёРµ СЃС‚СЂРѕРєРё
   const worksRows = React.useMemo(() => (
@@ -170,27 +139,33 @@ export default function FinalReview() {
     return baseTotal + customTotal;
   }, [worksRows, worksCustomRows]);
 
-  // РЎСѓРјРјР° Р РЈРќРќ вЂ” РёР· С‚РµС… Р¶Рµ СЃС‚СЂРѕРє, С‡С‚Рѕ СЂРµРЅРґРµСЂСЏС‚СЃСЏ РІ С‚Р°Р±Р»РёС†Рµ RUNN, РїР»СЋСЃ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёРµ СЃС‚СЂРѕРєРё
+  // Сумма РУНН — из тех же строк, что рендерятся в таблице RUNN (+ ДГУ), плюс пользовательские строки
   const runnRows = React.useMemo(
-    () => runnTableConfig.dataMapper(runnStore),
+    () =>
+      getRunnTableRows(
+        runnStore as unknown as Record<string, unknown>,
+        dguSnapshot,
+      ),
     [
       runnStore.cellSummaries,
       runnStore.cellConfigs,
       runnStore.busbarSummary,
       runnStore.busBridgeSummary,
       runnStore.busBridgeSummaries,
-      dguEnabled,
-      dguCellSummaries,
-      dguBusbarSummary,
-      dguBusBridgeSummaries,
+      dguSnapshot,
     ]
   );
   const runnCustomRows = React.useMemo(() => customRowsByTable[runnTableConfig.id] || [], [customRowsByTable]);
   const runnTotal = React.useMemo(() => {
     const baseTotal = runnRows.reduce((sum: number, row: any) => sum + (row.total || 0), 0);
+    const ustTotal = getTransformerUstRows(
+      selectedTransformer,
+      'runn',
+      busbarMaterialPrices,
+    ).reduce((sum, row) => sum + row.total, 0);
     const customTotal = runnCustomRows.reduce((sum: number, row: any) => sum + (row.total || 0), 0);
-    return baseTotal + customTotal;
-  }, [runnRows, runnCustomRows]);
+    return baseTotal + ustTotal + customTotal;
+  }, [runnRows, runnCustomRows, selectedTransformer, busbarMaterialPrices]);
 
   // РЎСѓРјРјР° РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅРѕРіРѕ РѕР±РѕСЂСѓРґРѕРІР°РЅРёСЏ - СЃС‡РёС‚Р°РµРј РёР· С‚РµС… Р¶Рµ СЃС‚СЂРѕРє, С‡С‚Рѕ СЂРµРЅРґРµСЂСЏС‚СЃСЏ РІ С‚Р°Р±Р»РёС†Рµ, РїР»СЋСЃ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёРµ СЃС‚СЂРѕРєРё
   const additionalEquipmentRows = React.useMemo(() => (
@@ -211,7 +186,10 @@ export default function FinalReview() {
   const displayRusnStore = backendConfig.rusn
     ? ({ ...rusnStore, ...backendConfig.rusn } as RusnState)
     : rusnStore;
-  const displayRunnStore = backendConfig.runn ? { ...runnStore, ...backendConfig.runn } : runnStore;
+  const displayRunnStore = React.useMemo(() => {
+    const base = backendConfig.runn ? { ...runnStore, ...backendConfig.runn } : runnStore;
+    return mergeRunnWithDgu(base, hasDguInSpec ? buildDguSnapshotFromStore() : dguSnapshot);
+  }, [backendConfig.runn, runnStore, hasDguInSpec, dguSnapshot]);
   const displayAdditionalEquipment = backendConfig.additionalEquipment || {
     selected: selectedEquipment,
     equipmentList,
@@ -227,13 +205,25 @@ export default function FinalReview() {
         ? toNumber(backendTotals.transformerTotal)
         : transformerTotalWithCustom,
     rusnTotal: backendTotals.rusnTotal !== undefined ? toNumber(backendTotals.rusnTotal) : rusnTotal,
-    runnTotal: backendTotals.runnTotal !== undefined ? toNumber(backendTotals.runnTotal) : runnTotal,
+    // Клиентский runnTotal включает ДГУ; бэкенд часто считает только РУНН без data.dgu
+    runnTotal:
+      hasDguInSpec || backendTotals.runnTotal === undefined
+        ? runnTotal
+        : toNumber(backendTotals.runnTotal),
     additionalEquipmentTotal:
       backendTotals.additionalEquipmentTotal !== undefined
         ? toNumber(backendTotals.additionalEquipmentTotal)
         : additionalEquipmentTotal,
     worksTotal: backendTotals.worksTotal !== undefined ? toNumber(backendTotals.worksTotal) : worksTotal,
-    grandTotal: backendTotals.grandTotal !== undefined ? toNumber(backendTotals.grandTotal) : grandTotal,
+    grandTotal:
+      hasDguInSpec || backendTotals.grandTotal === undefined
+        ? bmzTotal +
+          transformerTotalWithCustom +
+          rusnTotal +
+          runnTotal +
+          worksTotal +
+          additionalEquipmentTotal
+        : toNumber(backendTotals.grandTotal),
   };
   // === / Р Р°СЃС‡РµС‚ РёС‚РѕРіРѕРІС‹С… СЃСѓРјРј ===
 
@@ -296,7 +286,7 @@ export default function FinalReview() {
         newVisible.add(rusnTableConfig.id);
         changed = true;
       }
-      if (effectiveTotals.runnTotal > 0 && !newVisible.has(runnTableConfig.id)) {
+      if ((effectiveTotals.runnTotal > 0 || hasDguInSpec) && !newVisible.has(runnTableConfig.id)) {
         newVisible.add(runnTableConfig.id);
         changed = true;
       }
@@ -312,7 +302,7 @@ export default function FinalReview() {
       
       return changed ? newVisible : prev;
     });
-    }, [effectiveTotals.bmzTotal, effectiveTotals.transformerTotal, effectiveTotals.rusnTotal, effectiveTotals.runnTotal, effectiveTotals.additionalEquipmentTotal, effectiveTotals.worksTotal]);
+    }, [effectiveTotals.bmzTotal, effectiveTotals.transformerTotal, effectiveTotals.rusnTotal, effectiveTotals.runnTotal, effectiveTotals.additionalEquipmentTotal, effectiveTotals.worksTotal, hasDguInSpec]);
   
   React.useEffect(() => {
     // РРЅРёС†РёР°Р»РёР·РёСЂСѓРµРј С‚РѕР»СЊРєРѕ РѕРґРёРЅ СЂР°Р· РїСЂРё РїРµСЂРІРѕР№ Р·Р°РіСЂСѓР·РєРµ
@@ -393,7 +383,7 @@ export default function FinalReview() {
                 (tableId === bmzTableConfig.id && effectiveTotals.bmzTotal > 0) ||
                 (tableId === transformerTableConfig.id && effectiveTotals.transformerTotal > 0) ||
                 (tableId === rusnTableConfig.id && effectiveTotals.rusnTotal > 0) ||
-                (tableId === runnTableConfig.id && effectiveTotals.runnTotal > 0) ||
+                (tableId === runnTableConfig.id && (effectiveTotals.runnTotal > 0 || hasDguInSpec)) ||
                 (tableId === additionalEquipmentTableConfig.id && effectiveTotals.additionalEquipmentTotal > 0) ||
                 (tableId === worksTableConfig.id && effectiveTotals.worksTotal > 0);
               

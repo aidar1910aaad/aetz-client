@@ -23,7 +23,8 @@ export default function DguGeneralSummary() {
   const hasRows =
     uniqueCellSummaries.length > 0 ||
     busbarSummary ||
-    busBridgeSummaries.length > 0;
+    busBridgeSummaries.length > 0 ||
+    (settings.price || 0) > 0;
 
   if (!hasRows) {
     return null;

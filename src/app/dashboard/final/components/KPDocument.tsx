@@ -30,7 +30,7 @@ import { rusnTableConfig, bmzTableConfig, transformerTableConfig, runnTableConfi
 import { getRunnTableRows } from '@/utils/runnExportRows';
 import { PdfSpecTableSection } from './PdfSpecTableSection';
 import { useMaterialPrices } from '@/hooks/useMaterialPrices';
-import { calculateBusbarUstCost } from '@/utils/busbarUstCost';
+import { getTransformerUstRows } from '@/utils/busbarUstCost';
 import { PdfCommercialHeader, type PdfHeaderMeta } from './PdfCommercialHeader';
 import { registerPdfFonts, PDF_FONT_REGULAR, PDF_FONT_BOLD } from '@/lib/pdfFonts';
 
@@ -246,40 +246,6 @@ export const KPDocument = ({
   const transformerBasePrice = selectedTransformer?.price || 0;
   const transformerBaseTotal = transformerBasePrice * transformerQuantity;
 
-  // Функция для расчета цены УСТ
-  const calculateUstPrice = (calc: any, additionalUstCost: number = 0) => {
-    if (!calc?.data?.categories) return 0;
-    
-    let materialsTotal = 0;
-    calc.data.categories.forEach((category: any) => {
-      category.items.forEach((item: any) => {
-        materialsTotal += (item.price || 0) * (item.quantity || 0);
-      });
-    });
-
-    const totalMaterialsWithUst = materialsTotal + additionalUstCost;
-
-    const calculation = calc.data.calculation;
-    if (!calculation) return totalMaterialsWithUst;
-
-    const manufacturingCost = (calculation.manufacturingHours || 0) * (calculation.hourlyRate || 0);
-    const overheadCost = totalMaterialsWithUst * ((calculation.overheadPercentage || 0) / 100);
-    const productionCost = totalMaterialsWithUst + manufacturingCost + overheadCost;
-    const adminCost = totalMaterialsWithUst * ((calculation.adminPercentage || 0) / 100);
-    const fullCost = productionCost + adminCost;
-    const profitCost = fullCost * ((calculation.plannedProfitPercentage || 0) / 100);
-    const wholesalePrice = fullCost + profitCost;
-    const vatCost = wholesalePrice * ((calculation.ndsPercentage || 0) / 100);
-    const finalPrice = wholesalePrice + vatCost;
-
-    return finalPrice;
-  };
-
-  const busbarUstCost = calculateBusbarUstCost(
-    selectedTransformer?.busbarUstData,
-    busbarMaterialPrices,
-  );
-
   // Дополнительное оборудование
   const additionalEquipmentItems = Object.entries(selectedEquipment || {})
     .filter(([name, val]) => val.checked && (val.count ?? 0) > 0)
@@ -294,7 +260,11 @@ export const KPDocument = ({
       };
     });
 
-  const runnTableRows = getRunnTableRows(runnStore);
+  const rusnUstRows = getTransformerUstRows(selectedTransformer, 'rusn', busbarMaterialPrices);
+  const runnTableRows = [
+    ...getRunnTableRows(runnStore),
+    ...getTransformerUstRows(selectedTransformer, 'runn', busbarMaterialPrices),
+  ];
 
   // Проверяем наличие необходимых данных
   if (!bmzStore || !rusnStore || !selectedWorks || !worksList || !runnStore) {
@@ -416,31 +386,9 @@ export const KPDocument = ({
                 <Text style={styles.tableCellQuantity}>{transformerQuantity}</Text>
               </View>
 
-              {/* УСТ калькуляции */}
-              {selectedTransformer.ustCalculations && selectedTransformer.ustCalculations.length > 0 ? (
-                selectedTransformer.ustCalculations.map((calc: any, index: number) => (
-                  <View key={`ust-${index}`} style={styles.tableRow}>
-                    <Text style={styles.tableCellNumber}>{index + 2}</Text>
-                    <Text style={styles.tableCellName}>{calc.name || 'УСТ'}</Text>
-                    <Text style={styles.tableCellUnit}>шт</Text>
-                    <Text style={styles.tableCellQuantity}>{transformerQuantity}</Text>
-                  </View>
-                ))
-              ) : selectedTransformer.ustCalculation ? (
-                <View style={styles.tableRow}>
-                  <Text style={styles.tableCellNumber}>2</Text>
-                  <Text style={styles.tableCellName}>
-                    {selectedTransformer.ustCalculation.name || 'УСТ'}
-                  </Text>
-                  <Text style={styles.tableCellUnit}>шт</Text>
-                  <Text style={styles.tableCellQuantity}>{transformerQuantity}</Text>
-                </View>
-              ) : null}
-
               {/* Пользовательские строки для трансформатора */}
               {(customRowsByTable?.transformer || []).map((row: any, idx: number) => {
-                const baseRowCount = 1 + (selectedTransformer.ustCalculations?.length || (selectedTransformer.ustCalculation ? 1 : 0));
-                const rowNumber = baseRowCount + 1 + idx;
+                const rowNumber = 2 + idx;
                 const indentLevel = row.indent || 0;
                 const indentPadding = indentLevel * 8;
                 return (
@@ -471,7 +419,7 @@ export const KPDocument = ({
 
         {/* Секция РУСН */}
         {(() => {
-          const rusnRows = rusnTableConfig.dataMapper(rusnStore);
+          const rusnRows = [...rusnTableConfig.dataMapper(rusnStore), ...rusnUstRows];
 
           if (!rusnRows || rusnRows.length === 0) {
             return null;

@@ -23,6 +23,8 @@ import type {
 import type { WorkItem } from '@/store/useWorksStore';
 import { useRunnStore } from '@/store/useRunnStore';
 import { useDguStore } from '@/store/useDguStore';
+import { hasDguSnapshotData, resolveDguSnapshot } from '@/utils/dguSnapshot';
+import { mergeRunnWithDgu } from '@/utils/runnExportRows';
 import TableManager from './TableManager';
 import { useMaterialPrices } from '@/hooks/useMaterialPrices';
 
@@ -144,10 +146,10 @@ export default function FinalReviewContent({
 
   const transformerRows = React.useMemo(() => {
     if (selectedTransformer) {
-      return transformerTableConfig.dataMapper(selectedTransformer, { busbarMaterialPrices });
+      return transformerTableConfig.dataMapper(selectedTransformer);
     }
     return [];
-  }, [selectedTransformer, busbarMaterialPrices]);
+  }, [selectedTransformer]);
 
   const rusnRows = React.useMemo(() => {
     const cellConfigs = rusnStore?.cellConfigs || [];
@@ -163,13 +165,34 @@ export default function FinalReviewContent({
       !!busBridgeSummary ||
       busBridgeSummaries.length > 0;
 
-    if (hasRusnData) {
-      return rusnTableConfig.dataMapper(rusnStore);
-    }
-    return [];
-  }, [rusnStore]);
+    const rows = rusnTableConfig.dataMapper(rusnStore, {
+      transformer: selectedTransformer,
+      busbarMaterialPrices,
+    });
+    return hasRusnData || rows.length > 0 ? rows : [];
+  }, [rusnStore, selectedTransformer, busbarMaterialPrices]);
 
   const dguStore = useDguStore();
+
+  const runnWithDguData = React.useMemo(() => {
+    const dguFromRunn = (runn as { dgu?: Parameters<typeof hasDguSnapshotData>[0] }).dgu;
+    const liveDgu = {
+      enabled: dguStore.enabled,
+      settings: dguStore.settings,
+      cellSummaries: dguStore.cellSummaries,
+      busbarSummary: dguStore.busbarSummary,
+      busBridgeSummaries: dguStore.busBridgeSummaries,
+    };
+    const resolvedDgu = resolveDguSnapshot(dguFromRunn, liveDgu);
+    return mergeRunnWithDgu(runn, resolvedDgu);
+  }, [
+    runn,
+    dguStore.enabled,
+    dguStore.settings,
+    dguStore.cellSummaries,
+    dguStore.busbarSummary,
+    dguStore.busBridgeSummaries,
+  ]);
 
   const runnRows = React.useMemo(() => {
     const cellConfigs = runn?.cellConfigs || [];
@@ -177,15 +200,8 @@ export default function FinalReviewContent({
     const busbarSummary = runn?.busbarSummary;
     const busBridgeSummary = runn?.busBridgeSummary;
     const busBridgeSummaries = runn?.busBridgeSummaries || [];
-    const dguFromRunn = (runn as { dgu?: typeof dguStore }).dgu;
-    const hasDguData =
-      (dguFromRunn?.enabled ?? dguStore.enabled) &&
-      ((dguFromRunn?.cellSummaries?.length ?? 0) > 0 ||
-        (dguStore.cellSummaries?.length ?? 0) > 0 ||
-        !!dguFromRunn?.busbarSummary ||
-        !!dguStore.busbarSummary ||
-        (dguFromRunn?.busBridgeSummaries?.length ?? 0) > 0 ||
-        (dguStore.busBridgeSummaries?.length ?? 0) > 0);
+    const dguFromMerged = (runnWithDguData as { dgu?: Parameters<typeof hasDguSnapshotData>[0] }).dgu;
+    const hasDguData = hasDguSnapshotData(dguFromMerged);
 
     const hasRunnData =
       cellConfigs.length > 0 ||
@@ -195,35 +211,25 @@ export default function FinalReviewContent({
       busBridgeSummaries.length > 0 ||
       hasDguData;
 
-    if (hasRunnData) {
+    const rows = runnTableConfig.dataMapper(runnWithDguData, {
+      transformer: selectedTransformer,
+      busbarMaterialPrices,
+    });
+
+    if (hasRunnData || rows.length > 0) {
       const shouldCheck = propRunnStore ? true : isHydrated;
       if (shouldCheck) {
-        const runnWithDgu = dguFromRunn
-          ? runn
-          : {
-              ...runn,
-              dgu: {
-                enabled: dguStore.enabled,
-                settings: dguStore.settings,
-                cells: dguStore.cells,
-                cellSummaries: dguStore.cellSummaries,
-                busbarSummary: dguStore.busbarSummary,
-                busBridgeSummaries: dguStore.busBridgeSummaries,
-                total: 0,
-              },
-            };
-        return runnTableConfig.dataMapper(runnWithDgu);
+        return rows;
       }
     }
     return [];
   }, [
     runn,
+    runnWithDguData,
     propRunnStore,
     isHydrated,
-    dguStore.enabled,
-    dguStore.cellSummaries,
-    dguStore.busbarSummary,
-    dguStore.busBridgeSummaries,
+    selectedTransformer,
+    busbarMaterialPrices,
   ]);
 
   const additionalEquipmentRows = React.useMemo(() => {
@@ -332,6 +338,7 @@ export default function FinalReviewContent({
         <UniversalTable 
           config={rusnTableConfig}
           data={rusnStore}
+          additionalData={{ transformer: selectedTransformer, busbarMaterialPrices }}
           managerMarkupPercent={tableMarkupPercents[rusnTableConfig.id] ?? managerMarkupPercent}
           tableId={rusnTableConfig.id}
           tableMarkupPercent={tableMarkupPercents[rusnTableConfig.id] ?? managerMarkupPercent}
@@ -359,20 +366,8 @@ export default function FinalReviewContent({
       {shouldShowTable(runnTableConfig.id, hasRunnRows) && hasRunnRows && (
         <UniversalTable 
           config={runnTableConfig}
-          data={
-            (runn as { dgu?: unknown }).dgu
-              ? runn
-              : {
-                  ...runn,
-                  dgu: {
-                    enabled: dguStore.enabled,
-                    settings: dguStore.settings,
-                    cellSummaries: dguStore.cellSummaries,
-                    busbarSummary: dguStore.busbarSummary,
-                    busBridgeSummaries: dguStore.busBridgeSummaries,
-                  },
-                }
-          }
+          data={runnWithDguData}
+          additionalData={{ transformer: selectedTransformer, busbarMaterialPrices }}
           managerMarkupPercent={tableMarkupPercents[runnTableConfig.id] ?? managerMarkupPercent}
           tableId={runnTableConfig.id}
           tableMarkupPercent={tableMarkupPercents[runnTableConfig.id] ?? managerMarkupPercent}
