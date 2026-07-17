@@ -325,8 +325,10 @@ export default function CalculationDetailPage() {
                     })),
                   })),
                   calculation: {
-                    manufacturingHours:
-                      selectedCalculation.data.calculation?.manufacturingHours || 1,
+                    manufacturingHours: toSavedNumber(
+                      selectedCalculation.data.calculation?.manufacturingHours,
+                      API_FALLBACK_CALCULATION_RATES.manufacturingHours ?? 1
+                    ),
                     hourlyRate: selectedCalculation.data.calculation?.hourlyRate,
                     overheadPercentage:
                       selectedCalculation.data.calculation?.overheadPercentage,
@@ -494,8 +496,10 @@ export default function CalculationDetailPage() {
                 isReadOnly={true}
                 editablePercentages={editablePercentages}
                 initialValues={{
-                  manufacturingHours:
-                    selectedCalculation.data?.calculation?.manufacturingHours || 1,
+                  manufacturingHours: toSavedNumber(
+                    selectedCalculation.data?.calculation?.manufacturingHours,
+                    API_FALLBACK_CALCULATION_RATES.manufacturingHours ?? 1
+                  ),
                   hourlyRate: selectedCalculation.data?.calculation?.hourlyRate,
                   overheadPercentage:
                     selectedCalculation.data?.calculation?.overheadPercentage,

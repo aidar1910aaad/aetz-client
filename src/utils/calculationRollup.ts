@@ -74,7 +74,11 @@ export function calculateRollup(
   additionalMaterialsTotal = 0
 ): CalculationRollupResult {
   const totalMaterials = materialsTotal + additionalMaterialsTotal;
-  const salary = rates.hourlyRate * (rates.manufacturingHours || 4);
+  const salary =
+    rates.hourlyRate *
+    (rates.manufacturingHours !== undefined && rates.manufacturingHours !== null
+      ? rates.manufacturingHours
+      : 4);
   const overheadCost = (totalMaterials * rates.overheadPercentage) / 100;
   const productionCost = totalMaterials + salary + overheadCost;
   const adminCost = (totalMaterials * rates.adminPercentage) / 100;
